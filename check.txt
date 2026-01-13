@@ -1,0 +1,202 @@
+tblAffinityAgents :
+
+SELECT TOP (1000) [PK_Number]
+      ,[ProgramName]
+      ,[AgentName]
+      ,[AgentCode]
+      ,[AgentSegment]
+      ,[AgentContact1]
+      ,[WorkTel1]
+      ,[CellTel1]
+      ,[FaxTel1]
+      ,[Email1]
+      ,[AgentContact2]
+      ,[WorkTel2]
+      ,[CellTel2]
+      ,[FaxTel2]
+      ,[Email2]
+      ,[PrimaryAgt]
+      ,[LossRunReq]
+      ,[AutoDeliver]
+  FROM [CLMAA_SpecialAccounts].[dbo].[tblAffinityAgents]
+
+
+tblAffinityPolicyType :
+
+  SELECT TOP (1000) [PK_Number]
+      ,[ProgramName]
+      ,[PolicyType]
+      ,[PolicyStatus]
+      ,[PolicyBusinessType]
+      ,[PolicyNotes]
+      ,[GroupCode]
+      ,[ProdCode]
+      ,[UnderwriterName]
+      ,[DateCreated]
+      ,[CreatedBy]
+      ,[LOCCoded]
+      ,[ContactJan]
+      ,[ContactFeb]
+      ,[ContactMar]
+      ,[ContactApr]
+      ,[ContactMay]
+      ,[ContactJun]
+      ,[ContactJul]
+      ,[ContactAug]
+      ,[ContactSep]
+      ,[ContactOct]
+      ,[ContactNov]
+      ,[ContactDec]
+      ,[InsuredContact1]
+      ,[InsuredPhone1]
+      ,[InsuredCell1]
+      ,[InsuredFax1]
+      ,[InsuredEMail1]
+      ,[InsuredContact2]
+      ,[InsuredPhone2]
+      ,[InsuredCell2]
+      ,[InsuredFax2]
+      ,[InsuredEMail2]
+      ,[InsuredNotes]
+      ,[CoverageInstruct]
+      ,[ContactInstruct]
+      ,[ReserveInstruct]
+      ,[LitigationInstruct]
+      ,[SettlementInstruct]
+      ,[RecoveryInstruct]
+      ,[PrefCounselYN]
+      ,[MiscCovInstruct]
+      ,[LegSys]
+      ,[AcctLocID]
+      ,[AcctLocNotes]
+      ,[CCTOtherNotes]
+      ,[SpecHand]
+      ,[AutoAdjName1]
+      ,[AutoAdjName2]
+      ,[PIPAdjName1]
+      ,[PIPAdjName2]
+      ,[LiabAdjName1]
+      ,[LiabAdjName2]
+      ,[PropAdjName1]
+      ,[PropAdjName2]
+      ,[MarineAdjName1]
+      ,[MarineAdjName2]
+      ,[WCAdjName1]
+      ,[WCAdjName2]
+      ,[CCTAssgInstruct]
+      ,[TermReason]
+      ,[TermDate]
+      ,[UWMgr]
+      ,[AcctValetCov]
+      ,[AcctProdClaims]
+      ,[ProdProgram]
+      ,[AddLDocs]
+  FROM [CLMAA_SpecialAccounts].[dbo].[tblAffinityPolicyType]
+
+
+
+tblAcctAffinityProgram :
+
+
+  SELECT TOP (1000) [ProgramName]
+      ,[SpecAcct1]
+      ,[SpecAcct2]
+      ,[LossCtl1]
+      ,[LossCtl2]
+      ,[AcctOwner]
+      ,[DtCreated]
+      ,[CreatedBy]
+      ,[BranchVal]
+      ,[OnBoardDt]
+      ,[AcctNotes]
+      ,[BusType]
+      ,[ServReq]
+      ,[ExceptYN]
+      ,[ExceptType]
+      ,[AccomForm]
+      ,[AccomType]
+      ,[LossRunNotes]
+      ,[LossRunDistFreq]
+      ,[ClaimRevNotes]
+      ,[ClaimRevDistFreq]
+      ,[SHIComplete]
+      ,[SHINotes]
+      ,[OBMethod]
+      ,[CRThresh]
+      ,[AcctStatus]
+      ,[TermDate]
+      ,[TermCause]
+      ,[NumPol]
+      ,[TotalPrem]
+      ,[DateNotif]
+      ,[RiskSolMgr]
+      ,[ChangeNotes]
+  FROM [CLMAA_SpecialAccounts].[dbo].[tblAcctAffinityProgram]
+
+tblDist_ClaimRev_AFFIN :
+
+  SELECT TOP (1000) [PK_Number]
+      ,[ProgramName]
+      ,[RecipCat]
+      ,[DistVia]
+      ,[AttnTo]
+      ,[EMailAddress]
+  FROM [CLMAA_SpecialAccounts].[dbo].[tblDist_ClaimRev_AFFIN]
+
+
+
+tblDist_LossRun_AFFIN :
+
+
+SELECT TOP (1000) [PK_Number]
+      ,[ProgramName]
+      ,[RecipCat]
+      ,[DistVia]
+      ,[AttnTo]
+      ,[EMailAddress]
+  FROM [CLMAA_SpecialAccounts].[dbo].[tblDist_LossRun_AFFIN]
+
+
+tblDIST_PolicyTypeScheduler_AFFIN :
+
+SELECT TOP (1000) [PK_Number]
+      ,[ProgramName]
+      ,[PolicyType]
+      ,[RecipCat]
+      ,[DistVia]
+      ,[AttnTo]
+      ,[EMailAddress]
+  FROM [CLMAA_SpecialAccounts].[dbo].[tblDIST_PolicyTypeScheduler_AFFIN]
+
+
+
+tblClaimRevFreq_AFFIN ::
+
+
+  SELECT TOP (1000) [PK_Number]
+      ,[ProgramName]
+      ,[MthNum]
+      ,[RptMth]
+      ,[CompDate]
+      ,[RptType]
+      ,[DelivMeth]
+      ,[CRNumNarr]
+  FROM [CLMAA_SpecialAccounts].[dbo].[tblClaimRevFreq_AFFIN]
+
+
+tblLossRunFreq_AFFIN :
+
+
+  SELECT TOP (1000) [PK_Number]
+      ,[ProgramName]
+      ,[MthNum]
+      ,[RptMth]
+      ,[RptType]
+      ,[CompDate]
+      ,[DelivMeth]
+  FROM [CLMAA_SpecialAccounts].[dbo].[tblLossRunFreq_AFFIN]
+
+
+
+
+
