@@ -146,7 +146,10 @@ async def update_field_for_all_policies(data: dict[str, Any]):
             cursor = conn.cursor()
             cursor.execute(query, (field_value, data["updateViaValue"]))
             conn.commit()
-        return {"message": "Update successful"}
+        count = cursor.rowcount if cursor.rowcount is not None else 0
+        if count < 0:
+            count = 0
+        return {"message": "Update successful", "count": count}
 
     try:
         return await run_in_threadpool(_execute_update)
