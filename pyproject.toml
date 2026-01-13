@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=67.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "SAC-backend"
+version = "0.1.0"
+description = "Backend services for SAC account provisioning"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+exclude = ["tests*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+skip-string-normalization = false
+
+[tool.ruff]
+target-version = "py312"
+respect-gitignore = true
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "B",  # flake8-bugbear
+    "I",  # isort
+    "UP"  # pyupgrade
+]
+extend-ignore = [
+    "E501"  # rely on Black for long lines
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
