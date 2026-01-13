@@ -1,11 +1,26 @@
-from db import conn
-import pandas as pd
-from fastapi import HTTPException
 import logging
+from typing import Any
+
+from fastapi import HTTPException
+
+from core.date_utils import format_records_dates, normalize_payload_dates
+from core.db_helpers import (
+    delete_records_async,
+    fetch_records_async,
+    merge_upsert_records_async,
+    sanitize_filters,
+)
+from services.validations.affinity_validations import (
+    validate_policy_type_distribution_rows,
+)
 
 logger = logging.getLogger(__name__)
 
-async def get_distribution(query_params: dict):
+TABLE_NAME = "tblDIST_PolicyTypeScheduler_AFF"
+KEY_COLUMNS = ["ProgramName", "EMailAddress"]
+
+
+async def get_distribution(query_params: dict[str, Any]):
     """
     Fetch account(s) from tblDIST_PolicyTypeScheduler_AFF.
     If query_params is provided, filters by given key/value.
@@ -13,87 +28,50 @@ async def get_distribution(query_params: dict):
     """
 
     try:
-        base_query = "SELECT * FROM tblDIST_PolicyTypeScheduler_AFF"
-        filters = []
-        params = []
-        for key, value in query_params.items():
-            filters.append(f"{key} = ?")
-            params.append(value)
-        where_clause = " WHERE " + " AND ".join(filters)
-        query = base_query + where_clause
-
-        if filters:
-            where_clause = " WHERE " + " AND ".join(filters)
-            query = base_query + where_clause
-        else:
-            query = base_query
-
-        df = pd.read_sql(query, conn, params=params)
-        df = df.astype(object).where(pd.notna(df), None)   # replacing NaN with null
-        result = df.to_dict(orient="records")
-        return result
+        filters = sanitize_filters(query_params)
+        records = await fetch_records_async(table=TABLE_NAME, filters=filters)
+        return format_records_dates(records)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
     except Exception as e:
-        logger.warning(f"Error fetching Loss Run Distribution List - {str(e)}")
-        raise HTTPException(status_code=500, detail={"error": str(e)})
-    
+        logger.warning(f"Error fetching Policy Type Distribution List - {str(e)}")
+        raise HTTPException(status_code=500, detail={"error": str(e)}) from e
 
-async def upsert_distribution(data_list):
+
+async def upsert_distribution(data_list: list[dict[str, Any]]):
     """
-    Takes an array of maps as data
-    Update row if already exists, else insert row into tblDIST_PolicyTypeScheduler_AFF
+    Takes an array of maps as data.
+    Update row if already exists, else insert row into tblDIST_PolicyTypeScheduler_AFF.
     """
 
     try:
-        cursor = conn.cursor()
-
-        for data in data_list:
-            print(data)
-            # Assuming ProgramName + EMailAddress is the primary key / unique identifier
-            merge_query = f"""
-            MERGE INTO tblDIST_PolicyTypeScheduler_AFF AS target
-            USING (SELECT {", ".join(['? AS ' + col for col in data.keys()])}) AS source
-            ON target.ProgramName = source.ProgramName AND target.EMailAddress = source.EMailAddress
-            WHEN MATCHED THEN
-                UPDATE SET {", ".join([f"{col} = source.{col}" for col in data.keys() if col != 'ProgramName'])}
-            WHEN NOT MATCHED THEN
-                INSERT ({", ".join(data.keys())})
-                VALUES ({", ".join(['source.' + col for col in data.keys()])});
-            """
-
-            print(merge_query)
-            values = list(data.values())
-            cursor.execute(merge_query, values)
-
-        conn.commit()
-        return {"message": "Transaction successful", "count": len(data_list)}
+        errors = validate_policy_type_distribution_rows(data_list)
+        if errors:
+            raise HTTPException(status_code=400, detail={"errors": errors})
+        normalized = [normalize_payload_dates(item) for item in data_list]
+        return await merge_upsert_records_async(
+            table=TABLE_NAME,
+            data_list=normalized,
+            key_columns=KEY_COLUMNS,
+        )
     except Exception as e:
-        conn.rollback()
         logger.warning(f"Insert/Update failed - {str(e)}")
-        raise HTTPException(status_code=500, detail={"error": str(e)})
+        raise HTTPException(status_code=500, detail={"error": str(e)}) from e
 
-async def delete_distribution(data_list):
+
+async def delete_distribution(data_list: list[dict[str, Any]]):
     """
-    Takes an array of maps as data
-    Deletes matching rows from tblDIST_PolicyTypeScheduler_AFF
-    Matching is based on ProgramName + EMailAddress
+    Takes an array of maps as data.
+    Deletes matching rows from tblDIST_PolicyTypeScheduler_AFF.
+    Matching is based on ProgramName + EMailAddress.
     """
 
     try:
-        cursor = conn.cursor()
-
-        for data in data_list:
-            if "ProgramName" not in data or "EMailAddress" not in data:
-                raise ValueError("Both ProgramName and EMailAddress are required for deletion")
-
-            delete_query = """
-                DELETE FROM tblDIST_PolicyTypeScheduler_AFF
-                WHERE ProgramName = ? AND EMailAddress = ?
-            """
-            cursor.execute(delete_query, (data["ProgramName"], data["EMailAddress"]))
-
-        conn.commit()
-        return {"message": "Deletion successful", "count": len(data_list)}
+        return await delete_records_async(
+            table=TABLE_NAME,
+            data_list=data_list,
+            key_columns=KEY_COLUMNS,
+        )
     except Exception as e:
-        conn.rollback()
         logger.warning(f"Deletion failed - {str(e)}")
-        raise HTTPException(status_code=500, detail={"error": str(e)})
+        raise HTTPException(status_code=500, detail={"error": str(e)}) from e

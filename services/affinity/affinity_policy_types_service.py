@@ -1,76 +1,70 @@
-from db import conn
-import pandas as pd
-from fastapi import HTTPException
 import logging
+from typing import Any
+
+from fastapi import HTTPException
+
+from core.date_utils import format_records_dates, normalize_payload_dates
+from core.db_helpers import _ensure_safe_identifier, merge_upsert_records_async, run_raw_query_async
+from services.validations.affinity_validations import validate_affinity_policy_type_payload
 
 logger = logging.getLogger(__name__)
 
-async def get_affinity_policy_types(query_params: dict):
+TABLE_NAME = "tblAffinityPolicyType"
+AGENTS_TABLE = "tblAffinityAgents"
+
+
+async def get_affinity_policy_types(query_params: dict[str, Any]):
     """
-    Fetch account(s) from tblAffinityPolicyType.
+    Fetch account(s) from tblAffinityPolicyType joined with tblAffinityAgents.
     If query_params is provided, filters by given key/value.
     Returns a list of dicts (records).
     """
-    query_params.update({'PrimaryAgt': 'Yes'})
+
+    query_filters = dict(query_params)
+    query_filters["PrimaryAgt"] = "Yes"
 
     try:
-        base_query = """SELECT * FROM tblAffinityPolicyType LEFT JOIN tblAffinityAgents 
-                        ON tblAffinityPolicyType.ProgramName = tblAffinityAgents.ProgramName"""
         filters = []
         params = []
-        for key, value in query_params.items():
-            table = "tblAffinityAgents" if key == "PrimaryAgt" else "tblAffinityPolicyType"
+        for key, value in query_filters.items():
+            _ensure_safe_identifier(key)
+            table = AGENTS_TABLE if key == "PrimaryAgt" else TABLE_NAME
             filters.append(f"{table}.{key} = ?")
             params.append(value)
-        where_clause = " WHERE " + " AND ".join(filters)
-        query = base_query + where_clause
+
+        query = (
+            f"SELECT * FROM {TABLE_NAME} "
+            f"LEFT JOIN {AGENTS_TABLE} "
+            f"ON {TABLE_NAME}.ProgramName = {AGENTS_TABLE}.ProgramName"
+        )
 
         if filters:
-            where_clause = " WHERE " + " AND ".join(filters)
-            query = base_query + where_clause
-        else:
-            query = base_query
-        
-        print(query)
+            query += " WHERE " + " AND ".join(filters)
 
-        df = pd.read_sql(query, conn, params=params)
-        df = df.loc[:, ~df.columns.duplicated()]    # remove duplicate PK_Number
-        
-        df = df.astype(object).where(pd.notna(df), None)   # replacing NaN with null
-        result = df.to_dict(orient="records")
-        return result
+        records = await run_raw_query_async(query, params)
+        return format_records_dates(records)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
     except Exception as e:
-        logger.warning(f"Error fetching Affinity Program List - {str(e)}")
-        raise HTTPException(status_code=500, detail={"error": str(e)})
-    
-    
+        logger.warning(f"Error fetching Affinity Policy Types List - {str(e)}")
+        raise HTTPException(status_code=500, detail={"error": str(e)}) from e
 
-async def upsert_affinity_policy_types(data):
+
+async def upsert_affinity_policy_types(data: dict[str, Any]):
     """
-    Update row if already exists, else insert row into tblAffinityPolicyType
+    Update row if already exists, else insert row into tblAffinityPolicyType.
     """
 
     try:
-        cursor = conn.cursor()
-
-        # Assuming `ProgramName` is the primary key / unique identifier
-        merge_query = f"""
-        MERGE INTO tblAffinityPolicyType AS target
-        USING (SELECT {", ".join(['? AS ' + col for col in data.keys()])}) AS source
-        ON target.ProgramName = source.ProgramName
-        WHEN MATCHED THEN
-            UPDATE SET {", ".join([f"{col} = source.{col}" for col in data.keys() if col != 'ProgramName'])}
-        WHEN NOT MATCHED THEN
-            INSERT ({", ".join(data.keys())})
-            VALUES ({", ".join(['source.' + col for col in data.keys()])});
-        """
-
-        values = list(data.values())
-        cursor.execute(merge_query, values)
-        conn.commit()
-
-        return {"message": "Transaction successful"}
+        errors = validate_affinity_policy_type_payload(data)
+        if errors:
+            raise HTTPException(status_code=400, detail={"errors": errors})
+        normalized = normalize_payload_dates(data)
+        return await merge_upsert_records_async(
+            table=TABLE_NAME,
+            data_list=[normalized],
+            key_columns=["ProgramName"],
+        )
     except Exception as e:
-        conn.rollback()
         logger.warning(f"Insert/Update failed - {str(e)}")
-        raise HTTPException(status_code=500, detail={"error": str(e)})
+        raise HTTPException(status_code=500, detail={"error": str(e)}) from e

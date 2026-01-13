@@ -17,7 +17,7 @@ from api.sac.search_sac_account import router as search_sac_account_router
 from core.config import settings
 from core.logging_config import configure_logging
 
-"""from api.affinity.affinity_program import router as affinity_program_router
+from api.affinity.affinity_program import router as affinity_program_router
 from api.affinity.affinity_agents import router as affinity_agents_router
 from api.affinity.affinity_policy_types import router as affinity_policy_types_router
 from api.affinity.search_affinity_program import router as search_affinity_program_router
@@ -25,7 +25,7 @@ from api.affinity.loss_run_distribution import router as loss_run_distribution_a
 from api.affinity.claim_review_distribution import router as claim_review_distribution_affinity_router
 from api.affinity.policy_type_distribution import router as policy_type_distribution_affinity_router
 from api.affinity.loss_run_frequency import router as loss_run_frequency_affinity_router
-from api.affinity.claim_review_frequency import router as claim_review_frequency_affinity_router"""
+from api.affinity.claim_review_frequency import router as claim_review_frequency_affinity_router
 
 configure_logging()
 
@@ -87,7 +87,7 @@ app.include_router(
 )
 
 # affinity
-"""app.include_router(affinity_program_router, prefix="/affinity_program", tags=["affinity_program"])
+app.include_router(affinity_program_router, prefix="/affinity_program", tags=["affinity_program"])
 app.include_router(affinity_agents_router, prefix="/affinity_agents", tags=["affinity_agents"])
 app.include_router(affinity_policy_types_router, prefix="/affinity_policy_types", tags=["affinity_policy_types"])
 app.include_router(search_affinity_program_router, prefix="/search_affinity_program", tags=["search_affinity_program"])
@@ -98,4 +98,4 @@ app.include_router(policy_type_distribution_affinity_router, prefix="/policy_typ
 
 app.include_router(loss_run_frequency_affinity_router, prefix="/loss_run_frequency_affinity", tags=["loss_run_frequency_affinity"])
 app.include_router(claim_review_frequency_affinity_router, prefix="/claim_review_frequency_affinity", tags=["claim_review_frequency_affinity"])
-"""
+
