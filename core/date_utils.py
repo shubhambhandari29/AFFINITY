@@ -4,14 +4,14 @@ from collections.abc import Iterable
 from datetime import date, datetime
 from typing import Any
 
-DATE_OUTPUT_FORMAT = "%d-%m-%Y"
+DATE_OUTPUT_FORMAT = "%m-%d-%Y"
 _DEFAULT_INPUT_FORMATS: tuple[str, ...] = (
     "%Y-%m-%d",
     "%Y/%m/%d",
-    "%d-%m-%Y",
-    "%d/%m/%Y",
     "%m/%d/%Y",
     "%m-%d-%Y",
+    "%d/%m/%Y",
+    "%d-%m-%Y",
 )
 
 
@@ -134,7 +134,14 @@ def _try_parse_datetime(text: str) -> datetime | None:
     for sep in ("T", " "):
         if sep in clean_text:
             base = clean_text.split(sep, 1)[0]
-            for fmt in ("%Y-%m-%d", "%d-%m-%Y"):
+            for fmt in (
+                "%Y-%m-%d",
+                "%Y/%m/%d",
+                "%m/%d/%Y",
+                "%m-%d-%Y",
+                "%d/%m/%Y",
+                "%d-%m-%Y",
+            ):
                 try:
                     parsed = datetime.strptime(base, fmt)
                     return parsed
