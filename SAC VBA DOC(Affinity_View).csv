@@ -1,0 +1,591 @@
+Screen Name ,Entity Code Name,Visual Name on Screen,Box Type,Which query or Hard-Coded Strings are being used for showing DROP DOWN data values ?,Drop Down Tables or  Hard Coded,Which table is being used for saving actual client data?,Actual Table - Field Name,Tab Name,Form Level Exceptions,Buisness Rules (Viewing),Code Line,Buisness Rules/Validation (Save & Exit),Code Line ( Save) ,Code Line ( Save & Exit )  or Silent functions,Events - Drop Down / Group Boxes/ Check Boxes,Similar logic implemented by Akshat in ReACT,Comments / Extra Explanations  by Deepak
+Top Panel ,bxAcctname,Affinity Program Name,Plain Text,,,tblAcctAffinityProgram,ProgramName,frmAffinityParent,Program Name is a mandatory field,,, Program Name is a mandatory field,,,,,
+Top Panel ,txtAcctStatus,Account Status,Drop-Down,"""Active"";""Inactive"";""In Runoff"";""Unique""",,tblAcctAffinityProgram,AcctStatus,frmAffinityParent,,,,,2565,,"This procedure runs after the account status field (txtAcctStatus) is updated. It controls whether certain fields on the form are enabled or disabled based on the new account status.
+
+Step-by-step explanation
+1. If the account status is “Inactive” or “In Runoff”
+
+The form enables:
+
+Termination Date field (txtTermDt)
+Termination Cause field (txtTermCause)
+Notification Date field (bxNotifDt)
+
+
+It also sets the focus to the termination cause field and opens its dropdown list so the user can select a reason.
+
+
+2. If the account status is “Active”
+
+First, it enables the termination fields temporarily so it can clear them.
+It sets Termination Date and Termination Cause to Null (empty), removing any previous termination details.
+Then it disables those fields because an active account cannot have termination information.
+It also disables the Notification Date field.
+
+
+In short
+
+When the account becomes Inactive or In Runoff, termination-related fields are turned on so the user can fill them.
+When the account becomes Active, termination-related fields are cleared and turned off because they don’t apply.",,
+Top Panel ,bxSACName1,Spec Accounts 1,Drop-Down,SELECT tblMGTUsers.SACName FROM tblMGTUsers ORDER BY tblMGTUsers.SACName; ,,tblAcctAffinityProgram,SpecAcct1,frmAffinityParent,,,,,,,,,
+Top Panel ,bxSACName2,Spec Accounts 2,Drop-Down,SELECT tblMGTUsers.SACName FROM tblMGTUsers ORDER BY tblMGTUsers.SACName,,tblAcctAffinityProgram,SpecAcct2,frmAffinityParent,,,,,,,,,
+Top Panel ,AcctOwner,Account Owner,Drop-Down,"SELECT tblMGTUsers.SACName, tblMGTUsers.EMailID FROM tblMGTUsers ORDER BY tblMGTUsers.SACName",,tblAcctAffinityProgram,AcctOwner ,frmAffinityParent,,,,,,3,"Trigger: Runs after the form control AcctOwner is updated (i.e., when a new account owner is selected).
+
+
+A) Update Claim Review distribution (tblDist_ClaimRev_AFFIN)
+
+Initialize objects:
+
+MyDB = CurrentDb(); MyRec opens as an editable dynaset on tblDist_ClaimRev_AFFIN (with dbSeeChanges, dbOptimistic).
+
+
+Suppress prompts:
+
+DoCmd.SetWarnings False to avoid Access confirmation dialogs during delete/insert.
+
+
+Remove duplicates for the same program + recipient:
+
+Deletes rows where [ProgramName] & [AttnTo] equals Me.bxAcctName & Me.AcctOwner to prevent duplicate entries.
+
+
+Housekeeping (null recipients):
+
+Deletes any row in tblDist_ClaimRev_AFFIN where AttnTo is Null.
+
+
+Add the current selection:
+
+MyRec.AddNew creates a row tied to the current program and owner.
+Sets MyRec!ProgramName = Me.bxAcctName.
+Sets MyRec!RecipCat = ""Account Owner"".
+Sets MyRec!EMailAddress = Me.AcctOwner.Column(1) (email from the second column of AcctOwner).
+Sets MyRec!DistVia = ""Email"".
+Sets MyRec!AttnTo = Me.AcctOwner (the selected owner’s display value).
+
+
+Commit & cleanup:
+
+MyRec.Update, MyRec.Close, Set MyRec = Nothing.
+
+
+
+
+B) Update Loss Run distribution (tblDist_LossRun_AFFIN)
+
+Initialize objects:
+
+MyDB = CurrentDb(); MyRec opens as an editable dynaset on tblDist_LossRun_AFFIN (with dbSeeChanges, dbOptimistic).
+
+
+Suppress prompts:
+
+DoCmd.SetWarnings False (warnings already off; calling again is fine).
+
+
+Remove duplicates for the same program + recipient:
+
+Deletes rows where [ProgramName] & [AttnTo] equals Me.bxAcctName & Me.AcctOwner.
+
+
+Housekeeping (null recipients):
+
+Deletes any row in tblDist_LossRun_AFFIN where AttnTo is Null.
+
+
+Add the current selection:
+
+MyRec.AddNew then sets the same fields:
+
+ProgramName = Me.bxAcctName
+RecipCat = ""Account Owner""
+EMailAddress = Me.AcctOwner.Column(1)
+DistVia = ""Email""
+AttnTo = Me.AcctOwner
+
+
+
+
+Commit & cleanup:
+
+MyRec.Update, MyRec.Close, Set MyRec = Nothing.",,
+Top Panel ,bxBusType,Business Type,Drop-Down,SELECT tblBusType.[Business Type] FROM tblBusType ORDER BY tblBusType.SortNum,,tblAcctAffinityProgram,BusType ,frmAffinityParent,,,,,,,,,
+Top Panel ,bxLossCtl1,Risk Solutions 1,Drop-Down,"SELECT tblLossCtrl.RepName, tblLossCtrl.LCEmail FROM tblLossCtrl WHERE (((tblLossCtrl.Active)=""Yes"")) ORDER BY tblLossCtrl.RepName",,tblAcctAffinityProgram,LossCtl1,frmAffinityParent,,,,,,660,"Big picture
+When you change bxLossCtl1 on the form, this routine:
+
+Removes any duplicate or empty entries in two distribution tables.
+Adds a fresh entry to each table using the values currently shown on the form.
+It does this twice—first for tblDist_ClaimRev_AFFIN, then for tblDist_LossRun_AFFIN.
+
+
+Step-by-step (first table: tblDist_ClaimRev_AFFIN)
+
+
+Get ready to work with the database
+
+MyDB grabs the current database.
+MyRec opens a writable view (dynaset) of the tblDist_ClaimRev_AFFIN table.
+
+
+
+Suppress pop-up warnings
+
+DoCmd.SetWarnings False turns off Access’ confirmation prompts (so deletes/inserts don’t pop up messages).
+
+
+
+Remove any exact duplicate for the same person/program
+
+It deletes any row where the combined value of [ProgramName] and [AttnTo] equals the combined text of Me.bxAcctName and Me.bxLossCtl1.
+In simple terms: “If there’s already a record for this ProgramName and AttnTo combo, delete it first.”
+
+
+
+Housekeeping: remove rows with no name
+
+Deletes any record where AttnTo is empty (Null).
+
+
+
+Add a new record with the current selection
+
+MyRec.AddNew starts a new row.
+It fills fields from the form:
+
+ProgramName ? Me.bxAcctName (the selected program/account name)
+RecipCat ? ""Risk Solutions Consultant"" (a fixed category label)
+EMailAddress ? Me.bxLossCtl1.Column(1) (the email from the second column of the bxLossCtl1 control—likely a combo box)
+DistVia ? ""Email"" (distribution method)
+AttnTo ? Me.bxLossCtl1 (the display value—likely the person’s name)
+
+
+MyRec.Update saves the new row.
+Closes and clears MyRec.
+
+
+
+
+Repeat for the second table (tblDist_LossRun_AFFIN)
+The routine then performs the exact same sequence for tblDist_LossRun_AFFIN:
+
+Open the table.
+Turn off warnings (already off).
+Delete the duplicate based on [ProgramName] + [AttnTo] matching Me.bxAcctName + Me.bxLossCtl1.
+Delete any rows where AttnTo is Null.
+Add the new row with the same field values.
+Save and close.
+
+
+What the form controls likely represent
+
+bxAcctName: The selected program/account name.
+bxLossCtl1: A person selector (likely a combo box showing names), where:
+
+The visible text is the person’s name (used for AttnTo).
+Column(1) holds their email address (used for EMailAddress).
+
+
+
+
+Practical implications & tips
+
+Duplicates handling: By deleting a matching [ProgramName]+[AttnTo] combo before inserting, the tables keep only the latest entry for that pair.
+Warnings stay off: DoCmd.SetWarnings False is set but never turned back on here. Consider turning it back on after the operations to restore normal behavior.
+Concatenation in the WHERE clause: Matching on [ProgramName]&[AttnTo] works, but it assumes no ambiguous combinations (e.g., ""AB"" + ""C"" equals ""A"" + ""BC""). Safer is matching on separate fields (two conditions) to avoid edge cases.
+Null cleanup: Automatically removes incomplete rows where AttnTo wasn’t captured.
+Error handling: There’s no On Error block—adding one would make this more robust.
+Consistency: The logic is duplicated for two different tables to keep Claim Review and Loss Run distributions in sync.",,
+Top Panel ,bxLossctl2,Risk Solutions 2,Drop-Down,"SELECT tblLossCtrl.RepName FROM tblLossCtrl WHERE (((tblLossCtrl.Active)=""Yes"")) ORDER BY tblLossCtrl.RepName",,tblAcctAffinityProgram,LossCtl2,frmAffinityParent,,,,,,,,,
+Top Panel ,RiskSolMgr,Risk Solutions Mgr,Drop-Down,"SELECT tblLossCtrl.RepName FROM tblLossCtrl WHERE (((tblLossCtrl.Active)=""Yes"")) ORDER BY tblLossCtrl.RepName",,x,x,frmAffinityParent,,,,,,,,,
+Top Panel ,bxCreatedBy,Program Created By,Drop-Down,SELECT tblMGTUsers.SACName FROM tblMGTUsers ORDER BY tblMGTUsers.SACName,,tblAcctAffinityProgram,CreatedBy,frmAffinityParent,,,,,,,,,
+Top Panel ,bxAccomFormYN,Accomodation Form,Drop-Down,"""Yes"";""No"";""Pending""",,tblAcctAffinityProgram,AccomForm,frmAffinityParent,,,,,,,,,
+Top Panel ,bxAccomType,Accomodation Type,Drop-Down,tblAccomType,,tblAcctAffinityProgram,AccomType,frmAffinityParent,,,,,,,,,
+Top Panel ,txtTotPrem,Total $ Premium,Plain Text,NA,,tblAcctAffinityProgram,TotalPrem,frmAffinityParent,,,,,,,,,
+Top Panel ,bxBranchVal,Branch Name,Drop-Down,SELECT tblBranch.BranchName FROM tblBranch ORDER BY tblBranch.BranchName,,tblAcctAffinityProgram,BranchVal,frmAffinityParent,Branch Office is a mandatory field,,,Branch Office is a mandatory field,,,,,
+Top Panel ,txtNumPol,Number of Policies,Plain Text,NA,,tblAcctAffinityProgram,NumPol,frmAffinityParent,"values should be <99999 and Input validation error check with error messgae """"Invalid Value for Number of Policies""""",,,,,,,,
+Top Panel ,bxDateCreated,Date Account Created,Plain Text,NA,,tblAcctAffinityProgram,DtCreated,frmAffinityParent,Input Mask:99/99/0000;0;_,,,,,,,,
+Top Panel ,bxSince,On Board Date,Plain Text,NA,,tblAcctAffinityProgram,OnBoardDt,frmAffinityParent,Input Mask:99/99/0000;0;_,,,On Board Date is a mandatory field,,,,,
+Top Panel ,cboOB,Onboarding Method,Drop-Down,"""In Person"";""Remote"";""BOR Change""",,tblAcctAffinityProgram,OBMethod,frmAffinityParent,Hidden field,,,,,,,,
+Top Panel ,txtTermCause,Term Cause,Drop-Down,SELECT tblDNRStatus.DNRStatus FROM tblDNRStatus,,tblAcctAffinityProgram,TermCause,frmAffinityParent,Hidden field,,,,,2598,"As soon as the termination cause is entered or changed, the form automatically moves the cursor (focus) to the Termination Date field (txtTermDt).",,
+Top Panel ,bxTermDate,Termination Date,Plain Text,NA,,tblAcctAffinityProgram,TermDate,frmAffinityParent,Hidden field,,,,,,,,
+Top Panel ,bxNotifDt,Notification Date,Plain Text,NA,,tblAcctAffinityProgram,DateNotif,frmAffinityParent,Notification Date is a mandatory field when account status is changed to Inactive,,,Notification Date is a mandatory field when account status is changed to Inactive,,,,,
+,,,,,,,,,,,,,,,,,
+Program General,bxServReqYN,Services Requested?,Drop-Down,"""Yes"";""No""",,tblAcctAffinityProgram,ServReq,frmAffinityParent,,,,,,,,,
+Program General,bxExceptYN,Exceptions?,Drop-Down,"""Yes"";""No""",,tblAcctAffinityProgram,ExceptYN,frmAffinityParent,,,,,,,,,
+Program General,bxExceptType,Exception Type,Drop-Down,tblExceptTypes,,tblAcctAffinityProgram,ExceptType,frmAffinityParent,,,,,,,,,
+Program General,bxAcctNotes,Program Details,Plain Text,NA,,tblAcctAffinityProgram,AcctNotes,frmAffinityParent,,,,,,,,,
+Program General,Command227,View Agent Details,Command Button,,,,,frmAffinityParent,,,,,,,,,Opens up the frmFindAffinityAgents
+Program General - View Agent Details,ProgramName,ProgramName,Text Box,,,tblAffinityAgents ,x,frmFindAffinityAgents,,,,,,,,,
+Program General - View Agent Details,AgentName,Agent Name,Drop-Down,"SELECT tblPRODUCER.ffname1 AS [Agent Name], tblPRODUCER.code AS [Agent Code] FROM tblPRODUCER GROUP BY tblPRODUCER.ffname1, tblPRODUCER.code HAVING (((tblPRODUCER.ffname1)<>"""")) ORDER BY tblPRODUCER.ffname1; ",,tblAffinityAgents ,x,frmFindAffinityAgents,,"ProgrameName is populated by Account Name while opening the Agent form from Affinity form
+Me.ProgramName = Forms!frmAffinityParent!bxAcctName",,,,,,,
+Program General - View Agent Details,AgentCode,Agent Code,Drop-Down,"SELECT IIf(Len([code])=6,""0"" & [Code],[Code]) AS [Agent Code], tblPRODUCER.ffname1 AS [Agent Name] FROM tblPRODUCER WHERE (((tblPRODUCER.ffname1)<>"""")) ORDER BY IIf(Len([code])=6,""0"" & [Code],[Code]); ",tblPRODUCER,tblAffinityAgents ,x,frmFindAffinityAgents,Program Name is required before Agent Details,,,,,,,,
+Program General - View Agent Details,AgentSegment,Agent Segment,Drop-Down,SELECT tblAgentSegment.AgentSeg FROM tblAgentSegment ORDER BY tblAgentSegment.SortNum,,tblAffinityAgents ,x,frmFindAffinityAgents,Program Name is required before Agent Details,,,,,,,,
+Program General - View Agent Details,PK_Number,,,,,tblAffinityAgents ,x,,Hidden Tab just to store values in the variable,,,,,,,,
+Program General - View Agent Details,PrimaryAgt,Primary Agent?,Drop-Down,"""Yes"";""No""",,tblAffinityAgents ,x,frmFindAffinityAgents,Program Name is required before Agent Details,,,,,,,,
+Program General - View Agent Details,LossRunReq,Loss Run Req?,Drop-Down,"""Yes"";""No""",,tblAffinityAgents ,x,frmFindAffinityAgents,Default Value = No,,,,,,,,
+Program General - View Agent Details,AutoDeliver,Auto Deliver?,Drop-Down,"""Yes"";""No""",,tblAffinityAgents ,x,frmFindAffinityAgents,Default Value = No,,,,,,,,
+Program General - View Agent Details,AgentContact1,1st Contact,Plain Text,NA,,tblAffinityAgents ,x,frmFindAffinityAgents,Default Value = No,,,,,,,,
+Program General - View Agent Details,WorkTel1,1st Work Tel,Plain Text,NA,,tblAffinityAgents ,x,frmFindAffinityAgents,"Input Mask = !\(999"") ""000\-0000;0;_",,,,,,,,
+Program General - View Agent Details,CellTel1,1st Cell Tel,Plain Text,NA,,tblAffinityAgents ,x,frmFindAffinityAgents,"Input Mask = !\(999"") ""000\-0000;0;_",,,,,,,,
+Program General - View Agent Details,FaxTel1,1st Fax Tel,Plain Text,NA,,tblAffinityAgents ,x,frmFindAffinityAgents,"Input Mask = !\(999"") ""000\-0000;0;_",,,,,,,,
+Program General - View Agent Details,Email1,1st Email,Plain Text,NA,,tblAffinityAgents ,x,frmFindAffinityAgents,,,,,,,,,
+Program General - View Agent Details,AgentContact2,2nd Contact,Plain Text,NA,,tblAffinityAgents ,x,frmFindAffinityAgents,,,,,,,,,
+Program General - View Agent Details,WorkTel2,2nd Work Tel,Plain Text,NA,,tblAffinityAgents ,x,frmFindAffinityAgents,"Input Mask = !\(999"") ""000\-0000;0;_",,,,,,,,
+Program General - View Agent Details,CellTel2,2nd Cell Tel,Plain Text,NA,,tblAffinityAgents ,x,frmFindAffinityAgents,"Input Mask = !\(999"") ""000\-0000;0;_",,,,,,,,
+Program General - View Agent Details,FaxTel2,2nd Fax Tel,Plain Text,NA,,tblAffinityAgents ,x,frmFindAffinityAgents,"Input Mask = !\(999"") ""000\-0000;0;_",,,,,,,,
+Program General - View Agent Details,Email2,2nd Email,Plain Text,NA,,tblAffinityAgents ,x,frmFindAffinityAgents,,,,,,,,,
+Program General - View Agent Details,Command9,Save and Exit,Command Button,,,,,frmAffinityParent,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+Loss Run Scheduling,bxLossRunFreq,Distribution Frequency,Drop-Down,SELECT tblDistFreq.DistFrequency FROM tblDistFreq,,tblAcctAffinityProgram,LossRunDistFreq,frmAffinityParent,,,,,,,,,
+Loss Run Scheduling,Command117,Loss Run Report Recipients,Command Button,,,,,frmAffinityParent,,,,,,,,,
+Loss Run Scheduling - Loss Run Report Recipients List,ProgramName,Program name,PlainText,"SELECT tblDist_LossRun_AFFIN.ProgramName, tblDist_LossRun_AFFIN.RecipCat, tblDist_LossRun_AFFIN.DistVia, tblDist_LossRun_AFFIN.AttnTo, tblDist_LossRun_AFFIN.EMailAddress, tblDist_LossRun_AFFIN.PK_Number FROM tblDist_LossRun_AFFIN WHERE (((tblDist_LossRun_AFFIN.ProgramName)=forms!frmAffinityParent!bxAcctName))",,tblDist_LossRun_AFFIN,ProgramName,frmDist_LossRun_AFFIN,,,,,,,,,
+Loss Run Scheduling - Loss Run Report Recipients List,RecipCat,Recipient Category,Drop-Down,tbl_Lkp_RecipCategory,,tblDist_LossRun_AFFIN,RecipCat,frmDist_LossRun_AFFIN,,,,,,,,,
+Loss Run Scheduling - Loss Run Report Recipients List,DistVia,Distribute Via,Drop-Down,tbl_lkp_DistVia,,tblDist_LossRun_AFFIN,DistVia,frmDist_LossRun_AFFIN,,,,,,,,,
+Loss Run Scheduling - Loss Run Report Recipients List,AttnTo,Send To Attention,PlainText,"SELECT tblDist_LossRun_AFFIN.ProgramName, tblDist_LossRun_AFFIN.RecipCat, tblDist_LossRun_AFFIN.DistVia, tblDist_LossRun_AFFIN.AttnTo, tblDist_LossRun_AFFIN.EMailAddress, tblDist_LossRun_AFFIN.PK_Number FROM tblDist_LossRun_AFFIN WHERE (((tblDist_LossRun_AFFIN.ProgramName)=forms!frmAffinityParent!bxAcctName))",,tblDist_LossRun_AFFIN,AttnTo,frmDist_LossRun_AFFIN,,,,,,,,,
+Loss Run Scheduling - Loss Run Report Recipients List,EmailAddress,E-mail Address,Plain Text,"SELECT tblDist_LossRun_AFFIN.ProgramName, tblDist_LossRun_AFFIN.RecipCat, tblDist_LossRun_AFFIN.DistVia, tblDist_LossRun_AFFIN.AttnTo, tblDist_LossRun_AFFIN.EMailAddress, tblDist_LossRun_AFFIN.PK_Number FROM tblDist_LossRun_AFFIN WHERE (((tblDist_LossRun_AFFIN.ProgramName)=forms!frmAffinityParent!bxAcctName))",,tblDist_LossRun_AFFIN,EMailAddress ,frmDist_LossRun_AFFIN,,,,,,,,,
+Loss Run Scheduling,ckJanLR - ckDecLR,Due if Checked,CheckBox,,,tblLossRunFreq_AFFIN ,,frmAffinityParent,,,,,,,,,
+Loss Run Scheduling,LRSentJan,Last Send Date,Plain Text,NA,,tblLossRunFreq_AFFIN ,CompDate,frmAffinityParent,Input Mask : 99/99/0000;0;_,,,,,,,,
+,,,,,,,,,,,,,,,,,
+Loss Run Notes,bxLossRunNotes,Loss Run Notes,Plain Text,NA,,tblAcctAffinityProgram,LossRunNotes,frmAffinityParent,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+Claim Review Scheduling,bxClaimRevFreq,Distribution Frequency,Drop-Down,SELECT tblDistFreq.DistFrequency FROM tblDistFreq,,tblAcctAffinityProgram,ClaimRevDistFreq,frmAffinityParent,,,,,,,,,
+Claim Review Scheduling,txtCRThresh,Claim Review Threshold,Plain Text,"Default value - '$50,000'",,tblAcctAffinityProgram,CRThresh,frmAffinityParent,,,,,,,,,
+Claim Review Scheduling,CRSentJan,Last Send Date,Plain Text,NA,,tblClaimRevFreq_AFFIN,CompDate ,frmAffinityParent,,,,,,,,,
+Claim Review Scheduling,CRRptJan,Report Type,Drop-Down,"""Narrative"";""NQ Letter""",,tblClaimRevFreq_AFFIN,RptType ,frmAffinityParent,,,,,,,,,
+Claim Review Scheduling,CRDelJan,Delivery Method,Drop-Down,"""E-Mail"";""Telephone"";""In Person""",,tblClaimRevFreq_AFFIN,DelivMeth,frmAffinityParent,,,,,,,,,
+Claim Review Scheduling,CRNumNarr_Jan,Narratives Processed,Drop-Down,tbl_LKP_NumNarratives,,tblClaimRevFreq_AFFIN,CRNumNarr,frmAffinityParent,,,,,,,,,
+Claim Review Scheduling,Command186,Claim Review Report Recipients,CommandButton,,,,,frmAffinityParent,,,,,,,,,
+Claim Review Scheduling - Claim Review Report Recipients List,ProgramName,Program name,Drop-Down,"SELECT tblDist_ClaimRev_AFFIN.ProgramName, tblDist_ClaimRev_AFFIN.RecipCat, tblDist_ClaimRev_AFFIN.DistVia, tblDist_ClaimRev_AFFIN.AttnTo, tblDist_ClaimRev_AFFIN.EMailAddress, tblDist_ClaimRev_AFFIN.PK_Number FROM tblDist_ClaimRev_AFFIN WHERE (((tblDist_ClaimRev_AFFIN.ProgramName)=forms!frmAffinityParent!bxAcctName))",,tblDist_ClaimRev_AFFIN,ProgramName ,frmDist_ClaimRev_AFFIN,,,,,,,,,
+Claim Review Scheduling - Claim Review Report Recipients List,RecipCat,Recipient Category,Drop-Down,tbl_Lkp_RecipCategory,,tblDist_ClaimRev_AFFIN,RecipCat ,frmDist_ClaimRev_AFFIN,,,,,,,,,
+Claim Review Scheduling - Claim Review Report Recipients List,DistVia,Distribute Via,Drop-Down,tbl_lkp_DistVia,,tblDist_ClaimRev_AFFIN,DistVia ,frmDist_ClaimRev_AFFIN,,,,,,,,,
+Claim Review Scheduling - Claim Review Report Recipients List,Attnto,Send To Attention,Drop-Down,"SELECT tblDist_ClaimRev_AFFIN.ProgramName, tblDist_ClaimRev_AFFIN.RecipCat, tblDist_ClaimRev_AFFIN.DistVia, tblDist_ClaimRev_AFFIN.AttnTo, tblDist_ClaimRev_AFFIN.EMailAddress, tblDist_ClaimRev_AFFIN.PK_Number FROM tblDist_ClaimRev_AFFIN WHERE (((tblDist_ClaimRev_AFFIN.ProgramName)=forms!frmAffinityParent!bxAcctName))",,tblDist_ClaimRev_AFFIN,AttnTo ,frmDist_ClaimRev_AFFIN,,,,,,,,,
+Claim Review Scheduling - Claim Review Report Recipients List,EmailAddress,E-mail Address,Drop-Down,"SELECT tblDist_ClaimRev_AFFIN.ProgramName, tblDist_ClaimRev_AFFIN.RecipCat, tblDist_ClaimRev_AFFIN.DistVia, tblDist_ClaimRev_AFFIN.AttnTo, tblDist_ClaimRev_AFFIN.EMailAddress, tblDist_ClaimRev_AFFIN.PK_Number FROM tblDist_ClaimRev_AFFIN WHERE (((tblDist_ClaimRev_AFFIN.ProgramName)=forms!frmAffinityParent!bxAcctName))",,tblDist_ClaimRev_AFFIN,EMailAddress ,frmDist_ClaimRev_AFFIN,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+Claim Review Notes,bxClaimRevNotes,Claim Review Notes,Plain Text,NA,,tblAcctAffinityProgram,ClaimRevNotes,frmAffinityParent,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+SHI,bxSHIcompYN,Is SHI Complete?,Drop-Down,"[""Yes"";""No""]",,tblAcctAffinityProgram,SHIComplete,frmAffinityParent,,,,,,,,,
+SHI,bxSHINotes,SHI Notes,Plain Text,NA,,tblAcctAffinityProgram,SHINotes,frmAffinityParent,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+Change Notes,Change Notes,Change Notes,Plain Text,NA,,tblAcctAffinityProgram,ChangeNotes,frmAffinityParent,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+Affinity,Command 225,View Policy Types,Command Buttton,,,,,frmAffinityParent,,,,,,,,,
+Affinity,Command229,Interim Saves,Command Buttton,,,,,frmAffinityParent,,,,,,,,,
+Affinity,Open_Form,Code executed while opening the form,,,,,,,,"When the form opens, it:
+
+Loads all details for the selected Affinity Program from the database.
+Displays those details across multiple tabs (General, SHI, Loss Run, Claim Review).
+Dynamically enables/disables certain fields based on account status.
+Populates monthly reporting history for Claim Reviews and Loss Runs.
+Cleans up resources and prepares the form for user interaction.
+
+
+Step-by-Step Flow
+1. Load Selected Program Details
+
+The form takes the program name chosen on the previous search screen and uses it to find the matching record in the tblAcctAffinityProgram table.
+It then fills in all the form fields with data from that record:
+
+Program Heading: Program name, onboarding date, branch, notes, account owner, created date/by, total premium, account status, termination details, etc.
+General Tab: Business type, service request flags, accommodation details, exceptions.
+SHI Tab: SHI completion status and notes.
+Loss Run Tab: Notes and distribution frequency.
+Claim Review Tab: Notes, frequency, thresholds.
+New Fields: Change notes (audit info).
+
+
+
+
+2. Enable/Disable Termination Fields
+
+If the account is Inactive or In Runoff, the termination date and cause fields are enabled for editing.
+If the account is Active, those fields are disabled.
+
+
+3. Load Claim Review Reporting Frequency
+
+Connects to the tblClaimRevFreq_AFFIN table.
+If records exist for the program:
+
+Loops through all 12 months (January to December).
+For each month:
+
+Retrieves the completion date, report type, and delivery method.
+Updates corresponding form fields (e.g., CRSentJan, CRRptJan, CRDelJan).
+Sets a checkbox (ckJanCR) to indicate if a report was scheduled for that month.
+
+
+
+
+This gives a full year view of Claim Review reporting activity.
+
+
+4. Load Loss Run Reporting Frequency
+
+Similar process as Claim Review, but for Loss Run reports:
+
+Connects to tblLossRunFreq_AFFIN.
+Loops through all 12 months.
+Updates fields like LRSentJan and checkboxes (ckJanLR) for each month.
+
+
+Provides a month-by-month view of Loss Run reporting.
+
+
+5. Clean Up and Close Loading Screen
+
+Releases database objects.
+Closes a temporary form (frmRunning) used during loading.
+Sets focus back to a button on the main form so the user can start interacting.
+
+
+6. Button to Open Policy Types Form
+
+There’s a separate button (Command225) that, when clicked, opens another form called frmAffinityAccount_PolicyTypes.
+If an error occurs while opening, it shows an error message.
+
+
+In Simple Terms
+This function:
+
+Pre-fills the form with all program details.
+Shows reporting history for the entire year for Claim Reviews and Loss Runs.
+Adapts the form dynamically based on account status.
+Provides navigation to related forms.
+Ensures everything is ready for the user without manual data entry.",,,,,,,
+Affinity,btnClose,Save and Exit,Command Buttton,,,,,frmAffinityParent,,,,"Part 1 — Confirmation, agent check, and mandatory validations
+
+
+User confirmation to save/close
+
+Shows a Yes/No dialog using msg, Style, Title.
+If Response is vbNo, sets MyString = ""No"" and exits (no save).
+
+
+
+Agent of record check (tblAffinityAgents)
+
+Builds strSQL to look up ProgramName = Me.bxAcctName.
+Opens MyRec on results via MyDB (CurrentDb).
+If MyRec.EOF is true (no agent found), asks the user:
+
+If Response is vbNo, sets MyString = ""No"" and exits.
+If vbYes, continues without agent.
+
+
+
+
+
+Mandatory field validations prior to save
+
+Requires Me.bxSince (On Board Date), Me.bxAcctName (Program Name), Me.bxBranch (Branch Office).
+If Me.txtAcctStatus = ""Inactive"", requires Me.bxNotifDt (Notification Date).
+Any missing field shows a message, sets focus to the control, and exits.
+
+
+
+
+Part 2 — Save/update core program record (tblAcctAffinityProgram)
+
+
+Recordset setup
+
+MyDB = CurrentDb; MyRec opened as an editable dynaset on tblAcctAffinityProgram.
+DoCmd.SetWarnings False turns off Access prompts temporarily.
+
+
+
+Target record and edit
+
+MyRec.FindFirst locates row where ProgramName = Me.bxAcctName.
+MyRec.Edit enters edit mode for the found row.
+
+
+
+Assign fields from the form (Program Heading)
+
+Writes values from Me.bxAcctName, Me.bxSince, Me.bxBranch, Me.bxAcctNotes, Me.bxSACName1, Me.bxSACName2, Me.bxLossCtl1, Me.bxLossCtl2, Me.bxDateCreated, Me.bxCreatedBy, Me.AcctOwner, Me.cboOB.
+“APR 2015” fields: Me.txtTotPrem, Me.txtAcctStatus, Me.txtNumPol, Me.txtTermDt, Me.txtTermCause, Me.bxNotifDt.
+
+
+
+Assign fields (Program General tab)
+
+Me.bxBusType, Me.bxServReqYN, Me.bxAccomFormYN, Me.bxAccomType, Me.bxExceptYN, Me.bxExceptType, Me.bxSHIcompYN, Me.bxSHINotes.
+
+
+
+Assign fields (Loss Run tab)
+
+Me.bxLossRunNotes, Me.bxLossRunFreq.
+
+
+
+Assign fields (Claim Review tab)
+
+Me.bxClaimRevNotes, Me.bxClaimRevFreq, Me.txtCRThresh.
+
+
+
+Assign fields (Oct 2019)
+
+Me.txtChangeNotes ? ChangeNotes.
+
+
+
+Commit and clean up
+
+MyRec.Update, MyRec.Close, Set MyRec = Nothing.
+
+
+
+
+Part 3 — Monthly frequency tables, cleanup, and navigation
+A) Claim Review monthly rows (tblClaimRevFreq_AFFIN)
+
+
+Setup and reset
+
+MyRec opened on tblClaimRevFreq_AFFIN.
+Deletes all rows for ProgramName = Me.bxAcctName to rebuild fresh.
+
+
+
+12?month loop (LoopCount 1–12)
+
+Each month: MyRec.AddNew and set:
+
+ProgramName = Me.bxAcctName
+MthNum = month number (1–12)
+CompDate from Me.CRSentJan/Feb/…/Dec
+RptType from Me.CRRptJan/…/Dec
+DelivMeth from Me.CRDelJan/…/Dec
+CRNumNarr from Me.CRNumNarr_JAN/FEB/…/DEC
+RptMth = 1 if ckJanCR/…/ckDecCR is true, else 0
+
+
+MyRec.Update per month.
+Close and release MyRec after the loop.
+
+
+
+B) Loss Run monthly rows (tblLossRunFreq_AFFIN)
+
+
+Setup and reset
+
+MyRec opened on tblLossRunFreq_AFFIN.
+Deletes all rows for ProgramName = Me.bxAcctName.
+
+
+
+12?month loop (LoopCount 1–12)
+
+Each month: MyRec.AddNew and set:
+
+ProgramName = Me.bxAcctName
+MthNum = month number (1–12)
+CompDate from Me.LRSentJan/Feb/…/Dec
+RptMth = 1 if ckJanLR/…/ckDecLR is true, else 0
+
+
+MyRec.Update per month.
+Close and release MyRec after the loop.
+
+
+
+C) Final wrap?up
+
+DoCmd.SetWarnings True turns Access prompts back on.
+Closes the current object and frmFindAccount (without saving layout), then opens frmMainMenu.
+Exit_btnClose_Click clean exit; Err_btnClose_Click shows Err.Description and resumes to exit.",,84,,,
+,,,,,,,,,,,,,,,,,
+View Policy Types - Account Options,bxDisplayPolicy,Program Name,Plain Text,"SELECT tblAffinityPolicyType.ProgramName AS [Program Name], tblAffinityPolicyType.PolicyType AS [Policy Type], First(tblAffinityAgents.AgentName) AS [Primary Agent], First(tblAffinityAgents.AgentCode) AS [Agent Code] FROM tblAffinityPolicyType LEFT JOIN tblAffinityAgents ON tblAffinityPolicyType.ProgramName=tblAffinityAgents.ProgramName GROUP BY tblAffinityPolicyType.ProgramName, tblAffinityPolicyType.PolicyType HAVING (((tblAffinityPolicyType.ProgramName)=Forms!frmAffinityParent!bxAcctName))",,NA,NA,frmAffinityAccount_PolicyTypes,,,,,,,,,
+View Policy Types - Account Options,bxDisplayPolicy,Policy Type,Plain Text,"SELECT tblAffinityPolicyType.ProgramName AS [Program Name], tblAffinityPolicyType.PolicyType AS [Policy Type], First(tblAffinityAgents.AgentName) AS [Primary Agent], First(tblAffinityAgents.AgentCode) AS [Agent Code] FROM tblAffinityPolicyType LEFT JOIN tblAffinityAgents ON tblAffinityPolicyType.ProgramName=tblAffinityAgents.ProgramName GROUP BY tblAffinityPolicyType.ProgramName, tblAffinityPolicyType.PolicyType HAVING (((tblAffinityPolicyType.ProgramName)=Forms!frmAffinityParent!bxAcctName))",,NA,NA,frmAffinityAccount_PolicyTypes,,,,,,,,,
+View Policy Types - Account Options,bxDisplayPolicy,Primary Agent,Plain Text,"SELECT tblAffinityPolicyType.ProgramName AS [Program Name], tblAffinityPolicyType.PolicyType AS [Policy Type], First(tblAffinityAgents.AgentName) AS [Primary Agent], First(tblAffinityAgents.AgentCode) AS [Agent Code] FROM tblAffinityPolicyType LEFT JOIN tblAffinityAgents ON tblAffinityPolicyType.ProgramName=tblAffinityAgents.ProgramName GROUP BY tblAffinityPolicyType.ProgramName, tblAffinityPolicyType.PolicyType HAVING (((tblAffinityPolicyType.ProgramName)=Forms!frmAffinityParent!bxAcctName))",,NA,NA,frmAffinityAccount_PolicyTypes,,,,,,,,,
+View Policy Types - Account Options,bxDisplayPolicy,Agent Code,Plain Text,"SELECT tblAffinityPolicyType.ProgramName AS [Program Name], tblAffinityPolicyType.PolicyType AS [Policy Type], First(tblAffinityAgents.AgentName) AS [Primary Agent], First(tblAffinityAgents.AgentCode) AS [Agent Code] FROM tblAffinityPolicyType LEFT JOIN tblAffinityAgents ON tblAffinityPolicyType.ProgramName=tblAffinityAgents.ProgramName GROUP BY tblAffinityPolicyType.ProgramName, tblAffinityPolicyType.PolicyType HAVING (((tblAffinityPolicyType.ProgramName)=Forms!frmAffinityParent!bxAcctName))",,NA,NA,frmAffinityAccount_PolicyTypes,,,,,,,,,
+View Policy Types - Account Options,Command22,Create New Policy Types,Command Button,,,,,frmAffinityAccount_PolicyTypes,,,,,,,,,Opens frmPolicyType_FromAccount_New
+View Policy Types - Account Options,Commmand3,Go To Selected Policy Type,Command Button,,,,,frmAffinityAccount_PolicyTypes,,,,,,,,,Opens frmPolicyType_FromAccount
+,,,,,,,,,,,,,,,,,
+View Policy Types - Top Panel,bxAcctName,Affinity Program Name,Plain Text,NA,,NA,NA,frmPolicyType_FromAccount,,,,Affinity Program Name is a mandatory field,,,,,
+View Policy Types - Top Panel,bxPolType,Policy Type,Drop-Down,tblPolType,,tblAffinityPolicyType,PolicyType,frmPolicyType_FromAccount,,,,Policy Type Name is a mandatory field,,,,,
+View Policy Types - Top Panel,bxPolStatus,Affinity Status,Drop-Down,SELECT tblPolStatus.PolicyStatus FROM tblPolStatus ORDER BY tblPolStatus.PolicyStatus,,tblAffinityPolicyType,PolicyStatus,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Top Panel,bxBusinessType,Business Status,Drop-Down,SELECT tblGeneralPolicyStatus.GenPolicyStatus FROM tblGeneralPolicyStatus ORDER BY tblGeneralPolicyStatus.GenPolicyStatus,,tblAffinityPolicyType,PolicyBusinessType,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Top Panel,bxGroupCD,Group Code,Drop-Down,"SELECT tblGrpCode.Code, tblGrpCode.[Prgram Expanded Name] AS ProgramExpandedName FROM tblGrpCode ORDER BY tblGrpCode.Code",,tblAffinityPolicyType,GroupCode,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Top Panel,txtProductProgram,Group Program,Plain Text,NA,,tblAffinityPolicyType,GroupCode.Column(1),frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Top Panel,bxLOC,Is Location Coded?,Drop-Down,"""Yes"";""No""",,tblAffinityPolicyType,LOCCoded,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Top Panel,bxDateCreated,Date Created,Plain Text,NA,,tblAffinityPolicyType,DateCreated,frmPolicyType_FromAccount,Input Mask : 99/99/0000;0;_,,,,,,,,
+View Policy Types - Top Panel,bxCreatedBy,Created By,Drop-Down,SELECT tblMGTUsers.SACName FROM tblMGTUsers ORDER BY tblMGTUsers.SACName,,tblAffinityPolicyType,CreatedBy ,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Top Panel,bxUnderName,Underwriter,Drop-Down,"SELECT tblUnderwriters.[UW Last], tblUnderwriters.[UW Email] FROM tblUnderwriters ORDER BY tblUnderwriters.[UW Last]",,tblAffinityPolicyType,UnderwriterName,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Top Panel,bxUWMgr,Underwriting Manager,Drop-Down,"SELECT tblUnderwriters.[UW Last], tblUnderwriters.[UW Email] FROM tblUnderwriters ORDER BY tblUnderwriters.[UW Last]",,tblAffinityPolicyType,UWMgr,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Top Panel,bxTermReason,Termination Reason,Drop-Down,tblDNRStatus,,NA,NA,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Top Panel,bxTermDate,Termination Date,Plain Text,NA,,NA,NA,frmPolicyType_FromAccount,Input Mask : 99/99/0000;0;_,,,,,,,,
+,,,,,,,,,,,,,,,,,
+View Policy Types - General Information,bxPolNotes,Affinity Program Notes,Plain Text,NA,,tblAffinityPolicyType,PolicyNotes,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - General Information,ContactJAN - ContactDEC,Scheduled Contact Months,Check Box,,,,,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - General Information,Command38,Every Month,Command Button,,,,,frmPolicyType_FromAccount,,,,,,,,,Clear All  check box in Scheduled Contact months
+View Policy Types - General Information,Command40,Clear All,Command Button,,,,,frmPolicyType_FromAccount,,,,,,,,,Checks every check box in Scheduled Contact months
+View Policy Types - General Information,Command117,ReportRecipients,Command Button,,,,,frmPolicyType_FromAccount,,,,,,,,,Opens up frmPolicyTypeScheduler_AFFIN
+View Policy Types - General Information - Report Recipients,ProgramName,Program name,Text Box,"SELECT tblDIST_PolicyTypeScheduler_AFFIN.ProgramName, tblDIST_PolicyTypeScheduler_AFFIN.PolicyType, tblDIST_PolicyTypeScheduler_AFFIN.RecipCat, tblDIST_PolicyTypeScheduler_AFFIN.DistVia, tblDIST_PolicyTypeScheduler_AFFIN.AttnTo, tblDIST_PolicyTypeScheduler_AFFIN.EMailAddress FROM tblDIST_PolicyTypeScheduler_AFFIN WHERE (((tblDIST_PolicyTypeScheduler_AFFIN.ProgramName)=forms!frmPolicyType_FromAccount!bxAcctName) And ((tblDIST_PolicyTypeScheduler_AFFIN.PolicyType)=forms!frmPolicyType_FromAccount!bxPolType))",,tblDIST_PolicyTypeScheduler_AFFIN,ProgramName,frmPolicyTypeScheduler_AFFIN,Is Not Null and Mandatory Field,,,,,,,,
+View Policy Types - General Information - Report Recipients,PolicyType,Policy Type,Text Box,,,tblDIST_PolicyTypeScheduler_AFFIN,PolicyType,frmPolicyTypeScheduler_AFFIN, Mandatory Field,,,,,,,,
+View Policy Types - General Information - Report Recipients,RecipCat,Recipient Category,Drop-Down,tbl_Lkp_RecipCategory,,tblDIST_PolicyTypeScheduler_AFFIN,RecipCat,frmPolicyTypeScheduler_AFFIN,Is Not Null and Mandatory Field,,,,,,,,
+View Policy Types - General Information - Report Recipients,DistVia,Distribute Via,Drop-Down,tbl_lkp_DistVia,,tblDIST_PolicyTypeScheduler_AFFIN,DistVia,frmPolicyTypeScheduler_AFFIN,Is Not Null and Mandatory Field,,,,,,,,
+View Policy Types - General Information - Report Recipients,AttnTo,Send To Attention,Plain Text,"SELECT tblDIST_PolicyTypeScheduler_AFFIN.ProgramName, tblDIST_PolicyTypeScheduler_AFFIN.PolicyType, tblDIST_PolicyTypeScheduler_AFFIN.RecipCat, tblDIST_PolicyTypeScheduler_AFFIN.DistVia, tblDIST_PolicyTypeScheduler_AFFIN.AttnTo, tblDIST_PolicyTypeScheduler_AFFIN.EMailAddress FROM tblDIST_PolicyTypeScheduler_AFFIN WHERE (((tblDIST_PolicyTypeScheduler_AFFIN.ProgramName)=forms!frmPolicyType_FromAccount!bxAcctName) And ((tblDIST_PolicyTypeScheduler_AFFIN.PolicyType)=forms!frmPolicyType_FromAccount!bxPolType))",,tblDIST_PolicyTypeScheduler_AFFIN,AttnTo,frmPolicyTypeScheduler_AFFIN,Is Not Null and Mandatory Field,,,,,,,,
+View Policy Types - General Information - Report Recipients,EmailAddress,E-mail Address,Plain Text,"SELECT tblDIST_PolicyTypeScheduler_AFFIN.ProgramName, tblDIST_PolicyTypeScheduler_AFFIN.PolicyType, tblDIST_PolicyTypeScheduler_AFFIN.RecipCat, tblDIST_PolicyTypeScheduler_AFFIN.DistVia, tblDIST_PolicyTypeScheduler_AFFIN.AttnTo, tblDIST_PolicyTypeScheduler_AFFIN.EMailAddress FROM tblDIST_PolicyTypeScheduler_AFFIN WHERE (((tblDIST_PolicyTypeScheduler_AFFIN.ProgramName)=forms!frmPolicyType_FromAccount!bxAcctName) And ((tblDIST_PolicyTypeScheduler_AFFIN.PolicyType)=forms!frmPolicyType_FromAccount!bxPolType))",,tblDIST_PolicyTypeScheduler_AFFIN,EMailAddress ,frmPolicyTypeScheduler_AFFIN,Is Not Null and Mandatory Field,,,,,,,,
+View Policy Types - General Information - Report Recipients,Command9,Return to Account Detail,Command Button,,,,,frmPolicyTypeScheduler_AFFIN,,,,,,,,,Back Button
+,,,,,,,,,,,,,,,,,
+ View Policy Types -Insured Contacts - Primary Insured Contact,bxlnsContact1,Contact,Plain Text,NA,,tblAffinityPolicyType,InsuredContact1,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts - Primary Insured Contact,bxlnsTel1,Work Tel #,Plain Text,NA,,tblAffinityPolicyType,InsuredPhone1,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts - Primary Insured Contact,bxlnxCell1,Mobile #,Plain Text,NA,,tblAffinityPolicyType,InsuredCell1,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts - Primary Insured Contact,bxlnsFax1,Fax #,Plain Text,NA,,tblAffinityPolicyType,InsuredFax1,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts - Primary Insured Contact,bxlnsEmail1,E-Mail,Plain Text,NA,,tblAffinityPolicyType,InsuredEMail1,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts - Secondary Insured Contact,bxlnsContact2,Contact,Plain Text,NA,,tblAffinityPolicyType,InsuredContact2,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts - Secondary Insured Contact,bxlnsTel2,Work Tel #,Plain Text,NA,,tblAffinityPolicyType,InsuredPhone2,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts - Secondary Insured Contact,bxlnxCell2,Mobile #,Plain Text,NA,,tblAffinityPolicyType,InsuredCell2,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts - Secondary Insured Contact,bxlnsFax2,Fax #,Plain Text,NA,,tblAffinityPolicyType,InsuredFax2,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts - Secondary Insured Contact,bxlnsEmail2,E-Mail,Plain Text,NA,,tblAffinityPolicyType,InsuredEMail2,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts - Secondary Insured Contact,Command 570,Send Primary Contact to Recipient Lists,Command Button,,,,,frmPolicyType_FromAccount,,,,,,,"Checks that AttnTo (bxAgentContact1) isn’t ""N/A"" or blank.
+Removes duplicates (for the same CustomerNum + AttnTo) and cleans blank names in both tblDistribute_ClaimReview and tblDistribute_LossRun.
+Adds a fresh record to both tables with:
+
+Customer: bxCustNum
+Recipient Category: Agent
+Email: bxAgentEmail1
+Distribution Method: Email
+Attention To: bxAgentContact1
+
+
+
+That’s the full flow—validate, deduplicate, clean, and insert into both distribution tables.",,
+View Policy Types - Insured Contacts - Secondary Insured Contact,Command 593,Send Secondary Contact to Recipient Lists,Command Button,,,,,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Insured Contacts,bxlnsNotes,Insured Notes,Plain Text,NA,,tblAffinityPolicyType,InsuredNotes,frmPolicyType_FromAccount,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+View Policy Types - Claim Handling (1),bxContactlnst,Contact Instructions,Plain Text,NA,,tblAffinityPolicyType,ContactInstruct,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Claim Handling (1),bxCovlnstruct,Coverage Instructions,Plain Text,NA,,tblAffinityPolicyType,CoverageInstruct ,frmPolicyType_FromAccount,,,,,,,,,
+View Policy Types - Claim Handling (1),bxReslnst,Reserve Instructions,Plain Text,NA,,tblAffinityPolicyType,ReserveInstruct ,frmPolicyType_FromAccount,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+View Policy Types - Claim Handling (2),bxPrefCounYN,Is Preferred Counsel Approved?,Drop-Down,"""Yes"";""No"";""Pending""",,tblAffinityPolicyType,PrefCounselYN ,,,,,,,,,,
+View Policy Types - Claim Handling (2),bxLitlnst,Litigation Instructions,Plain Text,NA,,tblAffinityPolicyType,LitigationInstruct ,,,,,,,,,,
+View Policy Types - Claim Handling (2),bxSetlnst,Settlement Instructions,Plain Text,NA,,tblAffinityPolicyType,SettlementInstruct ,,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+View Policy Types - Claim Handling (3),bxReclnst,Recovery Instructions,Plain Text,NA,,tblAffinityPolicyType,RecoveryInstruct ,,,,,,,,,,
+View Policy Types - Claim Handling (3),bxMiscCovlnstruct,Miscellaneous Instructions,Plain Text,NA,,tblAffinityPolicyType,MiscCovInstruct ,,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+View Policy Types - CCT Instructions Other,,Account Location ID,Check-Box,"Use Desktop Shortcut, See Notes, None",,tblAffinityPolicyType,AcctLocID,,,,,,,,,,
+View Policy Types - CCT Instructions Other,bxLOCNotes,Account Location Notes,Plain Text,NA,,tblAffinityPolicyType,AcctLocNotes ,,,,,,,,,,
+View Policy Types - CCT Instructions Other,bxOtherCCTNotes,Other Additional Instructions,Plain Text,NA,,tblAffinityPolicyType,CCTOtherNotes ,,,,,,,,,,
+View Policy Types - CCT Instructions Other,cboAcctProdClaims,Accounts with Products Claims,Drop-Down,"""Yes"";""No""",,tblAffinityPolicyType,AcctProdClaims,,,,,,,,,,
+View Policy Types - CCT Instructions Other,cboAcctValetCov,Accounts with Valet Coverage,Drop-Down,"""Yes"";""No""",,tblAffinityPolicyType,AcctValetCov,,,,,,,,,,
+View Policy Types - CCT Instructions Other,cboAddlDocs,Are there any additional documents to attach?,Drop-Down,"""Yes"";""No""",,tblAffinityPolicyType,AddLDocs,,Default :No,,,,,,,,
+,,,,,,,,,,,,,,,,,
+View Policy Types - CCT Assignment,cboSpecHand,Assignment Instructions,Drop-Down,"""Auto Assign"";""See Assignment Instructions""",,tblAffinityPolicyType,SpecHand,,Default : Auto Assign,,,,,,,,
+View Policy Types - CCT Assignment,bxCCTAssignlnst,CCT Assignment Instructions,Plain Text,NA,,tblAffinityPolicyType,CCTAssgInstruct,,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+View Policy Types - SHI Print,Command551,Adjuster Instructions Report,Print-Button,NA,,NA,NA,,,,,,,,,,
+View Policy Types - SHI Print,Command580,Agent/Insured Report,Print-Button,NA,,NA,NA,,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+View Policy Types,Command336,Create New Policy Type,Command Button,,,,,,,,,,,,,,
+View Policy Types,Command337,Create Next Policy Type,Command Button,,,,,,,,,,,,,,
+View Policy Types,Command575,Interim Save,Command Button,,,,,,,,,,,,,,
+View Policy Types,btnClose,Save and Exit,Command Button,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+Policy Type - Create New Policy Type,,,,,,,,,,,,,,,,,
