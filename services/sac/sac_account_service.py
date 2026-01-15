@@ -12,6 +12,7 @@ from core.date_utils import (
 )
 from core.db_helpers import (
     fetch_records_async,
+    insert_records_async,
     merge_upsert_records_async,
     run_raw_query_async,
     sanitize_filters,
@@ -20,7 +21,9 @@ from core.db_helpers import (
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblAcctSpecial"
+PRIMARY_KEY = "AcctSpecialKey"
 ALLOWED_FILTERS = {
+    "AcctSpecialKey",
     "CustomerNum",
     "CustomerName",
     "Stage",
@@ -90,10 +93,16 @@ async def get_sac_account(query_params: dict[str, Any]):
 async def upsert_sac_account(data: dict[str, Any]):
     try:
         normalized_data = normalize_payload_dates(data, fields=_DATE_FIELDS)
+        pk_value = normalized_data.get(PRIMARY_KEY)
+        if pk_value in (None, ""):
+            sanitized = {k: v for k, v in normalized_data.items() if k != PRIMARY_KEY}
+            return await insert_records_async(table=TABLE_NAME, records=[sanitized])
+
         return await merge_upsert_records_async(
             table=TABLE_NAME,
             data_list=[normalized_data],
-            key_columns=["CustomerNum"],
+            key_columns=[PRIMARY_KEY],
+            exclude_key_columns_from_insert=True,
         )
     except Exception as e:
         logger.warning(f"Upsert failed - {str(e)}")
