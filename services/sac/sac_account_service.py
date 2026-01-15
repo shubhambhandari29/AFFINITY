@@ -48,6 +48,8 @@ async def get_sac_account(query_params: dict[str, Any]):
 
         if not branch_filter:
             records = await fetch_records_async(table=TABLE_NAME, filters=filters)
+            if not records:
+                return []
             return format_records_dates(records, fields=_DATE_FIELDS)
 
         branch_terms = [term for term in re.split(r"[ ,&]+", str(branch_filter)) if term.strip()]
@@ -55,6 +57,8 @@ async def get_sac_account(query_params: dict[str, Any]):
         # Fall back to simple filtering if nothing usable came from the branch filter.
         if not branch_terms:
             records = await fetch_records_async(table=TABLE_NAME, filters=filters)
+            if not records:
+                return []
             return format_records_dates(records, fields=_DATE_FIELDS)
 
         clauses: list[str] = []
@@ -73,6 +77,8 @@ async def get_sac_account(query_params: dict[str, Any]):
             query += " WHERE " + " AND ".join(clauses)
 
         records = await run_raw_query_async(query, list(params))
+        if not records:
+            return []
         return format_records_dates(records, fields=_DATE_FIELDS)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
