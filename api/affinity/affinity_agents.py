@@ -12,5 +12,9 @@ async def get_affinity_agents(request: Request):
     return await get_affinity_agents_service(dict(request.query_params))
     
 @router.post("/upsert")
-async def upsert_affinity_agents(payload: AffinityAgentUpsert):
-    return await upsert_affinity_agents_service(payload.model_dump(exclude_none=True))
+async def upsert_affinity_agents(payload: list[AffinityAgentUpsert] | AffinityAgentUpsert):
+    if isinstance(payload, list):
+        entries = [entry.model_dump() for entry in payload]
+    else:
+        entries = [payload.model_dump()]
+    return await upsert_affinity_agents_service(entries)

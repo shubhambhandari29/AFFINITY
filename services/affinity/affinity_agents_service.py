@@ -34,20 +34,29 @@ async def get_affinity_agents(query_params: dict[str, Any]):
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
 
 
-async def upsert_affinity_agents(data: dict[str, Any]):
+async def upsert_affinity_agents(data_list: list[dict[str, Any]]):
     """
     Update row if already exists, else insert row into tblAffinityAgents.
     """
 
     try:
-        data_with_defaults = apply_affinity_agent_defaults(data)
-        errors = validate_affinity_agent_payload(data_with_defaults)
+        normalized_list: list[dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
+
+        for index, item in enumerate(data_list):
+            data_with_defaults = apply_affinity_agent_defaults(item)
+            item_errors = validate_affinity_agent_payload(data_with_defaults)
+            if item_errors:
+                errors.append({"index": index, "errors": item_errors})
+                continue
+            normalized_list.append(normalize_payload_dates(data_with_defaults))
+
         if errors:
             raise HTTPException(status_code=400, detail={"errors": errors})
-        normalized = normalize_payload_dates(data_with_defaults)
+
         return await merge_upsert_records_async(
             table=TABLE_NAME,
-            data_list=[normalized],
+            data_list=normalized_list,
             key_columns=KEY_COLUMNS,
         )
     except Exception as e:
