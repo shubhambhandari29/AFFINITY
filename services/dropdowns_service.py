@@ -80,6 +80,19 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
         WHERE (((tblPRODUCER.ffname1)<>""))
         ORDER BY IIf(Len([code])=6,"0" & [Code],[Code]);
     """,
+    "AgentCode": """
+        SELECT IIf(Len([code])=6,"0" & [Code],[Code]) AS [Agent Code], tblPRODUCER.ffname1 AS [Agent Name]
+        FROM tblPRODUCER
+        WHERE (((tblPRODUCER.ffname1)<>""))
+        ORDER BY IIf(Len([code])=6,"0" & [Code],[Code]);
+    """,
+    "AgentName": """
+        SELECT tblPRODUCER.ffname1 AS [Agent Name], tblPRODUCER.code AS [Agent Code]
+        FROM tblPRODUCER
+        GROUP BY tblPRODUCER.ffname1, tblPRODUCER.code
+        HAVING (((tblPRODUCER.ffname1)<>""))
+        ORDER BY tblPRODUCER.ffname1;
+    """,
     "tblBusType": """
         SELECT tblBusType.[Business Type]
         FROM tblBusType
