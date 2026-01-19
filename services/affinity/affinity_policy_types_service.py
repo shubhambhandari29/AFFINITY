@@ -5,7 +5,10 @@ from fastapi import HTTPException
 
 from core.date_utils import format_records_dates, normalize_payload_dates
 from core.db_helpers import _ensure_safe_identifier, merge_upsert_records_async, run_raw_query_async
-from services.validations.affinity_validations import validate_affinity_policy_type_payload
+from services.validations.affinity_validations import (
+    apply_affinity_policy_type_defaults,
+    validate_affinity_policy_type_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +59,11 @@ async def upsert_affinity_policy_types(data: dict[str, Any]):
     """
 
     try:
-        errors = validate_affinity_policy_type_payload(data)
+        data_with_defaults = apply_affinity_policy_type_defaults(data)
+        errors = validate_affinity_policy_type_payload(data_with_defaults)
         if errors:
             raise HTTPException(status_code=400, detail={"errors": errors})
-        normalized = normalize_payload_dates(data)
+        normalized = normalize_payload_dates(data_with_defaults)
         return await merge_upsert_records_async(
             table=TABLE_NAME,
             data_list=[normalized],

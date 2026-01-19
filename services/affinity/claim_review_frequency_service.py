@@ -5,6 +5,7 @@ from fastapi import HTTPException
 
 from core.date_utils import format_records_dates, normalize_payload_dates
 from core.db_helpers import fetch_records_async, merge_upsert_records_async, sanitize_filters
+from services.validations.affinity_validations import validate_affinity_frequency_rows
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,9 @@ async def upsert_frequency(data_list: list[dict[str, Any]]):
     """
 
     try:
+        errors = validate_affinity_frequency_rows(data_list)
+        if errors:
+            raise HTTPException(status_code=400, detail={"errors": errors})
         payload = [normalize_payload_dates(item) for item in data_list]
         return await merge_upsert_records_async(
             table=TABLE_NAME,

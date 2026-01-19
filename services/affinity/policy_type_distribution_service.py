@@ -16,7 +16,7 @@ from services.validations.affinity_validations import (
 
 logger = logging.getLogger(__name__)
 
-TABLE_NAME = "tblDIST_PolicyTypeScheduler_AFF"
+TABLE_NAME = "tblDIST_PolicyTypeScheduler_AFFIN"
 KEY_COLUMNS = ["ProgramName", "EMailAddress"]
 
 
