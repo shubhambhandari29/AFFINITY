@@ -38,4 +38,18 @@ class Settings:
     SECURE_COOKIE: bool = _as_bool(os.getenv("SECURE_COOKIE"))
     SAME_SITE: str = os.getenv("SAME_SITE")
 
+    # F5 APM header authentication
+    F5_AUTH_ENABLED: bool = _as_bool(os.getenv("F5_AUTH_ENABLED"), default=False)
+    F5_ENFORCE: bool = _as_bool(os.getenv("F5_ENFORCE"), default=False)
+    F5_HEADER_USER_ID: str = os.getenv("F5_HEADER_USER_ID", "x-user-id")
+    F5_HEADER_GROUPS: str = os.getenv("F5_HEADER_GROUPS", "x-groups")
+    F5_HEADER_EMAIL: str = os.getenv("F5_HEADER_EMAIL", "x-user-email")
+    F5_HEADER_FIRST_NAME: str = os.getenv("F5_HEADER_FIRST_NAME", "x-user-first-name")
+    F5_HEADER_LAST_NAME: str = os.getenv("F5_HEADER_LAST_NAME", "x-user-last-name")
+    F5_SHARED_SECRET: str | None = os.getenv("F5_SHARED_SECRET")
+    F5_SHARED_SECRET_HEADER: str = os.getenv("F5_SHARED_SECRET_HEADER", "x-f5-auth")
+    F5_GROUP_ADMIN: str = os.getenv("F5_GROUP_ADMIN", "admin")
+    F5_GROUP_DIRECTOR: str = os.getenv("F5_GROUP_DIRECTOR", "director")
+    F5_GROUP_UNDERWRITER: str = os.getenv("F5_GROUP_UNDERWRITER", "underwriter")
+
 settings = Settings()
