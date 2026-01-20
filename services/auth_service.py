@@ -113,16 +113,10 @@ def _get_f5_identity(request: Request) -> dict[str, str] | None:
 
 
 def _resolve_user_for_f5(identity: dict[str, str]) -> dict[str, Any] | None:
-    email = identity.get("email") or ""
-    user_id = identity.get("user_id") or ""
-
-    if email:
-        return get_user_by_email(email)
-    if "@" in user_id:
-        return get_user_by_email(user_id)
-    if user_id.isdigit():
-        return get_user_by_id(int(user_id))
-    return get_user_by_email(user_id)
+    email = identity.get("email") or identity.get("user_id") or ""
+    if not email:
+        return None
+    return get_user_by_email(email)
 
 
 def _build_user_payload(
@@ -163,7 +157,12 @@ def _authenticate_f5_identity(
         raise HTTPException(status_code=404, detail={"error": "User not found"})
 
     groups = _parse_f5_groups(identity.get("groups"))
-    role = _map_f5_groups_to_role(groups) or user_record.get("Role")
+    role = _map_f5_groups_to_role(groups)
+    if not role:
+        logger.warning(
+            f"F5 login failed: no matching role for user {identity.get('user_id')}"
+        )
+        raise HTTPException(status_code=403, detail={"error": "Forbidden"})
     user = _build_user_payload(
         user_record,
         role_override=role,
@@ -323,12 +322,15 @@ async def get_current_user_from_token(
     Returns decoded user.
     """
 
+    identity = _get_f5_identity(request)
+    if identity:
+        user, token = _authenticate_f5_identity(identity, response)
+        return {"message": "User authenticated", "user": user, "token": token}
+    if settings.F5_AUTH_ENABLED and settings.F5_ENFORCE:
+        raise HTTPException(status_code=401, detail={"error": "Not authenticated"})
+
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
-        identity = _get_f5_identity(request)
-        if identity:
-            user, token = _authenticate_f5_identity(identity, response)
-            return {"message": "User authenticated", "user": user, "token": token}
         raise HTTPException(status_code=401, detail={"error": "Not authenticated"})
 
     try:
@@ -362,6 +364,13 @@ async def refresh_user_token(request: Request, response: Response, token: str | 
     """
     Creates a new token using an existing valid token.
     """
+
+    identity = _get_f5_identity(request)
+    if identity:
+        _, new_token = _authenticate_f5_identity(identity, response)
+        return {"message": "Token refreshed", "token": new_token}
+    if settings.F5_AUTH_ENABLED and settings.F5_ENFORCE:
+        raise HTTPException(status_code=401, detail={"error": "Not authenticated"})
 
     # If dependency didn't supply token, check cookie
     if not token:
