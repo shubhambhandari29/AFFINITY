@@ -1,202 +1,54 @@
-tblAffinityAgents :
+Short answer: treat F5 APM as your IdP/gateway, and have your FastAPI app trust user identity + group claims passed in a signed token (preferred) or trusted headers. Then map the incoming AD group to your roles (underwriter/admin/director).
 
-SELECT TOP (1000) [PK_Number]
-      ,[ProgramName]
-      ,[AgentName]
-      ,[AgentCode]
-      ,[AgentSegment]
-      ,[AgentContact1]
-      ,[WorkTel1]
-      ,[CellTel1]
-      ,[FaxTel1]
-      ,[Email1]
-      ,[AgentContact2]
-      ,[WorkTel2]
-      ,[CellTel2]
-      ,[FaxTel2]
-      ,[Email2]
-      ,[PrimaryAgt]
-      ,[LossRunReq]
-      ,[AutoDeliver]
-  FROM [CLMAA_SpecialAccounts].[dbo].[tblAffinityAgents]
+End‑to‑end roadmap
 
+Decide auth protocol: OIDC (preferred) or SAML via F5 APM. OIDC gives JWTs; SAML gives assertions that F5 can translate to headers.
+F5 APM setup:
+Connect F5 APM to Azure AD (OIDC/SAML federation).
+Define which attributes/claims to pass (user ID, groups).
+If groups are large, filter to only the 3 app groups or use Azure AD app roles.
+App integration:
+If OIDC: validate JWT in FastAPI (issuer, audience, signature, exp). Read sub or oid as user ID, and groups/roles for role mapping.
+If SAML via headers: have F5 inject trusted headers (e.g., x-user-id, x-groups) and ensure FastAPI only accepts those headers from the F5 proxy.
+Authorization mapping:
+Map AD group → app role (underwriter/admin/director).
+Implement role checks in your routes/services.
+User provisioning:
+On first login, create/update local user profile with ID + role(s).
+Optionally sync group changes on each request or via background sync.
+Observability & audit:
+Log user ID, groups, and decision outcomes.
+Add metrics for auth failures and group mismatches.
+Security hardening:
+Enforce HTTPS to F5 and from F5 to app.
+Lock down network so only F5 can reach the app.
+Validate token signatures or verify headers with a shared secret/HMAC.
+Testing & rollout:
+Dev/stage environment with F5 APM and Azure AD test tenant.
+End-to-end tests for each role.
+Gradual rollout with fallback to existing auth if needed.
+Connections you need
 
-tblAffinityPolicyType :
+F5 APM ↔ Azure AD (OIDC/SAML federation).
+F5 APM ↔ FastAPI app (reverse proxy).
+Optional: FastAPI ↔ Azure AD Graph/Microsoft Graph if you need live group queries (usually not required if claims are passed).
+Challenges to expect
 
-  SELECT TOP (1000) [PK_Number]
-      ,[ProgramName]
-      ,[PolicyType]
-      ,[PolicyStatus]
-      ,[PolicyBusinessType]
-      ,[PolicyNotes]
-      ,[GroupCode]
-      ,[ProdCode]
-      ,[UnderwriterName]
-      ,[DateCreated]
-      ,[CreatedBy]
-      ,[LOCCoded]
-      ,[ContactJan]
-      ,[ContactFeb]
-      ,[ContactMar]
-      ,[ContactApr]
-      ,[ContactMay]
-      ,[ContactJun]
-      ,[ContactJul]
-      ,[ContactAug]
-      ,[ContactSep]
-      ,[ContactOct]
-      ,[ContactNov]
-      ,[ContactDec]
-      ,[InsuredContact1]
-      ,[InsuredPhone1]
-      ,[InsuredCell1]
-      ,[InsuredFax1]
-      ,[InsuredEMail1]
-      ,[InsuredContact2]
-      ,[InsuredPhone2]
-      ,[InsuredCell2]
-      ,[InsuredFax2]
-      ,[InsuredEMail2]
-      ,[InsuredNotes]
-      ,[CoverageInstruct]
-      ,[ContactInstruct]
-      ,[ReserveInstruct]
-      ,[LitigationInstruct]
-      ,[SettlementInstruct]
-      ,[RecoveryInstruct]
-      ,[PrefCounselYN]
-      ,[MiscCovInstruct]
-      ,[LegSys]
-      ,[AcctLocID]
-      ,[AcctLocNotes]
-      ,[CCTOtherNotes]
-      ,[SpecHand]
-      ,[AutoAdjName1]
-      ,[AutoAdjName2]
-      ,[PIPAdjName1]
-      ,[PIPAdjName2]
-      ,[LiabAdjName1]
-      ,[LiabAdjName2]
-      ,[PropAdjName1]
-      ,[PropAdjName2]
-      ,[MarineAdjName1]
-      ,[MarineAdjName2]
-      ,[WCAdjName1]
-      ,[WCAdjName2]
-      ,[CCTAssgInstruct]
-      ,[TermReason]
-      ,[TermDate]
-      ,[UWMgr]
-      ,[AcctValetCov]
-      ,[AcctProdClaims]
-      ,[ProdProgram]
-      ,[AddLDocs]
-  FROM [CLMAA_SpecialAccounts].[dbo].[tblAffinityPolicyType]
+Group overage: Azure AD may omit groups if too many; fix by filtering groups or using app roles.
+Header spoofing: if using headers, you must ensure only F5 can call the app.
+Token validation: proper JWKS fetching, key rotation, clock skew.
+Role drift: user group changes not reflected until re-login unless you refresh tokens.
+Multi‑app consistency: ensure the same claims/roles across environments.
+How F5 APM and FastAPI connect
 
+F5 sits in front as a reverse proxy.
+It authenticates users against Azure AD.
+It passes identity to FastAPI as JWT (OIDC) or trusted headers (SAML → headers).
+FastAPI validates and authorizes.
+If you want, I can tailor this to your codebase and sketch the exact middleware + config changes.
+Quick questions to align:
 
-
-tblAcctAffinityProgram :
-
-
-  SELECT TOP (1000) [ProgramName]
-      ,[SpecAcct1]
-      ,[SpecAcct2]
-      ,[LossCtl1]
-      ,[LossCtl2]
-      ,[AcctOwner]
-      ,[DtCreated]
-      ,[CreatedBy]
-      ,[BranchVal]
-      ,[OnBoardDt]
-      ,[AcctNotes]
-      ,[BusType]
-      ,[ServReq]
-      ,[ExceptYN]
-      ,[ExceptType]
-      ,[AccomForm]
-      ,[AccomType]
-      ,[LossRunNotes]
-      ,[LossRunDistFreq]
-      ,[ClaimRevNotes]
-      ,[ClaimRevDistFreq]
-      ,[SHIComplete]
-      ,[SHINotes]
-      ,[OBMethod]
-      ,[CRThresh]
-      ,[AcctStatus]
-      ,[TermDate]
-      ,[TermCause]
-      ,[NumPol]
-      ,[TotalPrem]
-      ,[DateNotif]
-      ,[RiskSolMgr]
-      ,[ChangeNotes]
-  FROM [CLMAA_SpecialAccounts].[dbo].[tblAcctAffinityProgram]
-
-tblDist_ClaimRev_AFFIN :
-
-  SELECT TOP (1000) [PK_Number]
-      ,[ProgramName]
-      ,[RecipCat]
-      ,[DistVia]
-      ,[AttnTo]
-      ,[EMailAddress]
-  FROM [CLMAA_SpecialAccounts].[dbo].[tblDist_ClaimRev_AFFIN]
-
-
-
-tblDist_LossRun_AFFIN :
-
-
-SELECT TOP (1000) [PK_Number]
-      ,[ProgramName]
-      ,[RecipCat]
-      ,[DistVia]
-      ,[AttnTo]
-      ,[EMailAddress]
-  FROM [CLMAA_SpecialAccounts].[dbo].[tblDist_LossRun_AFFIN]
-
-
-tblDIST_PolicyTypeScheduler_AFFIN :
-
-SELECT TOP (1000) [PK_Number]
-      ,[ProgramName]
-      ,[PolicyType]
-      ,[RecipCat]
-      ,[DistVia]
-      ,[AttnTo]
-      ,[EMailAddress]
-  FROM [CLMAA_SpecialAccounts].[dbo].[tblDIST_PolicyTypeScheduler_AFFIN]
-
-
-
-tblClaimRevFreq_AFFIN ::
-
-
-  SELECT TOP (1000) [PK_Number]
-      ,[ProgramName]
-      ,[MthNum]
-      ,[RptMth]
-      ,[CompDate]
-      ,[RptType]
-      ,[DelivMeth]
-      ,[CRNumNarr]
-  FROM [CLMAA_SpecialAccounts].[dbo].[tblClaimRevFreq_AFFIN]
-
-
-tblLossRunFreq_AFFIN :
-
-
-  SELECT TOP (1000) [PK_Number]
-      ,[ProgramName]
-      ,[MthNum]
-      ,[RptMth]
-      ,[RptType]
-      ,[CompDate]
-      ,[DelivMeth]
-  FROM [CLMAA_SpecialAccounts].[dbo].[tblLossRunFreq_AFFIN]
-
-
-
-
-
+Are you already using any auth in FastAPI?
+Will F5 APM be configured for OIDC or SAML?
+Do you want JWT validation in-app, or to trust F5 headers only?
+How will group names be provided (actual AD group names vs. app roles)?
