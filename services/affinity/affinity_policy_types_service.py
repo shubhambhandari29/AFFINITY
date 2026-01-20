@@ -23,26 +23,30 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
     Returns a list of dicts (records).
     """
 
-    query_filters = dict(query_params)
-    query_filters["PrimaryAgt"] = "Yes"
-
     try:
         filters = []
         params = []
-        for key, value in query_filters.items():
+        for key, value in query_params.items():
+            if key == "PrimaryAgt":
+                continue
             _ensure_safe_identifier(key)
-            table = AGENTS_TABLE if key == "PrimaryAgt" else TABLE_NAME
-            filters.append(f"{table}.{key} = ?")
+            filters.append(f"{TABLE_NAME}.{key} = ?")
             params.append(value)
 
-        query = (
-            f"SELECT * FROM {TABLE_NAME} "
-            f"LEFT JOIN {AGENTS_TABLE} "
-            f"ON {TABLE_NAME}.ProgramName = {AGENTS_TABLE}.ProgramName"
-        )
+        query = f"""
+            SELECT {TABLE_NAME}.*
+            FROM {TABLE_NAME}
+            WHERE EXISTS (
+                SELECT 1
+                FROM {AGENTS_TABLE}
+                WHERE {AGENTS_TABLE}.ProgramName = {TABLE_NAME}.ProgramName
+                  AND {AGENTS_TABLE}.PrimaryAgt = ?
+            )
+        """
+        params.insert(0, "Yes")
 
         if filters:
-            query += " WHERE " + " AND ".join(filters)
+            query += " AND " + " AND ".join(filters)
 
         records = await run_raw_query_async(query, params)
         return format_records_dates(records)
