@@ -1,67 +1,100 @@
-import logging
-from typing import Any
-
-from fastapi import HTTPException
-
-from core.date_utils import format_records_dates, normalize_payload_dates
-from core.db_helpers import (
-    fetch_records_async,
-    insert_records_async,
-    merge_upsert_records_async,
-    sanitize_filters,
-)
-from services.validations.affinity_validations import validate_affinity_program_payload
-
-logger = logging.getLogger(__name__)
-
-TABLE_NAME = "tblAcctAffinityProgram"
-
-
-async def get_affinity_program(query_params: dict[str, Any]):
-    """
-    Fetch account(s) from tblAcctAffinityProgram.
-    If query_params is provided, filters by given key/value.
-    Returns a list of dicts (records).
-    """
-
-    try:
-        filters = sanitize_filters(query_params)
-        records = await fetch_records_async(table=TABLE_NAME, filters=filters)
-        return format_records_dates(records)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
-    except Exception as e:
-        logger.warning(f"Error fetching Affinity Program List - {str(e)}")
-        raise HTTPException(status_code=500, detail={"error": str(e)}) from e
-
-
-async def upsert_affinity_program(data: dict[str, Any]):
-    """
-    Update row if already exists, else insert row into tblAcctAffinityProgram.
-    """
-
-    try:
-        errors = validate_affinity_program_payload(data)
-        if errors:
-            raise HTTPException(status_code=400, detail={"errors": errors})
-
-        normalized_data = normalize_payload_dates(data)
-        pk_value = normalized_data.get("AcctAffinityProgramKey")
-        if pk_value not in (None, ""):
-            sanitized = {k: v for k, v in normalized_data.items() if k != "AcctAffinityProgramKey"}
-            return await merge_upsert_records_async(
-            table=TABLE_NAME,
-            data_list=[sanitized],
-            key_columns=["ProgramName"],
-        )
-        
-
-        return await merge_upsert_records_async(
-            table=TABLE_NAME,
-            data_list=[normalized_data],
-            key_columns=["AcctAffinityProgramKey"],
-        )
-    except Exception as e:
-        logger.warning(f"Insert/Update failed - {str(e)}")
-        raise HTTPException(status_code=500, detail={"error": str(e)}) from e
-    
+STEP 1: Confirm / Create Secrets in Key Vault
+Secrets to be stored
+Only values that are sensitive or environment-specific.
+Recommended secrets:
+Secret Name	Value
+sac-db-server	cms-xxx.database.windows.net
+sac-db-name	CLMAA_SpecialAccounts
+We are using Managed Identity →
+❌ No DB username
+❌ No DB password
+How to create (Azure Portal)
+Go to Key Vault
+Open Secrets
+Click Generate / Import
+Enter:
+Name: sac-db-server
+Value: actual server name
+Save
+Repeat for sac-db-name
+STEP 2: Enable Managed Identity on App Service
+Why
+Managed Identity is required for:
+Key Vault access
+Azure SQL authentication (ActiveDirectoryMSI)
+How
+Go to App Service
+Open Identity
+Under System assigned
+Set Status = On
+Click Save
+⚠️ This step generates a service principal automatically.
+STEP 3: Grant Key Vault Access to App Service Identity
+This is the most critical step
+Option A (Recommended): RBAC Model
+Go to Key Vault
+Open Access control (IAM)
+Click Add role assignment
+Select:
+Role: Key Vault Secrets User
+Assign access to: Managed identity
+Member: Select the App Service name
+Save
+✅ This allows read-only access to secrets.
+Option B (If Access Policies are used instead of RBAC)
+Go to Key Vault
+Open Access policies
+Click Create / Add
+Select principal → App Service managed identity
+Secret permissions:
+✅ Get
+✅ List
+Save
+STEP 4: Verify Key Vault Networking
+This step avoids silent failures.
+Ask infra to confirm ONE of the following:
+Case 1: Public network access enabled
+✅ No action needed
+Case 2: Firewall / Selected Networks enabled
+One of these must be true:
+App Service outbound IPs are allowed
+OR App Service is VNet-integrated and KV allows that subnet
+OR KV is exposed via Private Endpoint + Private DNS
+⚠️ If networking is blocked, Key Vault references will fail at runtime.
+STEP 5: Update App Service Application Settings (Key Vault References)
+Replace only DB-related values
+In App Service → Configuration → Application settings
+DB_SERVER
+@Microsoft.KeyVault(SecretUri=https://<keyvault-name>.vault.azure.net/secrets/sac-db-server/)
+DB_NAME
+@Microsoft.KeyVault(SecretUri=https://<keyvault-name>.vault.azure.net/secrets/sac-db-name/)
+Keep these as plain values (DO NOT move to Key Vault)
+DB_AUTH   = ActiveDirectoryMSI
+DB_DRIVER = {ODBC Driver 17 for SQL Server}
+Reason:
+These are configuration, not secrets
+App Service resolves KV references only for values
+STEP 6: Restart App Service
+Mandatory.
+Key Vault references are resolved:
+On app startup
+Or after restart
+STEP 7: Azure SQL Permissions (Managed Identity)
+The App Service identity must exist as a user in Azure SQL.
+Run once in the database:
+CREATE USER [<app-service-name>] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [<app-service-name>];
+ALTER ROLE db_datawriter ADD MEMBER [<app-service-name>];
+⚠️ This step is often missed and causes login failures.
+How the Runtime Flow Works (for clarity)
+App Service starts
+Azure resolves Key Vault references
+Secrets become normal environment variables
+App reads os.getenv("DB_SERVER")
+pyodbc uses Authentication=ActiveDirectoryMSI
+Managed Identity token is sent to Azure SQL
+Connection succeeds
+✅ No secrets in code
+✅ No secrets in repo
+✅ No secrets in App Settings
+Optional (Strongly Recommended)
