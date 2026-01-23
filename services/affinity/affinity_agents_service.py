@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblAffinityAgents"
 KEY_COLUMNS = ["ProgramName", "AgentCode"]
+IDENTITY_COLUMNS = {"PK_Number"}
 
 
 async def get_affinity_agents(query_params: dict[str, Any]):
@@ -49,7 +50,9 @@ async def upsert_affinity_agents(data_list: list[dict[str, Any]]):
             if item_errors:
                 errors.append({"index": index, "errors": item_errors})
                 continue
-            normalized_list.append(normalize_payload_dates(data_with_defaults))
+            normalized = normalize_payload_dates(data_with_defaults)
+            sanitized = {k: v for k, v in normalized.items() if k not in IDENTITY_COLUMNS}
+            normalized_list.append(sanitized)
 
         if errors:
             raise HTTPException(status_code=400, detail={"errors": errors})
