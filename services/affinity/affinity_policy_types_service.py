@@ -26,8 +26,9 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
     """
 
     try:
-        filters = []
-        params = []
+        filters: list[str] = []
+        params: list[Any] = []
+        primary_agt = query_params.get("PrimaryAgt")
         for key, value in query_params.items():
             if key == "PrimaryAgt":
                 continue
@@ -35,20 +36,24 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
             filters.append(f"{TABLE_NAME}.{key} = ?")
             params.append(value)
 
-        query = f"""
-            SELECT {TABLE_NAME}.*
-            FROM {TABLE_NAME}
-            WHERE EXISTS (
-                SELECT 1
-                FROM {AGENTS_TABLE}
-                WHERE {AGENTS_TABLE}.ProgramName = {TABLE_NAME}.ProgramName
-                  AND {AGENTS_TABLE}.PrimaryAgt = ?
-            )
-        """
-        params.insert(0, "Yes")
-
-        if filters:
-            query += " AND " + " AND ".join(filters)
+        if primary_agt not in (None, ""):
+            query = f"""
+                SELECT {TABLE_NAME}.*
+                FROM {TABLE_NAME}
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM {AGENTS_TABLE}
+                    WHERE {AGENTS_TABLE}.ProgramName = {TABLE_NAME}.ProgramName
+                      AND {AGENTS_TABLE}.PrimaryAgt = ?
+                )
+            """
+            params.insert(0, primary_agt)
+            if filters:
+                query += " AND " + " AND ".join(filters)
+        else:
+            query = f"SELECT {TABLE_NAME}.* FROM {TABLE_NAME}"
+            if filters:
+                query += " WHERE " + " AND ".join(filters)
 
         records = await run_raw_query_async(query, params)
         return format_records_dates(records)
