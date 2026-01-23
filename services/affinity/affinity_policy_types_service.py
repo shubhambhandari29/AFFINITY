@@ -4,7 +4,13 @@ from typing import Any
 from fastapi import HTTPException
 
 from core.date_utils import format_records_dates, normalize_payload_dates
-from core.db_helpers import _ensure_safe_identifier, merge_upsert_records_async, run_raw_query_async
+from core.db_helpers import (
+    _ensure_safe_identifier,
+    fetch_records_async,
+    insert_records_async,
+    merge_upsert_records_async,
+    run_raw_query_async,
+)
 from services.validations.affinity_validations import (
     apply_affinity_policy_type_defaults,
     validate_affinity_policy_type_payload,
@@ -15,7 +21,6 @@ logger = logging.getLogger(__name__)
 TABLE_NAME = "tblAffinityPolicyType"
 AGENTS_TABLE = "tblAffinityAgents"
 PRIMARY_KEY = "PK_Number"
-KEY_COLUMNS = ["ProgramName", "PolicyType"]
 
 
 async def get_affinity_policy_types(query_params: dict[str, Any]):
@@ -66,7 +71,7 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
 
 async def upsert_affinity_policy_types(data: dict[str, Any]):
     """
-    Update row if already exists, else insert row into tblAffinityPolicyType.
+    Update row when PK_Number is provided, else insert a new row into tblAffinityPolicyType.
     """
 
     try:
@@ -77,6 +82,15 @@ async def upsert_affinity_policy_types(data: dict[str, Any]):
         normalized = normalize_payload_dates(data_with_defaults)
         pk_value = normalized.get(PRIMARY_KEY)
         if pk_value not in (None, ""):
+            existing = await fetch_records_async(
+                table=TABLE_NAME,
+                filters={PRIMARY_KEY: pk_value},
+            )
+            if not existing:
+                raise HTTPException(
+                    status_code=404,
+                    detail={"error": f"{PRIMARY_KEY} {pk_value} not found"},
+                )
             return await merge_upsert_records_async(
                 table=TABLE_NAME,
                 data_list=[normalized],
@@ -85,11 +99,9 @@ async def upsert_affinity_policy_types(data: dict[str, Any]):
             )
 
         sanitized = {k: v for k, v in normalized.items() if k != PRIMARY_KEY}
-        return await merge_upsert_records_async(
-            table=TABLE_NAME,
-            data_list=[sanitized],
-            key_columns=KEY_COLUMNS,
-        )
+        return await insert_records_async(table=TABLE_NAME, records=[sanitized])
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning(f"Insert/Update failed - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
