@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblAffinityPolicyType"
 AGENTS_TABLE = "tblAffinityAgents"
+PRIMARY_KEY = "PK_Number"
+KEY_COLUMNS = ["ProgramName", "PolicyType"]
 
 
 async def get_affinity_policy_types(query_params: dict[str, Any]):
@@ -68,10 +70,20 @@ async def upsert_affinity_policy_types(data: dict[str, Any]):
         if errors:
             raise HTTPException(status_code=400, detail={"errors": errors})
         normalized = normalize_payload_dates(data_with_defaults)
+        pk_value = normalized.get(PRIMARY_KEY)
+        if pk_value not in (None, ""):
+            return await merge_upsert_records_async(
+                table=TABLE_NAME,
+                data_list=[normalized],
+                key_columns=[PRIMARY_KEY],
+                exclude_key_columns_from_insert=True,
+            )
+
+        sanitized = {k: v for k, v in normalized.items() if k != PRIMARY_KEY}
         return await merge_upsert_records_async(
             table=TABLE_NAME,
-            data_list=[normalized],
-            key_columns=["ProgramName"],
+            data_list=[sanitized],
+            key_columns=KEY_COLUMNS,
         )
     except Exception as e:
         logger.warning(f"Insert/Update failed - {str(e)}")
