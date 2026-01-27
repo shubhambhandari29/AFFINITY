@@ -1,100 +1,204 @@
-STEP 1: Confirm / Create Secrets in Key Vault
-Secrets to be stored
-Only values that are sensitive or environment-specific.
-Recommended secrets:
-Secret Name	Value
-sac-db-server	cms-xxx.database.windows.net
-sac-db-name	CLMAA_SpecialAccounts
-We are using Managed Identity →
-❌ No DB username
-❌ No DB password
-How to create (Azure Portal)
-Go to Key Vault
-Open Secrets
-Click Generate / Import
-Enter:
-Name: sac-db-server
-Value: actual server name
-Save
-Repeat for sac-db-name
-STEP 2: Enable Managed Identity on App Service
-Why
-Managed Identity is required for:
-Key Vault access
-Azure SQL authentication (ActiveDirectoryMSI)
-How
-Go to App Service
-Open Identity
-Under System assigned
-Set Status = On
-Click Save
-⚠️ This step generates a service principal automatically.
-STEP 3: Grant Key Vault Access to App Service Identity
-This is the most critical step
-Option A (Recommended): RBAC Model
-Go to Key Vault
-Open Access control (IAM)
-Click Add role assignment
-Select:
-Role: Key Vault Secrets User
-Assign access to: Managed identity
-Member: Select the App Service name
-Save
-✅ This allows read-only access to secrets.
-Option B (If Access Policies are used instead of RBAC)
-Go to Key Vault
-Open Access policies
-Click Create / Add
-Select principal → App Service managed identity
-Secret permissions:
-✅ Get
-✅ List
-Save
-STEP 4: Verify Key Vault Networking
-This step avoids silent failures.
-Ask infra to confirm ONE of the following:
-Case 1: Public network access enabled
-✅ No action needed
-Case 2: Firewall / Selected Networks enabled
-One of these must be true:
-App Service outbound IPs are allowed
-OR App Service is VNet-integrated and KV allows that subnet
-OR KV is exposed via Private Endpoint + Private DNS
-⚠️ If networking is blocked, Key Vault references will fail at runtime.
-STEP 5: Update App Service Application Settings (Key Vault References)
-Replace only DB-related values
-In App Service → Configuration → Application settings
-DB_SERVER
-@Microsoft.KeyVault(SecretUri=https://<keyvault-name>.vault.azure.net/secrets/sac-db-server/)
-DB_NAME
-@Microsoft.KeyVault(SecretUri=https://<keyvault-name>.vault.azure.net/secrets/sac-db-name/)
-Keep these as plain values (DO NOT move to Key Vault)
-DB_AUTH   = ActiveDirectoryMSI
-DB_DRIVER = {ODBC Driver 17 for SQL Server}
-Reason:
-These are configuration, not secrets
-App Service resolves KV references only for values
-STEP 6: Restart App Service
-Mandatory.
-Key Vault references are resolved:
-On app startup
-Or after restart
-STEP 7: Azure SQL Permissions (Managed Identity)
-The App Service identity must exist as a user in Azure SQL.
-Run once in the database:
-CREATE USER [<app-service-name>] FROM EXTERNAL PROVIDER;
-ALTER ROLE db_datareader ADD MEMBER [<app-service-name>];
-ALTER ROLE db_datawriter ADD MEMBER [<app-service-name>];
-⚠️ This step is often missed and causes login failures.
-How the Runtime Flow Works (for clarity)
-App Service starts
-Azure resolves Key Vault references
-Secrets become normal environment variables
-App reads os.getenv("DB_SERVER")
-pyodbc uses Authentication=ActiveDirectoryMSI
-Managed Identity token is sent to Azure SQL
-Connection succeeds
-✅ No secrets in code
-✅ No secrets in repo
-✅ No secrets in App Settings
-Optional (Strongly Recommended)
+select  AgentCode,count(*) from tblAffinityAgents
+group by AgentCode order by AgentCode 
+desc;
+
+
+
+AgentCode	(No column name)
+8608414	1
+860285611	1
+8602856	2
+6605835	1
+5701638	1
+5701624	1
+5701504	1
+5701494	1
+5701493	1
+5701400	1
+5701312	1
+5701309	1
+5701212	1
+5701181	1
+5701167	1
+5701083	1
+5504032	1
+5503707	1
+5103474	1
+5103228	1
+5009628	1
+5009446	1
+4108887	1
+3002939	1
+3002895	1
+3002891	1
+3002890	1
+3002889	1
+3002888	1
+3002887	1
+3002886	1
+3002871	1
+3002858	1
+3002830	3
+3002726	1
+3002717	1
+2902463	1
+2902443	1
+2902441	1
+2902405	1
+2509848	1
+2509659	1
+2301658	1
+2003760	1
+1802809	1
+1802465	1
+1602657	1
+1602483	1
+1502070	1
+1309570	1
+1309564	1
+1304920	1
+1304316	1
+1001690	1
+1001192	1
+1001191	1
+1001181	1
+1001093	1
+1001072	1
+0501773	1
+0303919	1
+0200110	1
+
+
+
+
+
+
+
+----------------------------------------------
+
+
+
+
+
+AgentCode	(No column name)
+
+8608414	1
+
+6605835	1
+
+5701638	1
+
+5701624	1
+
+5701504	1
+
+5701494	1
+
+5701493	1
+
+5701400	1
+
+5701312	1
+
+5701309	1
+
+5701212	1
+
+5701181	1
+
+5701167	1
+
+5701083	1
+
+5504032	1
+
+5503707	1
+
+5103474	1
+
+5103228	1
+
+5009628	1
+
+5009446	1
+
+4108887	1
+
+3002939	1
+
+3002895	1
+
+3002891	1
+
+3002890	1
+
+3002889	1
+
+3002888	1
+
+3002887	1
+
+3002886	1
+
+3002871	1
+
+3002858	1
+
+3002830	1
+
+3002726	1
+
+3002717	1
+
+2902463	1
+
+2902443	1
+
+2902441	1
+
+2902405	1
+
+2509848	1
+
+2509659	1
+
+2301658	1
+
+2003760	1
+
+1802809	1
+
+1802465	1
+
+1602657	1
+
+1602483	1
+
+1502070	1
+
+1309570	1
+
+1309564	1
+
+1304920	1
+
+1304316	1
+
+1001690	1
+
+1001192	1
+
+1001191	1
+
+1001181	1
+
+1001093	1
+
+1001072	1
+
+0501773	1
+
+0303919	1
+
+0200110	1
+ 
