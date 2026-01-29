@@ -14,6 +14,7 @@ from api.sac.sac_account import router as sac_account_router
 from api.sac.sac_affiliates import router as sac_affiliates_router
 from api.sac.sac_policies import router as sac_policies_router
 from api.sac.search_sac_account import router as search_sac_account_router
+from api.outlook_compose import router as outlook_compose_router
 from core.config import settings
 from core.logging_config import configure_logging
 
@@ -85,6 +86,9 @@ app.include_router(
 app.include_router(
     deduct_bill_frequency_router, prefix="/deduct_bill_frequency", tags=["deduct_bill_frequency"]
 )
+
+# outlook compose
+app.include_router(outlook_compose_router, prefix="/outlook", tags=["outlook"])
 
 # affinity
 app.include_router(affinity_program_router, prefix="/affinity_program", tags=["affinity_program"])

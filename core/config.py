@@ -38,4 +38,11 @@ class Settings:
     SECURE_COOKIE: bool = _as_bool(os.getenv("SECURE_COOKIE"))
     SAME_SITE: str = os.getenv("SAME_SITE")
 
+    # Outlook compose settings
+    OUTLOOK_COMPOSE_BASE_URL: str = os.getenv(
+        "OUTLOOK_COMPOSE_BASE_URL",
+        "https://outlook.office.com/mail/deeplink/compose",
+    )
+
+
 settings = Settings()

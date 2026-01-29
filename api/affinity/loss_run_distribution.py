@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, Request
 
 from core.models.affinity.affinity_distribution import AffinityDistributionEntry
 from services.auth_service import get_current_user_from_token
-from services.affinity.loss_run_distribution_service import get_distribution as get_distribution_service
-from services.affinity.loss_run_distribution_service import upsert_distribution as upsert_distribution_service
-from services.affinity.loss_run_distribution_service import delete_distribution as delete_distribution_service
+from services.affinity.loss_run_distribution_service import (
+    delete_distribution as delete_distribution_service,
+    get_distribution as get_distribution_service,
+    upsert_distribution as upsert_distribution_service,
+)
 
 router = APIRouter(dependencies=[Depends(get_current_user_from_token)])
 
@@ -21,3 +23,4 @@ async def upsert_distribution(payload: list[AffinityDistributionEntry]):
 async def delete_distribution(payload: list[AffinityDistributionEntry]):
     entries = [entry.model_dump() for entry in payload]
     return await delete_distribution_service(entries)
+

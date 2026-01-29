@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class DistributionEntry(BaseModel):
@@ -12,7 +12,8 @@ class DistributionEntry(BaseModel):
     RecipCat: str | None = None
     DistVia: str | None = None
     AttnTo: str | None = None
-    EMailAddress: EmailStr | None = None
+    EMailAddress: str | None = None
 
     class Config:
         extra = "allow"
+
