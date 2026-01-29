@@ -27,6 +27,13 @@ from api.affinity.claim_review_distribution import router as claim_review_distri
 from api.affinity.policy_type_distribution import router as policy_type_distribution_affinity_router
 from api.affinity.loss_run_frequency import router as loss_run_frequency_affinity_router
 from api.affinity.claim_review_frequency import router as claim_review_frequency_affinity_router
+from api.cct.cct_account import router as cct_account_router
+from api.cct.cct_affinity_program import router as cct_affinity_program_router
+from api.cct.cct_policies import router as cct_policies_router
+from api.cct.search_cct_account import router as search_cct_account_router
+from api.cct.search_cct_affinity_program import (
+    router as search_cct_affinity_program_router,
+)
 
 configure_logging()
 
@@ -102,4 +109,15 @@ app.include_router(policy_type_distribution_affinity_router, prefix="/policy_typ
 
 app.include_router(loss_run_frequency_affinity_router, prefix="/loss_run_frequency_affinity", tags=["loss_run_frequency_affinity"])
 app.include_router(claim_review_frequency_affinity_router, prefix="/claim_review_frequency_affinity", tags=["claim_review_frequency_affinity"])
+
+# cct
+app.include_router(cct_account_router, prefix="/cct_account", tags=["cct_account"])
+app.include_router(cct_policies_router, prefix="/cct_policies", tags=["cct_policies"])
+app.include_router(search_cct_account_router, prefix="/search_cct_account", tags=["search_cct_account"])
+app.include_router(cct_affinity_program_router, prefix="/cct_affinity_program", tags=["cct_affinity_program"])
+app.include_router(
+    search_cct_affinity_program_router,
+    prefix="/search_cct_affinity_program",
+    tags=["search_cct_affinity_program"],
+)
 
