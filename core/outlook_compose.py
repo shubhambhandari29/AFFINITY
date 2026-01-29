@@ -16,7 +16,7 @@ def build_compose_link(
             detail={"error": "Provide recipients to build the compose link"},
         )
 
-    deduped: list[str] = []
+    unique_recipients: list[str] = []
     seen: set[str] = set()
     filtered_out = 0
     for email in recipients:
@@ -27,9 +27,9 @@ def build_compose_link(
             filtered_out += 1
             continue
         seen.add(email)
-        deduped.append(email)
+        unique_recipients.append(email)
 
-    if not deduped:
+    if not unique_recipients:
         raise HTTPException(
             status_code=400,
             detail={
@@ -41,7 +41,7 @@ def build_compose_link(
 
     params = urlencode(
         {
-            "to": ";".join(deduped),
+            "to": ";".join(unique_recipients),
             "subject": subject or "",
             "body": body or "",
         }
@@ -50,7 +50,7 @@ def build_compose_link(
 
     return {
         "url": compose_url,
-        "recipients": deduped,
+        "recipients": unique_recipients,
         "invalid_emails": [],
         "filtered_out": filtered_out,
         "total": len(recipients),
