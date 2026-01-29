@@ -138,6 +138,58 @@ export default function ReportRecipientList({ url, parameter }) {
     replace(originalData);
   };
 
+  const handleComposeEmail = async () => {
+    try {
+      setLoading("composing");
+      const composeEndpoint = url.endsWith("/")
+        ? `${url}compose_link`
+        : `${url}/compose_link`;
+      const res = await api.post(composeEndpoint, {
+        filters: parameter,
+      });
+      const composeUrl = res?.data?.url;
+      if (!composeUrl) {
+        throw new Error("Compose URL not returned");
+      }
+      const win = window.open(composeUrl, "_blank", "noopener");
+      if (!win) {
+        Swal.fire({
+          title: "Pop-up blocked",
+          text: "Please allow pop-ups for this site and try again.",
+          icon: "warning",
+          confirmButtonText: "OK",
+          iconColor: theme.palette.warning.main,
+          customClass: {
+            confirmButton: "swal-confirm-button",
+            cancelButton: "swal-cancel-button",
+          },
+          buttonsStyling: false,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      const errorText =
+        err?.response?.data?.detail?.error ||
+        "Unable to open Outlook compose window";
+      Swal.fire({
+        title: "Error",
+        text: errorText,
+        icon: "error",
+        confirmButtonText: "OK",
+        iconColor: theme.palette.error.main,
+        customClass: {
+          confirmButton: "swal-confirm-button",
+          cancelButton: "swal-cancel-button",
+        },
+        buttonsStyling: false,
+      });
+    } finally {
+      setLoading("");
+    }
+  };
+
+  const canComposeEmail = url === "/loss_run_distribution/";
+
   let columns = [
     {
       field: Object.keys(parameter)[0],
@@ -378,11 +430,22 @@ export default function ReportRecipientList({ url, parameter }) {
 
           {url !== "/policy_type_distribution_affinity/" && (
             <div style={{ marginTop: 16 }}>
+              {!isEdit && canComposeEmail && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleComposeEmail}
+                  disabled={loading === "composing"}
+                  sx={{ height: "45" }}
+                >
+                  Send Email
+                </Button>
+              )}
               {!isEdit && (
                 <Button
                   variant="outlined"
                   onClick={() => setIsEdit(true)}
-                  sx={{ height: "45" }}
+                  sx={{ height: "45", marginLeft: canComposeEmail ? 8 : 0 }}
                 >
                   Edit
                 </Button>
