@@ -34,6 +34,7 @@ from api.cct.search_cct_account import router as search_cct_account_router
 from api.cct.search_cct_affinity_program import (
     router as search_cct_affinity_program_router,
 )
+from api.cct.cct_policy_filters import router as cct_policy_filters_router
 
 configure_logging()
 
@@ -120,4 +121,5 @@ app.include_router(
     prefix="/search_cct_affinity_program",
     tags=["search_cct_affinity_program"],
 )
+app.include_router(cct_policy_filters_router, prefix="/cct_policies", tags=["cct_policies"])
 
