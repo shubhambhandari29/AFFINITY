@@ -38,4 +38,21 @@ class Settings:
     SECURE_COOKIE: bool = _as_bool(os.getenv("SECURE_COOKIE"))
     SAME_SITE: str = os.getenv("SAME_SITE")
 
+    # Outlook compose settings
+    OUTLOOK_COMPOSE_ENABLED: bool = _as_bool(os.getenv("OUTLOOK_COMPOSE_ENABLED"), True)
+    OUTLOOK_COMPOSE_BASE_URL: str = os.getenv(
+        "OUTLOOK_COMPOSE_BASE_URL",
+        "https://outlook.office.com/mail/deeplink/compose",
+    )
+    OUTLOOK_COMPOSE_MAX_RECIPIENTS: int = int(os.getenv("OUTLOOK_COMPOSE_MAX_RECIPIENTS", "50"))
+    OUTLOOK_COMPOSE_ALLOWED_DOMAINS: str | None = os.getenv("OUTLOOK_COMPOSE_ALLOWED_DOMAINS")
+    OUTLOOK_COMPOSE_SUBJECT_TEMPLATE: str = os.getenv(
+        "OUTLOOK_COMPOSE_SUBJECT_TEMPLATE",
+        "Loss Run Report Distribution",
+    )
+    OUTLOOK_COMPOSE_BODY_TEMPLATE: str = os.getenv(
+        "OUTLOOK_COMPOSE_BODY_TEMPLATE",
+        "Hi,\n\nPlease see the loss run report.\n\nThanks,",
+    )
+
 settings = Settings()
