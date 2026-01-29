@@ -1,204 +1,490 @@
-select  AgentCode,count(*) from tblAffinityAgents
-group by AgentCode order by AgentCode 
-desc;
-
-
-
-AgentCode	(No column name)
-8608414	1
-860285611	1
-8602856	2
-6605835	1
-5701638	1
-5701624	1
-5701504	1
-5701494	1
-5701493	1
-5701400	1
-5701312	1
-5701309	1
-5701212	1
-5701181	1
-5701167	1
-5701083	1
-5504032	1
-5503707	1
-5103474	1
-5103228	1
-5009628	1
-5009446	1
-4108887	1
-3002939	1
-3002895	1
-3002891	1
-3002890	1
-3002889	1
-3002888	1
-3002887	1
-3002886	1
-3002871	1
-3002858	1
-3002830	3
-3002726	1
-3002717	1
-2902463	1
-2902443	1
-2902441	1
-2902405	1
-2509848	1
-2509659	1
-2301658	1
-2003760	1
-1802809	1
-1802465	1
-1602657	1
-1602483	1
-1502070	1
-1309570	1
-1309564	1
-1304920	1
-1304316	1
-1001690	1
-1001192	1
-1001191	1
-1001181	1
-1001093	1
-1001072	1
-0501773	1
-0303919	1
-0200110	1
-
-
-
-
-
-
-
-----------------------------------------------
-
-actual data :
-
-
-
-AgentCode	(No column name)
-
-8608414	1
-
-6605835	1
-
-5701638	1
-
-5701624	1
-
-5701504	1
-
-5701494	1
-
-5701493	1
-
-5701400	1
-
-5701312	1
-
-5701309	1
-
-5701212	1
-
-5701181	1
-
-5701167	1
-
-5701083	1
-
-5504032	1
-
-5503707	1
-
-5103474	1
-
-5103228	1
-
-5009628	1
-
-5009446	1
-
-4108887	1
-
-3002939	1
-
-3002895	1
-
-3002891	1
-
-3002890	1
-
-3002889	1
-
-3002888	1
-
-3002887	1
-
-3002886	1
-
-3002871	1
-
-3002858	1
-
-3002830	1
-
-3002726	1
-
-3002717	1
-
-2902463	1
-
-2902443	1
-
-2902441	1
-
-2902405	1
-
-2509848	1
-
-2509659	1
-
-2301658	1
-
-2003760	1
-
-1802809	1
-
-1802465	1
-
-1602657	1
-
-1602483	1
-
-1502070	1
-
-1309570	1
-
-1309564	1
-
-1304920	1
-
-1304316	1
-
-1001690	1
-
-1001192	1
-
-1001191	1
-
-1001181	1
-
-1001093	1
-
-1001072	1
-
-0501773	1
-
-0303919	1
-
-0200110	1
- 
+import { useState, useEffect } from "react";
+import {
+  useForm,
+  FormProvider,
+  useFieldArray,
+  Controller,
+} from "react-hook-form";
+import { DataGrid } from "@mui/x-data-grid";
+import {
+  Button,
+  TextField,
+  Typography,
+  MenuItem,
+  useTheme,
+  Select,
+} from "@mui/material";
+import api from "../../../../api/api";
+import Loader from "../../../ui/Loader";
+import Swal from "sweetalert2";
+import useDropdownData from "../../../../hooks/useDropdownData";
+import EmailField from "../../../ui/EmailField";
+
+export default function ReportRecipientList({ url, parameter }) {
+  const [isEdit, setIsEdit] = useState(false);
+  const [originalData, setOriginalData] = useState([]);
+  const methods = useForm({ defaultValues: { recipients: [] } });
+  const [loading, setLoading] = useState("");
+  const { control, handleSubmit, reset } = methods;
+  const { fields, append, replace } = useFieldArray({
+    control,
+    name: "recipients",
+  });
+  const theme = useTheme();
+  const { data: ddData, loading: ddLoading } =
+    useDropdownData("/dropdowns/all");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading("fetching");
+      try {
+        const res = await api.get(url, {
+          params: parameter,
+        });
+        setOriginalData(res.data);
+        reset({ recipients: res.data });
+      } catch (err) {
+        console.error(err);
+        Swal.fire({
+          title: "Error",
+          text: "Some error occoured, unable to load data",
+          icon: "error",
+          confirmButtonText: "OK",
+          iconColor: theme.palette.error.main,
+          customClass: {
+            confirmButton: "swal-confirm-button",
+            cancelButton: "swal-cancel-button",
+          },
+          buttonsStyling: false,
+        });
+      } finally {
+        setLoading("");
+      }
+    };
+    fetchData();
+  }, [reset, url, parameter, theme.palette.error.main]);
+
+  const onSubmit = (data) => {
+    // Check if data is same as original
+    const isSame =
+      JSON.stringify(data.recipients) === JSON.stringify(originalData);
+
+    if (isSame) {
+      reset({ recipients: data.recipients });
+      setIsEdit(false);
+      return;
+    }
+
+    try {
+      setLoading("submitting");
+      api.post(`${url}upsert`, data.recipients);
+    } catch (err) {
+      console.log(err);
+      Swal.fire({
+        title: "Error",
+        text: "Some error occoured, unable to save data",
+        icon: "error",
+        confirmButtonText: "OK",
+        iconColor: theme.palette.error.main,
+        customClass: {
+          confirmButton: "swal-confirm-button",
+          cancelButton: "swal-cancel-button",
+        },
+        buttonsStyling: false,
+      });
+    } finally {
+      setLoading("");
+    }
+
+    setOriginalData(data.recipients);
+    reset({ recipients: data.recipients });
+    setIsEdit(false);
+  };
+
+  const onError = (errors) => {
+    const errVals = Object.values(errors.recipients.find((i) => i));
+
+    if (errVals.length > 0) {
+      Swal.fire({
+        title: "Data Validation Error",
+        text:
+          errVals[0].message === "true"
+            ? "You've left blank a mandatory field. Please check your entries"
+            : errVals[0].message,
+        icon: "error",
+        confirmButtonText: "OK",
+        iconColor: theme.palette.error.main,
+        customClass: {
+          confirmButton: "swal-confirm-button",
+          cancelButton: "swal-cancel-button",
+        },
+        buttonsStyling: false,
+      });
+    }
+  };
+
+  const handleAdd = () => {
+    append({
+      [Object.keys(parameter)[0]]: Object.values(parameter)[0],
+      RecipCat: "",
+      DistVia: "",
+      AttnTo: "",
+      EMailAddress: "",
+    });
+  };
+
+  const handleCancel = () => {
+    setIsEdit(false);
+    replace(originalData);
+  };
+
+  const handleComposeEmail = async () => {
+    try {
+      setLoading("composing");
+      const composeEndpoint = url.endsWith("/")
+        ? `${url}compose_link`
+        : `${url}/compose_link`;
+      const res = await api.post(composeEndpoint, {
+        filters: parameter,
+      });
+      const composeUrl = res?.data?.url;
+      if (!composeUrl) {
+        throw new Error("Compose URL not returned");
+      }
+      const win = window.open(composeUrl, "_blank", "noopener");
+      if (!win) {
+        Swal.fire({
+          title: "Pop-up blocked",
+          text: "Please allow pop-ups for this site and try again.",
+          icon: "warning",
+          confirmButtonText: "OK",
+          iconColor: theme.palette.warning.main,
+          customClass: {
+            confirmButton: "swal-confirm-button",
+            cancelButton: "swal-cancel-button",
+          },
+          buttonsStyling: false,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      const errorText =
+        err?.response?.data?.detail?.error ||
+        "Unable to open Outlook compose window";
+      Swal.fire({
+        title: "Error",
+        text: errorText,
+        icon: "error",
+        confirmButtonText: "OK",
+        iconColor: theme.palette.error.main,
+        customClass: {
+          confirmButton: "swal-confirm-button",
+          cancelButton: "swal-cancel-button",
+        },
+        buttonsStyling: false,
+      });
+    } finally {
+      setLoading("");
+    }
+  };
+
+  const canComposeEmail = url === "/loss_run_distribution/";
+
+  let columns = [
+    {
+      field: Object.keys(parameter)[0],
+      headerName: (
+        <b>
+          {Object.keys(parameter)[0].replace(/([a-z])([A-Z])/g, "$1 $2")}
+          <sup style={{ color: "red" }}>*</sup>
+        </b>
+      ),
+      flex: 2,
+      renderCell: (params) =>
+        isEdit ? (
+          <Controller
+            name={`recipients.${params.row.rhfIndex}.${
+              Object.keys(parameter)[0]
+            }`}
+            control={control}
+            rules={{ required: "true" }}
+            render={({ field, fieldState: { error } }) => (
+              <TextField
+                {...field}
+                fullWidth
+                disabled={true}
+                onKeyDown={(event) => event.stopPropagation()}
+                error={!!error}
+              />
+            )}
+          />
+        ) : (
+          params.value
+        ),
+    },
+    {
+      field: "PolicyType",
+      headerName: <b>Policy Type</b>,
+      flex: 1,
+      renderCell: (params) =>
+        isEdit ? (
+          <Controller
+            name={`recipients.${params.row.rhfIndex}.PolicyType`}
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                fullWidth
+                onKeyDown={(event) => event.stopPropagation()}
+              />
+            )}
+          />
+        ) : (
+          params.value
+        ),
+    },
+    {
+      field: "RecipCat",
+      headerName: (
+        <b>
+          Recipient Category<sup style={{ color: "red" }}>*</sup>
+        </b>
+      ),
+      flex: 1.5,
+      renderCell: (params) =>
+        isEdit ? (
+          <Controller
+            name={`recipients.${params.row.rhfIndex}.RecipCat`}
+            control={control}
+            rules={{ required: "true" }}
+            render={({ field, fieldState: { error } }) => (
+              <Select
+                {...field}
+                fullWidth
+                MenuProps={{
+                  PaperProps: { sx: { maxHeight: 300 } },
+                }}
+                error={!!error}
+                renderValue={(selected) => {
+                  const existingOption = ddData
+                    .filter((i) => i.DD_Type === "RecipCat")
+                    .find((opt) => opt.DD_Value === selected);
+                  return existingOption ? existingOption.DD_Value : selected;
+                }}
+              >
+                {ddLoading ? (
+                  <MenuItem disabled>
+                    <Loader size={15} height="20px" />
+                  </MenuItem>
+                ) : (
+                  ddData
+                    .filter((i) => i.DD_Type === "RecipCat")
+                    .sort((a, b) => a - b)
+                    .map((i) => (
+                      <MenuItem key={i.DD_Value} value={i.DD_Value}>
+                        {i.DD_Value}
+                      </MenuItem>
+                    ))
+                )}
+              </Select>
+            )}
+          />
+        ) : (
+          params.value
+        ),
+    },
+    {
+      field: "DistVia",
+      headerName: (
+        <b>
+          Distribute Via<sup style={{ color: "red" }}>*</sup>
+        </b>
+      ),
+      flex: 0.8,
+      renderCell: (params) =>
+        isEdit ? (
+          <Controller
+            name={`recipients.${params.row.rhfIndex}.DistVia`}
+            control={control}
+            rules={{ required: "true" }}
+            render={({ field, fieldState: { error } }) => (
+              <TextField
+                {...field}
+                select
+                fullWidth
+                MenuProps={{
+                  PaperProps: { sx: { maxHeight: 300 } },
+                }}
+                error={!!error}
+              >
+                {ddLoading ? (
+                  <MenuItem disabled>
+                    <Loader size={15} height="20px" />
+                  </MenuItem>
+                ) : (
+                  ddData
+                    .filter((i) => i.DD_Type === "DistVia")
+                    .sort((a, b) => a - b)
+                    .map((i) => (
+                      <MenuItem key={i.DD_Value} value={i.DD_Value}>
+                        {i.DD_Value}
+                      </MenuItem>
+                    ))
+                )}
+              </TextField>
+            )}
+          />
+        ) : (
+          params.value
+        ),
+    },
+    {
+      field: "AttnTo",
+      headerName: (
+        <b>
+          Send to Attention<sup style={{ color: "red" }}>*</sup>
+        </b>
+      ),
+      flex: 1,
+      renderCell: (params) =>
+        isEdit ? (
+          <Controller
+            name={`recipients.${params.row.rhfIndex}.AttnTo`}
+            control={control}
+            rules={{ required: "true" }}
+            render={({ field, fieldState: { error } }) => (
+              <TextField
+                {...field}
+                fullWidth
+                onKeyDown={(event) => event.stopPropagation()}
+                error={!!error}
+              />
+            )}
+          />
+        ) : (
+          params.value
+        ),
+    },
+    {
+      field: "EMailAddress",
+      headerName: (
+        <b>
+          E-Mail Address<sup style={{ color: "red" }}>*</sup>
+        </b>
+      ),
+      flex: 1.5,
+      renderCell: (params) =>
+        isEdit ? (
+          <EmailField
+            name={`recipients.${params.row.rhfIndex}.EMailAddress`}
+            control={control}
+            rules={{ required: "true" }}
+          />
+        ) : (
+          params.value
+        ),
+    },
+  ];
+
+  return (
+    <FormProvider {...methods}>
+      {loading === "fetching" ? (
+        <Loader size={40} height="600px" />
+      ) : (
+        <form>
+          {fields.length === 0 ? (
+            <Typography
+              variant="h6"
+              sx={{ width: "100%", textAlign: "center" }}
+            >
+              No Recipients Found
+            </Typography>
+          ) : (
+            <>
+              <Typography variant="subtitle1">
+                Who will receive a copy of this report?
+              </Typography>
+              <div style={{ height: 500, width: "100%", marginTop: "20px" }}>
+                <DataGrid
+                  rows={fields.map((field, index) => ({
+                    ...field,
+                    id: field.id,
+                    rhfIndex: index,
+                  }))}
+                  columns={columns}
+                  disableColumnMenu
+                  disableRowSelectionOnClick
+                  disableSelectionOnClick
+                  initialState={{
+                    columns: {
+                      columnVisibilityModel: {
+                        PolicyType:
+                          url === "/policy_type_distribution_affinity/",
+                      },
+                    },
+                  }}
+                />
+              </div>
+            </>
+          )}
+
+          {url !== "/policy_type_distribution_affinity/" && (
+            <div style={{ marginTop: 16 }}>
+              {!isEdit && canComposeEmail && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleComposeEmail}
+                  disabled={loading === "composing"}
+                  sx={{ height: "45" }}
+                >
+                  Send Email
+                </Button>
+              )}
+              {!isEdit && (
+                <Button
+                  variant="outlined"
+                  onClick={() => setIsEdit(true)}
+                  sx={{ height: "45", marginLeft: canComposeEmail ? 8 : 0 }}
+                >
+                  Edit
+                </Button>
+              )}
+              {isEdit && (
+                <>
+                  <Button
+                    variant="contained"
+                    onClick={handleAdd}
+                    disabled={loading === "submitting"}
+                    sx={{ height: "45" }}
+                  >
+                    Add Row
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    style={{ marginLeft: 8 }}
+                    onClick={handleSubmit(onSubmit, onError)}
+                    disabled={loading === "submitting"}
+                    sx={{ height: "45" }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    style={{ marginLeft: 8 }}
+                    onClick={handleCancel}
+                    disabled={loading === "submitting"}
+                    sx={{ height: "45" }}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </form>
+      )}
+    </FormProvider>
+  );
+}
