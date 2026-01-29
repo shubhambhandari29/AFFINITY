@@ -141,12 +141,12 @@ export default function ReportRecipientList({ url, parameter }) {
   const handleComposeEmail = async () => {
     try {
       setLoading("composing");
-      const composeEndpoint = url.endsWith("/")
-        ? `${url}compose_link`
-        : `${url}/compose_link`;
-      const recipients = methods.getValues("recipients") || [];
+      const composeEndpoint = "/outlook/compose_link";
+      const recipients = (methods.getValues("recipients") || [])
+        .map((row) => row?.EMailAddress)
+        .filter(Boolean);
       const res = await api.post(composeEndpoint, {
-        entries: recipients,
+        recipients,
       });
       const composeUrl = res?.data?.url;
       if (!composeUrl) {
@@ -189,7 +189,8 @@ export default function ReportRecipientList({ url, parameter }) {
     }
   };
 
-  const canComposeEmail = url === "/loss_run_distribution/";
+  const canComposeEmail =
+    url === "/loss_run_distribution/" || url === "/loss_run_distribution_affinity/";
 
   let columns = [
     {
