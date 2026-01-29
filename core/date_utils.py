@@ -13,6 +13,13 @@ _DEFAULT_INPUT_FORMATS: tuple[str, ...] = (
     "%d/%m/%Y",
     "%d-%m-%Y",
 )
+_SENTINEL_DATE = date(1900, 1, 1)
+
+
+def _is_sentinel_date(value: date | datetime) -> bool:
+    if isinstance(value, datetime):
+        value = value.date()
+    return value == _SENTINEL_DATE
 
 
 def format_records_dates(
@@ -77,9 +84,13 @@ def format_date_value(value: Any) -> Any:
         return value
 
     if isinstance(value, datetime):
+        if _is_sentinel_date(value):
+            return None
         return value.strftime(DATE_OUTPUT_FORMAT)
 
     if isinstance(value, date):
+        if _is_sentinel_date(value):
+            return None
         return value.strftime(DATE_OUTPUT_FORMAT)
 
     if isinstance(value, str):
@@ -88,25 +99,31 @@ def format_date_value(value: Any) -> Any:
             return value
         parsed = _try_parse_datetime(text)
         if parsed:
+            if _is_sentinel_date(parsed):
+                return None
             return parsed.strftime(DATE_OUTPUT_FORMAT)
 
     return value
 
 
 def parse_date_input(value: Any) -> Any:
-    if value in (None, ""):
-        return value
+    if value is None:
+        return None
 
     if isinstance(value, (datetime, date)):
+        if _is_sentinel_date(value):
+            return None
         return value
 
     if isinstance(value, str):
         text = value.strip()
         if not text:
-            return value
+            return None
 
         parsed = _try_parse_datetime(text)
         if parsed:
+            if _is_sentinel_date(parsed):
+                return None
             if "T" in text or ":" in text:
                 return parsed
             return parsed.date()
