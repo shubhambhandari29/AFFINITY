@@ -1,16 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from core.models.distribution import ComposeLinkRequest, DistributionEntry
 from services.auth_service import get_current_user_from_token
 from services.sac.loss_run_distribution_service import (
+    build_outlook_compose_link,
     delete_distribution as delete_distribution_service,
 )
 from services.sac.loss_run_distribution_service import (
     get_distribution as get_distribution_service,
 )
-from services.sac.loss_run_distribution_service import (
-    build_outlook_compose_link as build_outlook_compose_link_service,
-)
+
 from services.sac.loss_run_distribution_service import (
     upsert_distribution as upsert_distribution_service,
 )
@@ -38,12 +37,10 @@ async def delete_distribution(payload: list[DistributionEntry]):
 @router.post("/compose_link")
 async def build_compose_link(
     payload: ComposeLinkRequest,
-    current_user: dict = Depends(get_current_user_from_token),
 ):
     entries = [entry.model_dump() for entry in payload.entries] if payload.entries else None
-    return await build_outlook_compose_link_service(
+    return await build_outlook_compose_link(
         entries=entries,
         subject=payload.subject,
-        body=payload.body,
-        requested_by=current_user.get("user", {}).get("email"),
+        body=payload.body
     )
