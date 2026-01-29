@@ -16,9 +16,32 @@ def build_compose_link(
             detail={"error": "Provide recipients to build the compose link"},
         )
 
+    deduped: list[str] = []
+    seen: set[str] = set()
+    filtered_out = 0
+    for email in recipients:
+        if not email:
+            filtered_out += 1
+            continue
+        if email in seen:
+            filtered_out += 1
+            continue
+        seen.add(email)
+        deduped.append(email)
+
+    if not deduped:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "No valid email recipients found",
+                "filtered_out": filtered_out,
+                "total": len(recipients),
+            },
+        )
+
     params = urlencode(
         {
-            "to": ";".join(recipients),
+            "to": ";".join(deduped),
             "subject": subject or "",
             "body": body or "",
         }
@@ -27,8 +50,8 @@ def build_compose_link(
 
     return {
         "url": compose_url,
-        "recipients": recipients,
+        "recipients": deduped,
         "invalid_emails": [],
-        "filtered_out": 0,
+        "filtered_out": filtered_out,
         "total": len(recipients),
     }
