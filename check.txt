@@ -144,8 +144,9 @@ export default function ReportRecipientList({ url, parameter }) {
       const composeEndpoint = url.endsWith("/")
         ? `${url}compose_link`
         : `${url}/compose_link`;
+      const recipients = methods.getValues("recipients") || [];
       const res = await api.post(composeEndpoint, {
-        filters: parameter,
+        entries: recipients,
       });
       const composeUrl = res?.data?.url;
       if (!composeUrl) {

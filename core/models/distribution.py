@@ -23,7 +23,6 @@ class ComposeLinkRequest(BaseModel):
     Request for building an Outlook compose link from loss run distribution data.
     """
 
-    filters: dict[str, str] | None = None
     entries: list[DistributionEntry] | None = None
     subject: str | None = None
     body: str | None = None

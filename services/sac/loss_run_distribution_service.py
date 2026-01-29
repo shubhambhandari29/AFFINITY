@@ -95,11 +95,11 @@ def _extract_recipients(records: list[dict[str, Any]]):
     filtered_out = 0
 
     for record in records:
-        email = record.get("EMailAddress") or record.get("EmailAddress") or record.get("email")
+        email = record.get("EMailAddress")
         if not email:
             filtered_out += 1
             continue
-        if not _is_email_delivery(record.get("DistVia")):
+        if not record.get("DistVia") is "Email":
             filtered_out += 1
             continue
 
@@ -136,28 +136,18 @@ def _build_compose_url(recipients: list[str], subject: str, body: str) -> str:
 
 
 async def build_outlook_compose_link(
-    filters: dict[str, Any] | None,
     entries: list[dict[str, Any]] | None,
     subject: str | None,
     body: str | None,
     requested_by: str | None,
 ):
-    if not settings.OUTLOOK_COMPOSE_ENABLED:
-        raise HTTPException(status_code=403, detail={"error": "Outlook compose is disabled"})
+    if not entries:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Provide entries to build the compose link"},
+        )
 
-    if entries is None:
-        if not filters:
-            raise HTTPException(
-                status_code=400,
-                detail={"error": "Provide filters or entries to build the compose link"},
-            )
-        try:
-            sanitized_filters = sanitize_filters(filters, ALLOWED_FILTERS)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
-        records = await fetch_records_async(table=TABLE_NAME, filters=sanitized_filters)
-    else:
-        records = entries
+    records = entries
 
     recipients, invalid_emails, filtered_out = _extract_recipients(records)
     total = len(records)
