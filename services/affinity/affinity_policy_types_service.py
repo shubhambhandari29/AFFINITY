@@ -130,3 +130,4 @@ async def upsert_affinity_policy_types(data: dict[str, Any]):
     except Exception as e:
         logger.warning(f"Insert/Update failed - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
+    
