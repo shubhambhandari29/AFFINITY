@@ -26,6 +26,8 @@ SEARCH_QUERIES = {
         FROM tblAcctAffinityProgram LEFT JOIN tblAffinityAgents
         ON tblAcctAffinityProgram.ProgramName=tblAffinityAgents.ProgramName
         WHERE tblAffinityAgents.AgentCode IS NOT NULL
+        AND tblAcctAffinityProgram.Stage = 'Admin' 
+        AND tblAcctAffinityProgram.IsSubmitted = 1
         ORDER BY tblAcctAffinityProgram.ProgramName;
     """,
 }
