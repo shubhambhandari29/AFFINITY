@@ -14,6 +14,7 @@ SEARCH_QUERIES = {
             tblAcctAffinityProgram.ProgramName AS [Program Name],
             tblAcctAffinityProgram.OnBoardDt AS [On Board Date]
         FROM tblAcctAffinityProgram
+        WHERE tblAcctAffinityProgram.Stage = 'Admin' AND tblAcctAffinityProgram.IsSubmitted = 1
         ORDER BY tblAcctAffinityProgram.ProgramName;
     """,
     "ProducerCode": """
@@ -25,6 +26,8 @@ SEARCH_QUERIES = {
         FROM tblAcctAffinityProgram LEFT JOIN tblAffinityAgents
         ON tblAcctAffinityProgram.ProgramName=tblAffinityAgents.ProgramName
         WHERE tblAffinityAgents.AgentCode IS NOT NULL
+        AND tblAcctAffinityProgram.Stage = 'Admin' 
+        AND tblAcctAffinityProgram.IsSubmitted = 1
         ORDER BY tblAcctAffinityProgram.ProgramName;
     """,
 }
