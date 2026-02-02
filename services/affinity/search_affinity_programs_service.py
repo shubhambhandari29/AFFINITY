@@ -14,12 +14,7 @@ SEARCH_QUERIES = {
             tblAcctAffinityProgram.ProgramName AS [Program Name],
             tblAcctAffinityProgram.OnBoardDt AS [On Board Date]
         FROM tblAcctAffinityProgram
-        INNER JOIN tblAcctSpecial
-            ON tblAcctAffinityProgram.ProgramName = tblAcctSpecial.CustomerName
-        WHERE tblAcctSpecial.Stage = 'Admin'
-            AND tblAcctSpecial.IsSubmitted = 1
-            AND tblAcctAffinityProgram.Stage = 'Admin'
-            AND tblAcctAffinityProgram.IsSubmitted = 1
+        WHERE tblAcctAffinityProgram.Stage = 'Admin' AND tblAcctAffinityProgram.IsSubmitted = 1
         ORDER BY tblAcctAffinityProgram.ProgramName;
     """,
     "ProducerCode": """
@@ -28,16 +23,11 @@ SEARCH_QUERIES = {
             tblAffinityAgents.AgentName AS [Agent Name],
             tblAcctAffinityProgram.ProgramName AS [Program Name],
             tblAcctAffinityProgram.OnBoardDt AS [On Board Date]
-        FROM tblAcctAffinityProgram
-        LEFT JOIN tblAffinityAgents
-            ON tblAcctAffinityProgram.ProgramName = tblAffinityAgents.ProgramName
-        INNER JOIN tblAcctSpecial
-            ON tblAcctAffinityProgram.ProgramName = tblAcctSpecial.CustomerName
+        FROM tblAcctAffinityProgram LEFT JOIN tblAffinityAgents
+        ON tblAcctAffinityProgram.ProgramName=tblAffinityAgents.ProgramName
         WHERE tblAffinityAgents.AgentCode IS NOT NULL
-            AND tblAcctSpecial.Stage = 'Admin'
-            AND tblAcctSpecial.IsSubmitted = 1
-            AND tblAcctAffinityProgram.Stage = 'Admin'
-            AND tblAcctAffinityProgram.IsSubmitted = 1
+        AND tblAcctAffinityProgram.Stage = 'Admin' 
+        AND tblAcctAffinityProgram.IsSubmitted = 1
         ORDER BY tblAcctAffinityProgram.ProgramName;
     """,
 }
