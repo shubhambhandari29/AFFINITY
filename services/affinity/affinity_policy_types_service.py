@@ -52,6 +52,9 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
     try:
         filters: list[str] = []
         params: list[Any] = []
+        pk_value = query_params.get(PRIMARY_KEY)
+        program_name = query_params.get("ProgramName")
+        use_join = pk_value in (None, "") and program_name not in (None, "")
         for key, value in query_params.items():
             if key == "PrimaryAgt":
                 continue
@@ -59,33 +62,54 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
             filters.append(f"{TABLE_NAME}.{key} = ?")
             params.append(value)
 
-        query = f"""
-            WITH primary_agents AS (
+        if use_join:
+            query = f"""
+                WITH primary_agents AS (
+                    SELECT
+                        ProgramName,
+                        AgentName,
+                        AgentCode,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ProgramName
+                            ORDER BY AgentCode, AgentName
+                        ) AS rn
+                    FROM {AGENTS_TABLE}
+                    WHERE LOWER(PrimaryAgt) = ?
+                )
                 SELECT
-                    ProgramName,
-                    AgentName,
-                    AgentCode,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY ProgramName
-                        ORDER BY AgentCode, AgentName
-                    ) AS rn
-                FROM {AGENTS_TABLE}
-                WHERE LOWER(PrimaryAgt) = ?
-            )
-            SELECT
-                {TABLE_NAME}.PK_Number,
-                {TABLE_NAME}.ProgramName,
-                {TABLE_NAME}.PolicyType,
-                primary_agents.AgentName,
-                primary_agents.AgentCode
-            FROM {TABLE_NAME}
-            LEFT JOIN primary_agents
-              ON primary_agents.ProgramName = {TABLE_NAME}.ProgramName
-             AND primary_agents.rn = 1
-        """
-        params.insert(0, "yes")
-        if filters:
-            query += " WHERE " + " AND ".join(filters)
+                    {TABLE_NAME}.PK_Number,
+                    {TABLE_NAME}.ProgramName,
+                    {TABLE_NAME}.PolicyType,
+                    primary_agents.AgentName,
+                    primary_agents.AgentCode
+                FROM {TABLE_NAME}
+                LEFT JOIN primary_agents
+                  ON primary_agents.ProgramName = {TABLE_NAME}.ProgramName
+                 AND primary_agents.rn = 1
+            """
+            params.insert(0, "yes")
+            if filters:
+                query += " WHERE " + " AND ".join(filters)
+        else:
+            primary_agt = query_params.get("PrimaryAgt")
+            if primary_agt not in (None, ""):
+                query = f"""
+                    SELECT {TABLE_NAME}.*
+                    FROM {TABLE_NAME}
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM {AGENTS_TABLE}
+                        WHERE {AGENTS_TABLE}.ProgramName = {TABLE_NAME}.ProgramName
+                          AND {AGENTS_TABLE}.PrimaryAgt = ?
+                    )
+                """
+                params.insert(0, primary_agt)
+                if filters:
+                    query += " AND " + " AND ".join(filters)
+            else:
+                query = f"SELECT {TABLE_NAME}.* FROM {TABLE_NAME}"
+                if filters:
+                    query += " WHERE " + " AND ".join(filters)
 
         records = await run_raw_query_async(query, params)
         return format_records_dates(records)
