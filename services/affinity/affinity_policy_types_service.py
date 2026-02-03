@@ -73,12 +73,13 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
                 WHERE LOWER(PrimaryAgt) = ?
             )
             SELECT
+                {TABLE_NAME}.PK_Number,
                 {TABLE_NAME}.ProgramName,
                 {TABLE_NAME}.PolicyType,
                 primary_agents.AgentName,
                 primary_agents.AgentCode
             FROM {TABLE_NAME}
-            JOIN primary_agents
+            LEFT JOIN primary_agents
               ON primary_agents.ProgramName = {TABLE_NAME}.ProgramName
              AND primary_agents.rn = 1
         """
