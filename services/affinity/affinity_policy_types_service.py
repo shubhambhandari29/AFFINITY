@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblAffinityPolicyType"
 AGENTS_TABLE = "tblAffinityAgents"
-PRIMARY_KEY = "PK_Number"
 
 async def _lookup_pk_number(record: dict[str, Any]) -> int | None:
     """
@@ -52,17 +51,12 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
     try:
         filters: list[str] = []
         params: list[Any] = []
-        pk_value = query_params.get(PRIMARY_KEY)
-        program_name = query_params.get("ProgramName")
-        use_join = pk_value in (None, "") and program_name not in (None, "")
-        for key, value in query_params.items():
-            if key == "PrimaryAgt":
-                continue
+        for key,value in query_params.items():
             _ensure_safe_identifier(key)
             filters.append(f"{TABLE_NAME}.{key} = ?")
             params.append(value)
 
-        if use_join:
+        if query_params.get("ProgramName"):
             query = f"""
                 WITH primary_agents AS (
                     SELECT
@@ -131,27 +125,27 @@ async def upsert_affinity_policy_types(data: dict[str, Any]):
         if errors:
             raise HTTPException(status_code=400, detail={"errors": errors})
         normalized = normalize_payload_dates(data_with_defaults)
-        pk_value = normalized.get(PRIMARY_KEY)
+        pk_value = normalized.get("PK_Number")
         pk_response: int | None = None
         if pk_value not in (None, ""):
             existing = await fetch_records_async(
                 table=TABLE_NAME,
-                filters={PRIMARY_KEY: pk_value},
+                filters={"PK_Number": pk_value},
             )
             if not existing:
                 raise HTTPException(
                     status_code=404,
-                    detail={"error": f"{PRIMARY_KEY} {pk_value} not found"},
+                    detail={"error": f"Primary key {pk_value} not found"},
                 )
             await merge_upsert_records_async(
                 table=TABLE_NAME,
                 data_list=[normalized],
-                key_columns=[PRIMARY_KEY],
+                key_columns=["PK_Number"],
                 exclude_key_columns_from_insert=True,
             )
             pk_response = pk_value
         else:
-            sanitized = {k: v for k, v in normalized.items() if k != PRIMARY_KEY}
+            sanitized = {k: v for k, v in normalized.items() if k != "PK_Number"}
             if sanitized:
                 await insert_records_async(table=TABLE_NAME, records=[sanitized])
                 pk_response = await _lookup_pk_number(sanitized)
