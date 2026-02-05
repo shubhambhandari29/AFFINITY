@@ -1,11 +1,11 @@
-Azure Web App Creation and Deployment 
+1. Azure Web App Creation and Deployment 
 
- Creation of Web Apps 
+ 1.1Creation of Web Apps 
 
-Code Repos and Deployment Pipelines 
+ 1.2 Code Repos and Deployment Pipelines 
 
-Environment Variables and key Vault 
+ 1.3 Environment Variables and key Vault 
 
-AD groups 
+ 1.4 AD groups 
 
-Custom URL and F5 
+ 1.5 Custom URL and F5

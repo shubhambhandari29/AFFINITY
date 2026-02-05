@@ -1,9 +1,10 @@
-# SAC Backend
+# SAC Backend (Affinity)
 
-Backend services for Special Accounts Center (SAC). The app authenticates internal users, proxies curated SQL Server datasets, and exposes CRUD/search APIs that power the SAC front-end.
+Backend services for Special Accounts Center (SAC) and Affinity. The app authenticates internal users, proxies curated SQL Server datasets, and exposes CRUD/search APIs that power the SAC and Affinity front-ends.
 
 ## Highlights
 - FastAPI application with modular routers per feature domain (`api/`) and thin service layer (`services/`).
+- Separate SAC and Affinity API domains (`api/sac/`, `api/affinity/`) sharing common auth and DB helpers.
 - Centralized SQL Server access helpers (`core/db_helpers.py`) that validate filters, run parameterized queries, and support upserts/deletes.
 - JWT + secure cookie authentication managed in `services/auth_service.py` with bcrypt hashing for migrated accounts.
 - Pydantic models under `core/models/` enforce request validation and give automatic OpenAPI documentation.
@@ -14,7 +15,8 @@ Backend services for Special Accounts Center (SAC). The app authenticates intern
 app.py
  ├── api/                  # FastAPI routers
  │     ├── auth/           # Login/logout endpoints
- │     └── sac/            # SAC feature routers (accounts, policies, distributions, etc.)
+ │     ├── sac/            # SAC feature routers (accounts, policies, distributions, etc.)
+ │     └── affinity/       # Affinity feature routers (programs, agents, policy types, etc.)
  ├── services/             # Business logic and DB orchestration
  ├── core/                 # Cross-cutting concerns (config, models, auth, DB helpers)
  ├── db.py                 # pyodbc connection helpers
@@ -48,9 +50,15 @@ Each route validates input with a Pydantic schema, enforces authentication via d
    DB_SERVER=<server>.database.windows.net
    DB_NAME=<database>
    DB_AUTH=ActiveDirectoryIntegrated
+   AZURE_TENANT_ID=<tenant-id>
+   AZURE_CLIENT_ID=<client-id>
+   AZURE_CLIENT_SECRET=<client-secret>
    SECRET_KEY=<random-64-character-string>
    ACCESS_TOKEN_VALIDITY=480
    FRONTEND_URL=http://localhost:3000
+   SECURE_COOKIE=true
+   SAME_SITE=Lax
+   OUTLOOK_COMPOSE_BASE_URL=https://outlook.office.com/mail/deeplink/compose
    ```
    > Do **not** commit real secrets. Use Key Vault, AWS Secrets Manager, or your chosen secret store in deployed environments.
 
@@ -58,7 +66,38 @@ Each route validates input with a Pydantic schema, enforces authentication via d
    ```bash
    uvicorn app:app --reload
    ```
-   The interactive docs are available at `http://localhost:8000/docs`.
+The interactive docs are available at `http://localhost:8000/docs`.
+
+## API Domains
+SAC endpoints (prefixes):
+- `/sac_account`
+- `/sac_policies`
+- `/hcm_users`
+- `/sac_affiliates`
+- `/search_sac_account`
+- `/loss_run_distribution`
+- `/claim_review_distribution`
+- `/deduct_bill_distribution`
+- `/loss_run_frequency`
+- `/claim_review_frequency`
+- `/deduct_bill_frequency`
+
+Affinity endpoints (prefixes):
+- `/affinity_program`
+- `/affinity_agents`
+- `/affinity_policy_types`
+- `/search_affinity_program`
+- `/loss_run_distribution_affinity`
+- `/claim_review_distribution_affinity`
+- `/policy_type_distribution_affinity`
+- `/loss_run_frequency_affinity`
+- `/claim_review_frequency_affinity`
+
+Shared endpoints:
+- `/auth`
+- `/dropdowns`
+- `/outlook`
+- `/health`
 
 ## Running Tests & Tooling
 ```bash
