@@ -1,17 +1,11 @@
-2026-02-03T10:03:24.2743233Z INFO:     169.254.130.1:48261 - "OPTIONS /auth/login HTTP/1.1" 200 OK
-2026-02-03T10:03:28.0854974Z 2026-02-03 10:03:28,075 ERROR services.auth_service - Failed to rehash password for user mbond@hanover.com: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]String or binary data would be truncated in table 'CLMAA_SpecialAccounts.dbo.tblUsers', column 'Password'. Truncated value: '$2b$12$yM.5ivUUMDeCopg0Q4Ew/uVQxdHPyTgecBAp2AtipDI'. (2628) (SQLExecDirectW)")
-2026-02-03T10:03:28.085521Z Traceback (most recent call last):
-2026-02-03T10:03:28.0855242Z   File "/home/site/wwwroot/services/auth_service.py", line 148, in login_user
-2026-02-03T10:03:28.085527Z     _persist_hashed_password(user_record["ID"], new_hash)
-2026-02-03T10:03:28.0855296Z     ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-03T10:03:28.0855325Z   File "/home/site/wwwroot/services/auth_service.py", line 45, in _persist_hashed_password
-2026-02-03T10:03:28.0855349Z     cursor.execute(
-2026-02-03T10:03:28.0855426Z     ~~~~~~~~~~~~~~^
-2026-02-03T10:03:28.0855456Z         "UPDATE tblUsers SET password = ? WHERE id = ?",
-2026-02-03T10:03:28.0855482Z         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-03T10:03:28.0855507Z         (new_hash, user_id),
-2026-02-03T10:03:28.0855531Z         ^^^^^^^^^^^^^^^^^^^^
-2026-02-03T10:03:28.0855554Z     )
-2026-02-03T10:03:28.0855577Z     ^
-2026-02-03T10:03:28.0855618Z pyodbc.ProgrammingError: ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]String or binary data would be truncated in table 'CLMAA_SpecialAccounts.dbo.tblUsers', column 'Password'. Truncated value: '$2b$12$yM.5ivUUMDeCopg0Q4Ew/uVQxdHPyTgecBAp2AtipDI'. (2628) (SQLExecDirectW)")
-2026-02-03T10:03:28.0869413Z 2026-02-03 10:03:28,086 INFO services.auth_service - User mbond@hanover.com logged in successfully
+Azure Web App Creation and Deployment 
+
+ Creation of Web Apps 
+
+Code Repos and Deployment Pipelines 
+
+Environment Variables and key Vault 
+
+AD groups 
+
+Custom URL and F5 
