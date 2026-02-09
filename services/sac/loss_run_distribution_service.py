@@ -56,4 +56,3 @@ async def delete_distribution(data_list: list[dict[str, Any]]):
     except Exception as e:
         logger.warning(f"Deletion failed - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
-

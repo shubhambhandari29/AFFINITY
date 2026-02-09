@@ -41,6 +41,7 @@ _DATE_FIELDS = {
     "RenewLetterDt",
     "NCMStartDt",
     "NCMEndDt",
+    "EffectiveDate"
 }
 
 

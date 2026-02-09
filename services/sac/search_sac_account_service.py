@@ -94,6 +94,18 @@ SEARCH_QUERIES = {
         HAVING tblPolicies.AcctOnPolicyName IS NOT NULL
         ORDER BY tblPolicies.AcctOnPolicyName;
     """,
+    "AffiliateName": """
+    SELECT tblAffiliates.AffiliateName AS [Affiliate Name],
+      tblAcctSpecial.CustomerName AS [Customer Name],
+        tblAcctSpecial.CustomerNum AS [Cust Number],
+          tblAcctSpecial.OnBoardDate,
+            tblAcctSpecial.ServLevel AS [Service Level]
+              FROM
+                tblAffiliates INNER JOIN tblAcctSpecial
+                  ON tblAffiliates.CustomerNum=tblAcctSpecial.CustomerNum
+                    GROUP BY 
+                    tblAffiliates.AffiliateName, tblAcctSpecial.CustomerName, tblAcctSpecial.CustomerNum, tblAcctSpecial.OnBoardDate, tblAcctSpecial.ServLevel
+                      ORDER BY tblAffiliates.AffiliateName;""",
 }
 
 

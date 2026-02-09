@@ -4,7 +4,11 @@ from typing import Any
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 
-from core.date_utils import format_records_dates, normalize_payload_dates, parse_date_input
+from core.date_utils import (
+    format_records_dates,
+    normalize_payload_dates,
+    parse_date_input,
+)
 from core.db_helpers import (
     _ensure_safe_identifier,
     fetch_records_async,
@@ -20,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblPolicies"
 PRIMARY_KEY = "PK_Number"
-ALLOWED_FILTERS = {"CustomerNum", "PolicyNum", "PolMod","PK_Number"}
+ALLOWED_FILTERS = {"CustomerNum", "PolicyNum", "PolMod", "PK_Number"}
 PREMIUM_ALLOWED_FILTERS = {"CustomerNum", "PolicyNum", "PolMod", "PolicyStatus"}
 
 
@@ -120,7 +124,9 @@ async def update_field_for_all_policies(data: dict[str, Any]):
     update_via = data.get("updateVia")
 
     if not field_name or not update_via:
-        raise HTTPException(status_code=400, detail={"error": "Field name and update via are required"})
+        raise HTTPException(
+            status_code=400, detail={"error": "Field name and update via are required"}
+        )
     if "fieldValue" not in data or "updateViaValue" not in data:
         raise HTTPException(status_code=400, detail={"error": "Missing required values"})
 

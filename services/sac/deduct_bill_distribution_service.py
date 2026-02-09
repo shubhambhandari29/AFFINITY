@@ -14,7 +14,7 @@ from core.db_helpers import (
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblDistribute_DeductBill"
-ALLOWED_FILTERS = {"CustomerNum", "EMailAddress","AttnTo"}
+ALLOWED_FILTERS = {"CustomerNum", "EMailAddress", "AttnTo"}
 
 
 async def get_distribution(query_params: dict[str, Any]):

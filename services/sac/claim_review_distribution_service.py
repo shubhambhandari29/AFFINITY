@@ -11,7 +11,6 @@ from core.db_helpers import (
     sanitize_filters,
 )
 
-
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblDistribute_ClaimReview"
