@@ -40,12 +40,6 @@ PHONE_FIELDS_AGENT: tuple[str, ...] = (
     "FaxTel2",
 )
 
-AGENT_DEFAULTS: dict[str, Any] = {
-    "LossRunReq": "No",
-    "AutoDeliver": "No",
-    "AgentContact1": "No",
-}
-
 POLICY_TYPE_DEFAULTS: dict[str, Any] = {
     "AddLDocs": "No",
     "SpecHand": "Auto Assign",
@@ -184,10 +178,6 @@ def validate_policy_type_distribution_rows(
                 errors.append(_error(field, message))
 
     return errors
-
-
-def apply_affinity_agent_defaults(payload: dict[str, Any]) -> dict[str, Any]:
-    return _apply_defaults(payload, AGENT_DEFAULTS)
 
 
 def apply_affinity_policy_type_defaults(payload: dict[str, Any]) -> dict[str, Any]:
