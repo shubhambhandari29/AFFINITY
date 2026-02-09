@@ -7,3 +7,45 @@ Backend returns a "Deep Link" URL to that specific message ID.
 Frontend opens that URL in a popup.
 If you are strictly limited to "Frontend Only" without new backend API integrations, the Download method (Option 1) is the standard industry workaround for this limitation.
  
+---
+SAC Account Associations API (UI contract)
+
+Add associations (auto-inserts both directions, skips self-links)
+Endpoint: POST /sac_account_associations/add
+Payload:
+{
+  "parent_account": "111",
+  "child_account": ["222", "333", "444"]
+}
+Response (when inserted):
+{
+  "message": "Insertion successful",
+  "count": 6
+}
+Response (when nothing new):
+{
+  "message": "No new associations to add",
+  "count": 0
+}
+
+Delete associations (deletes both directions, skips self-links)
+Endpoint: POST /sac_account_associations/delete
+Payload:
+{
+  "parent_account": "111",
+  "child_account": ["222", "333"]
+}
+Response:
+{
+  "message": "Deletion successful",
+  "count": 4
+}
+
+Get associations for a parent account
+Endpoint: GET /sac_account_associations?ParentAccount=111
+Response:
+[
+  "222",
+  "333",
+  "444"
+]

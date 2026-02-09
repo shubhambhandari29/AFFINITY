@@ -11,6 +11,7 @@ from api.sac.deduct_bill_frequency import router as deduct_bill_frequency_router
 from api.sac.hcm_users import router as hcm_users_router
 from api.sac.loss_run_distribution import router as loss_run_distribution_router
 from api.sac.loss_run_frequency import router as loss_run_frequency_router
+from api.sac.sac_account_associations import router as sac_account_associations_router
 from api.sac.sac_account import router as sac_account_router
 from api.sac.sac_affiliates import router as sac_affiliates_router
 from api.sac.sac_policies import router as sac_policies_router
@@ -57,6 +58,11 @@ app.include_router(dropdowns_router, prefix="/dropdowns", tags=["dropdowns"])
 
 # sac
 app.include_router(sac_account_router, prefix="/sac_account", tags=["sac_account"])
+app.include_router(
+    sac_account_associations_router,
+    prefix="/sac_account_associations",
+    tags=["sac_account_associations"],
+)
 app.include_router(sac_policies_router, prefix="/sac_policies", tags=["sac_policies"])
 app.include_router(hcm_users_router, prefix="/hcm_users", tags=["hcm_users"])
 app.include_router(sac_affiliates_router, prefix="/sac_affiliates", tags=["sac_affiliates"])
