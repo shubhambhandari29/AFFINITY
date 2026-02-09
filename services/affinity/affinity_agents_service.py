@@ -5,10 +5,7 @@ from fastapi import HTTPException
 
 from core.date_utils import format_records_dates, normalize_payload_dates
 from core.db_helpers import fetch_records_async, merge_upsert_records_async, sanitize_filters
-from services.validations.affinity_validations import (
-    apply_affinity_agent_defaults,
-    validate_affinity_agent_payload,
-)
+from services.validations.affinity_validations import validate_affinity_agent_payload
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +42,11 @@ async def upsert_affinity_agents(data_list: list[dict[str, Any]]):
         errors: list[dict[str, Any]] = []
 
         for index, item in enumerate(data_list):
-            data_with_defaults = apply_affinity_agent_defaults(item)
-            item_errors = validate_affinity_agent_payload(data_with_defaults)
+            item_errors = validate_affinity_agent_payload(item)
             if item_errors:
                 errors.append({"index": index, "errors": item_errors})
                 continue
-            normalized = normalize_payload_dates(data_with_defaults)
+            normalized = normalize_payload_dates(item)
             sanitized = {k: v for k, v in normalized.items() if k not in IDENTITY_COLUMNS}
             normalized_list.append(sanitized)
 

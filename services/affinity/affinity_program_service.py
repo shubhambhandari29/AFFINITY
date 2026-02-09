@@ -5,7 +5,12 @@ from typing import Any
 from fastapi import HTTPException
 
 from core.date_utils import format_records_dates, normalize_payload_dates
-from core.db_helpers import fetch_records_async, merge_upsert_records_async, run_raw_query_async, sanitize_filters
+from core.db_helpers import (
+    fetch_records_async,
+    merge_upsert_records_async,
+    run_raw_query_async,
+    sanitize_filters,
+)
 from services.validations.affinity_validations import validate_affinity_program_payload
 
 logger = logging.getLogger(__name__)
