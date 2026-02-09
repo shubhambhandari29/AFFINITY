@@ -15,5 +15,5 @@ async def get_hcm_users(request: Request):
 
 @router.post("/upsert")
 async def upsert_hcm_users(payload: list[HCMUserUpsert]):
-    data = [item.model_dump(exclude_none=True) for item in payload]
+    data = [item.model_dump() for item in payload]
     return await upsert_hcm_users_service(data)

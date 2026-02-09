@@ -31,4 +31,3 @@ async def upsert_distribution(payload: list[DistributionEntry]):
 async def delete_distribution(payload: list[DistributionEntry]):
     entries = [entry.model_dump() for entry in payload]
     return await delete_distribution_service(entries)
-

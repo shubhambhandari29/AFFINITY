@@ -23,7 +23,7 @@ async def get_sac_policies(request: Request):
 
 @router.post("/upsert")
 async def upsert_sac_policies(payload: SacPolicyUpsert):
-    return await upsert_sac_policies_service(payload.model_dump(exclude_none=True))
+    return await upsert_sac_policies_service(payload.model_dump())
 
 
 @router.post("/update_field_for_all_policies")

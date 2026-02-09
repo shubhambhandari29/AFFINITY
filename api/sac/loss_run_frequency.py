@@ -19,5 +19,5 @@ async def get_frequency(request: Request):
 
 @router.post("/upsert")
 async def upsert_frequency(payload: list[LossRunFrequencyEntry]):
-    items = [entry.model_dump(exclude_none=True) for entry in payload]
+    items = [entry.model_dump() for entry in payload]
     return await upsert_frequency_service(items)

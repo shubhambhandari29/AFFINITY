@@ -17,4 +17,4 @@ async def get_sac_account(request: Request):
 
 @router.post("/upsert")
 async def upsert_sac_account(payload: SacAccountUpsert):
-    return await upsert_sac_account_service(payload.model_dump(exclude_none=True))
+    return await upsert_sac_account_service(payload.model_dump())

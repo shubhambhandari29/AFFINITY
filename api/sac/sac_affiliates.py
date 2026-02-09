@@ -17,5 +17,5 @@ async def get_affiliates(request: Request):
 
 @router.post("/upsert")
 async def upsert_affiliates(payload: list[SacAffiliateUpsert]):
-    data = [item.model_dump(exclude_none=True) for item in payload]
+    data = [item.model_dump() for item in payload]
     return await upsert_affiliates_service(data)
