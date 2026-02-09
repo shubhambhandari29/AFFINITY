@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -13,13 +14,13 @@ _DEFAULT_INPUT_FORMATS: tuple[str, ...] = (
     "%d/%m/%Y",
     "%d-%m-%Y",
 )
-_SENTINEL_DATE = date(1900, 1, 1)
+
 
 
 def _is_sentinel_date(value: date | datetime) -> bool:
     if isinstance(value, datetime):
         value = value.date()
-    return value == _SENTINEL_DATE
+    return value == date(1900, 1, 1)
 
 
 def format_records_dates(
@@ -43,6 +44,7 @@ def format_records_dates(
                 lowered = key.lower()
                 if not (
                     "date" in lowered
+                    or lowered.startswith("dt")
                     or lowered.endswith("dt")
                     or lowered.endswith("_dt")
                     or lowered.endswith("date")
@@ -70,6 +72,7 @@ def normalize_payload_dates(
             lowered = key.lower()
             if not (
                 "date" in lowered
+                or lowered.startswith("dt")
                 or lowered.endswith("dt")
                 or lowered.endswith("_dt")
                 or lowered.endswith("date")
@@ -165,4 +168,3 @@ def _try_parse_datetime(text: str) -> datetime | None:
                 except ValueError:
                     continue
     return None
-

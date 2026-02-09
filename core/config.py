@@ -39,10 +39,7 @@ class Settings:
     SAME_SITE: str = os.getenv("SAME_SITE")
 
     # Outlook compose settings
-    OUTLOOK_COMPOSE_BASE_URL: str = os.getenv(
-        "OUTLOOK_COMPOSE_BASE_URL",
-        "https://outlook.office.com/mail/deeplink/compose",
-    )
+    OUTLOOK_COMPOSE_BASE_URL: str = os.getenv("OUTLOOK_COMPOSE_BASE_URL")
 
 
 settings = Settings()
