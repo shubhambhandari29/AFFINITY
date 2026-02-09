@@ -1,8 +1,12 @@
 # Affinity model exports
 
-from core.models.affinity.affinity_program import AffinityProgramUpsert
 from core.models.affinity.affinity_agents import AffinityAgentUpsert
-from core.models.affinity.affinity_policy_types import AffinityPolicyTypeUpsert
+from core.models.affinity.affinity_claim_review_frequency import (
+    AffinityClaimReviewFrequencyEntry,
+)
 from core.models.affinity.affinity_distribution import AffinityDistributionEntry
-from core.models.affinity.affinity_loss_run_frequency import AffinityLossRunFrequencyEntry
-from core.models.affinity.affinity_claim_review_frequency import AffinityClaimReviewFrequencyEntry
+from core.models.affinity.affinity_loss_run_frequency import (
+    AffinityLossRunFrequencyEntry,
+)
+from core.models.affinity.affinity_policy_types import AffinityPolicyTypeUpsert
+from core.models.affinity.affinity_program import AffinityProgramUpsert

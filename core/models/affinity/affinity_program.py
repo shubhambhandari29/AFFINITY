@@ -4,7 +4,10 @@ from pydantic import BaseModel
 
 
 class AffinityProgramUpsert(BaseModel):
-    ProgramName: Any | None = None
+    ProgramName: str | None = None
+    BranchVal: str | None = None
+    OnBoardDt: Any | None = None
+    AcctStatus: str | None = None
 
     class Config:
         extra = "allow"
