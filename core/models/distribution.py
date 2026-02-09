@@ -16,4 +16,3 @@ class DistributionEntry(BaseModel):
 
     class Config:
         extra = "allow"
-

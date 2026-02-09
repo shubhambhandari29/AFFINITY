@@ -14,5 +14,5 @@ class LossRunFrequencyEntry(BaseModel):
     CompDate: str | None = None
     RptType: Any | None = None
     DelivMeth: Any | None = None
-    no_claims: bool | None = None
-    AdHocReport: bool | None = None
+    NoClaims: Any | None =None
+    AdHocReport: Any | None = None
