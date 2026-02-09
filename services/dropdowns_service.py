@@ -74,12 +74,6 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
         FROM tblEDW_AGENT_LIST
         ORDER BY Agent_Code
     """,
-    "tblPRODUCER": """
-        SELECT IIf(Len([code])=6,"0" & [Code],[Code]) AS [Agent Code], tblPRODUCER.ffname1 AS [Agent Name]
-        FROM tblPRODUCER
-        WHERE (((tblPRODUCER.ffname1)<>""))
-        ORDER BY IIf(Len([code])=6,"0" & [Code],[Code]);
-    """,
     "AgentCode": """
         SELECT IIf(Len([code])=6,"0" & [Code],[Code]) AS [Agent Code], tblPRODUCER.ffname1 AS [Agent Name]
         FROM tblPRODUCER
@@ -126,16 +120,6 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
         SELECT tblDistFreq.DistFrequency
         FROM tblDistFreq
     """,
-    "tbl_Lkp_RecipCategory": """
-        SELECT *
-        FROM tbl_Lkp_RecipCategory
-        ORDER BY 1
-    """,
-    "tbl_lkp_DistVia": """
-        SELECT *
-        FROM tbl_lkp_DistVia
-        ORDER BY 1
-    """,
     "tblAccomType": """
         SELECT *
         FROM tblAccomType
@@ -156,6 +140,12 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
         FROM tbl_LKP_NumNarratives
         ORDER BY 1
     """,
+    "LossCtl": """
+SELECT tblLossCtrl.RepName, tblLossCtrl.LCEmail
+ FROM tblLossCtrl 
+ WHERE (((tblLossCtrl.Active)='Yes')) 
+ ORDER BY tblLossCtrl.RepName
+""",
 }
 
 
