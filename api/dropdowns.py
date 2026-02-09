@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, Response
 from services.auth_service import get_current_user_from_token
 from services.dropdowns_service import (
     DROPDOWN_CACHE_TTL_SECONDS,
+)
+from services.dropdowns_service import (
     get_dropdown_values as get_dropdown_values_service,
 )
 
