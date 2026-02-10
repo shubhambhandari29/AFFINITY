@@ -1,49 +1,9 @@
-Dropdowns API (UI contract)
-
-GET /dropdowns/{dropdown_name}
-Returns: list of rows for the dropdown, including the primary key column.
-Example response:
-[
-  {
-    "LANID": "u123",
-    "SACName": "John Doe",
-    "EmpTitle": "Manager",
-    "TelNum": "555-1111",
-    "EMailID": "john@example.com"
-  }
-]
-
-POST /dropdowns/{dropdown_name}/upsert
-Body: list of rows. Rows with PK are updated (MERGE). Rows without PK are inserted.
-Example request:
-[
-  {
-    "LANID": "u123",
-    "SACName": "John Doe",
-    "EmpTitle": "Sr Manager",
-    "TelNum": "555-1111",
-    "EMailID": "john@example.com"
-  },
-  {
-    "SACName": "New User",
-    "EmpTitle": "Analyst",
-    "TelNum": "555-2222",
-    "EMailID": "new@example.com"
-  }
-]
-Example response:
-{ "message": "Upsert successful", "count": 2 }
-
-POST /dropdowns/{dropdown_name}/delete
-Body: list of PK objects only.
-Example request:
-[
-  { "LANID": "u123" }
-]
-Example response:
-{ "message": "Deletion successful", "count": 1 }
-
-Notes
-- Static dropdowns use their table PK: LANID, BranchNmb, or PK_Number.
-- Dynamic dropdowns use tblDropDowns with DD_Key; DD_Type is inferred from {dropdown_name}.
-- Cache is invalidated for the dropdown and "all" after upsert/delete.
+{
+  "parent_account": "111",
+  "parent_customer_name": "Acme Corp",
+  "parent_acct_status": "Active",
+  "child_account": [
+    { "account": "222", "customer_name": "Beta LLC", "acct_status": "Active" },
+    { "account": "333", "customer_name": "Gamma Inc", "acct_status": "Inactive" }
+  ]
+}
