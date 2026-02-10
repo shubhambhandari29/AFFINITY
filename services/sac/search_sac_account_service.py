@@ -14,7 +14,8 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerName AS [Customer Name],
             tblAcctSpecial.CustomerNum AS [Customer Number],
             tblAcctSpecial.OnBoardDate AS [On Board Date],
-            tblAcctSpecial.ServLevel AS [Service Level]
+            tblAcctSpecial.ServLevel AS [Service Level],
+            tblAcctSpecial.AcctStatus AS [Account Status]
         FROM tblAcctSpecial
         WHERE tblAcctSpecial.Stage = 'Admin' AND tblAcctSpecial.IsSubmitted = 1
         GROUP BY
@@ -29,7 +30,8 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerNum AS [Customer Number],
             tblAcctSpecial.CustomerName AS [Customer Name],
             tblAcctSpecial.OnBoardDate AS [On Board Date],
-            tblAcctSpecial.ServLevel AS [Service Level]
+            tblAcctSpecial.ServLevel AS [Service Level],
+            tblAcctSpecial.AcctStatus AS [Account Status]
         FROM tblAcctSpecial
         WHERE tblAcctSpecial.Stage = 'Admin' AND tblAcctSpecial.IsSubmitted = 1
         GROUP BY
@@ -45,7 +47,8 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerNum AS [Customer Number],
             tblAcctSpecial.CustomerName AS [Customer Name],
             tblAcctSpecial.OnBoardDate AS [On Board Date],
-            tblAcctSpecial.ServLevel AS [Service Level]
+            tblAcctSpecial.ServLevel AS [Service Level],
+            tblAcctSpecial.AcctStatus AS [Account Status]
         FROM tblPOLICIES
         INNER JOIN tblAcctSpecial
             ON tblPOLICIES.CustomerNum = tblAcctSpecial.CustomerNum
@@ -81,7 +84,8 @@ SEARCH_QUERIES = {
             tblPolicies.AcctOnPolicyName AS [Name Insured on Policy],
             tblAcctSpecial.CustomerName AS [Customer Name],
             tblAcctSpecial.AcctOwner AS [Account Owner],
-            tblPolicies.CustomerNum AS [Customer Number]
+            tblPolicies.CustomerNum AS [Customer Number],
+            tblAcctSpecial.AcctStatus AS [Account Status]
         FROM tblPolicies
         INNER JOIN tblAcctSpecial
             ON tblPolicies.CustomerNum = tblAcctSpecial.CustomerNum
@@ -99,7 +103,8 @@ SEARCH_QUERIES = {
       tblAcctSpecial.CustomerName AS [Customer Name],
         tblAcctSpecial.CustomerNum AS [Cust Number],
           tblAcctSpecial.OnBoardDate,
-            tblAcctSpecial.ServLevel AS [Service Level]
+            tblAcctSpecial.ServLevel AS [Service Level],
+            tblAcctSpecial.AcctStatus AS [Account Status]
               FROM
                 tblAffiliates INNER JOIN tblAcctSpecial
                   ON tblAffiliates.CustomerNum=tblAcctSpecial.CustomerNum
