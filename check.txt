@@ -1,51 +1,49 @@
-Is there any way to auto-open it?
-There is only one Enterprise-grade way to achieve "Auto-Open + Rich HTML" without a download, but it requires backend work:
-The Microsoft Graph API Solution:If your company uses Office 365, you can have your Backend (API) talk to Microsoft directly.
-Frontend sends UserID to Backend.
-Backend calls Microsoft Graph API (POST /me/messages) to create a Draft in the user's "Drafts" folder.
-Backend returns a "Deep Link" URL to that specific message ID.
-Frontend opens that URL in a popup.
-If you are strictly limited to "Frontend Only" without new backend API integrations, the Download method (Option 1) is the standard industry workaround for this limitation.
- 
----
-SAC Account Associations API (UI contract)
+Dropdowns API (UI contract)
 
-Add associations (auto-inserts both directions, skips self-links)
-Endpoint: POST /sac_account_associations/add
-Payload:
-{
-  "parent_account": "111",
-  "child_account": ["222", "333", "444"]
-}
-Response (when inserted):
-{
-  "message": "Insertion successful",
-  "count": 6
-}
-Response (when nothing new):
-{
-  "message": "No new associations to add",
-  "count": 0
-}
-
-Delete associations (deletes both directions, skips self-links)
-Endpoint: POST /sac_account_associations/delete
-Payload:
-{
-  "parent_account": "111",
-  "child_account": ["222", "333"]
-}
-Response:
-{
-  "message": "Deletion successful",
-  "count": 4
-}
-
-Get associations for a parent account
-Endpoint: GET /sac_account_associations?ParentAccount=111
-Response:
+GET /dropdowns/{dropdown_name}
+Returns: list of rows for the dropdown, including the primary key column.
+Example response:
 [
-  "222",
-  "333",
-  "444"
+  {
+    "LANID": "u123",
+    "SACName": "John Doe",
+    "EmpTitle": "Manager",
+    "TelNum": "555-1111",
+    "EMailID": "john@example.com"
+  }
 ]
+
+POST /dropdowns/{dropdown_name}/upsert
+Body: list of rows. Rows with PK are updated (MERGE). Rows without PK are inserted.
+Example request:
+[
+  {
+    "LANID": "u123",
+    "SACName": "John Doe",
+    "EmpTitle": "Sr Manager",
+    "TelNum": "555-1111",
+    "EMailID": "john@example.com"
+  },
+  {
+    "SACName": "New User",
+    "EmpTitle": "Analyst",
+    "TelNum": "555-2222",
+    "EMailID": "new@example.com"
+  }
+]
+Example response:
+{ "message": "Upsert successful", "count": 2 }
+
+POST /dropdowns/{dropdown_name}/delete
+Body: list of PK objects only.
+Example request:
+[
+  { "LANID": "u123" }
+]
+Example response:
+{ "message": "Deletion successful", "count": 1 }
+
+Notes
+- Static dropdowns use their table PK: LANID, BranchNmb, or PK_Number.
+- Dynamic dropdowns use tblDropDowns with DD_Key; DD_Type is inferred from {dropdown_name}.
+- Cache is invalidated for the dropdown and "all" after upsert/delete.
