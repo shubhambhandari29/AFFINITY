@@ -1,54 +1,5 @@
-SAC Account Associations API (UI contract)
-
-Add associations (auto-inserts both directions, skips self-links)
-Endpoint: POST /sac_account_associations/add
-Payload:
 {
-  "parent_account": "111",
-  "child_account": ["222", "333", "444"]
+    "detail": {
+        "error": "Execution failed on sql '\n        SELECT\n            tblAcctSpecial.CustomerNum AS [Customer Number],\n            tblAcctSpecial.CustomerName AS [Customer Name],\n            tblAcctSpecial.OnBoardDate AS [On Board Date],\n            tblAcctSpecial.ServLevel AS [Service Level],\n            tblAcctSpecial.AcctStatus AS [Account Status]\n        FROM tblAcctSpecial\n        WHERE tblAcctSpecial.Stage = 'Admin' AND tblAcctSpecial.IsSubmitted = 1\n        GROUP BY\n            tblAcctSpecial.CustomerNum,\n            tblAcctSpecial.CustomerName,\n            tblAcctSpecial.OnBoardDate,\n            tblAcctSpecial.ServLevel\n        ORDER BY tblAcctSpecial.CustomerNum;\n    ': ('42000', \"[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Column 'tblAcctSpecial.AcctStatus' is invalid in the select list because it is not contained in either an aggregate function or the GROUP BY clause. (8120) (SQLExecDirectW)\")"
+    }
 }
-Response (when inserted):
-{
-  "message": "Insertion successful",
-  "count": 6
-}
-Response (when nothing new):
-{
-  "message": "No new associations to add",
-  "count": 0
-}
-
-Delete associations (deletes both directions, skips self-links)
-Endpoint: POST /sac_account_associations/delete
-Payload:
-{
-  "parent_account": "111",
-  "child_account": ["222", "333"]
-}
-Response:
-{
-  "message": "Deletion successful",
-  "count": 4
-}
-
-Get associations for a parent account
-Endpoint: GET /sac_account_associations?ParentAccount=111
-Response:
-[
-  {
-    "ParentAccount": "111",
-    "ParentCustomerName": "Acme Corp",
-    "ParentAcctStatus": "Active",
-    "AssociatedAccount": "222",
-    "AssociatedCustomerName": "Beta LLC",
-    "AssociatedAcctStatus": "Active"
-  },
-  {
-    "ParentAccount": "111",
-    "ParentCustomerName": "Acme Corp",
-    "ParentAcctStatus": "Active",
-    "AssociatedAccount": "333",
-    "AssociatedCustomerName": "Gamma Inc",
-    "AssociatedAcctStatus": "Inactive"
-  }
-]
