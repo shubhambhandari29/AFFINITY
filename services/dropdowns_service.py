@@ -30,11 +30,6 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
         FROM tblMGTUsers
         ORDER BY SACName
     """,
-    "CreatedBy": """
-        SELECT SACName
-        FROM tblMGTUsers
-        ORDER BY SACName
-    """,
     "LossCtlRep1": """
         SELECT RepName, LCEmail, LCTel, LAN_ID
         FROM tblLossCtrl
@@ -74,71 +69,10 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
         FROM tblEDW_AGENT_LIST
         ORDER BY Agent_Code
     """,
-    "AgentCode": """
-        SELECT IIf(Len([code])=6,"0" & [Code],[Code]) AS [Agent Code], tblPRODUCER.ffname1 AS [Agent Name]
-        FROM tblPRODUCER
-        WHERE (((tblPRODUCER.ffname1)<>""))
-        ORDER BY IIf(Len([code])=6,"0" & [Code],[Code]);
-    """,
-    "AgentName": """
-        SELECT tblPRODUCER.ffname1 AS [Agent Name], tblPRODUCER.code AS [Agent Code]
-        FROM tblPRODUCER
-        GROUP BY tblPRODUCER.ffname1, tblPRODUCER.code
-        HAVING (((tblPRODUCER.ffname1)<>""))
-        ORDER BY tblPRODUCER.ffname1;
-    """,
-    "tblBusType": """
-        SELECT tblBusType.[Business Type]
-        FROM tblBusType
-        ORDER BY tblBusType.SortNum
-    """,
-    "tblDNRStatus": """
-        SELECT tblDNRStatus.DNRStatus
-        FROM tblDNRStatus
-    """,
-    "tblAgentSegment": """
-        SELECT tblAgentSegment.AgentSeg
-        FROM tblAgentSegment
-        ORDER BY tblAgentSegment.SortNum
-    """,
-    "tblPolStatus": """
-        SELECT tblPolStatus.PolicyStatus
-        FROM tblPolStatus
-        ORDER BY tblPolStatus.PolicyStatus
-    """,
-    "tblGeneralPolicyStatus": """
-        SELECT tblGeneralPolicyStatus.GenPolicyStatus
-        FROM tblGeneralPolicyStatus
-        ORDER BY tblGeneralPolicyStatus.GenPolicyStatus
-    """,
     "tblGrpCode": """
         SELECT tblGrpCode.Code, tblGrpCode.[Prgram Expanded Name] AS ProgramExpandedName
         FROM tblGrpCode
         ORDER BY tblGrpCode.Code
-    """,
-    "tblDistFreq": """
-        SELECT tblDistFreq.DistFrequency
-        FROM tblDistFreq
-    """,
-    "tblAccomType": """
-        SELECT *
-        FROM tblAccomType
-        ORDER BY 1
-    """,
-    "tblExceptTypes": """
-        SELECT *
-        FROM tblExceptTypes
-        ORDER BY 1
-    """,
-    "tblPolType": """
-        SELECT *
-        FROM tblPolType
-        ORDER BY 1
-    """,
-    "tbl_LKP_NumNarratives": """
-        SELECT *
-        FROM tbl_LKP_NumNarratives
-        ORDER BY 1
     """,
     "LossCtl": """
 SELECT tblLossCtrl.RepName, tblLossCtrl.LCEmail
