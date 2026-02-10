@@ -22,7 +22,8 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerName,
             tblAcctSpecial.CustomerNum,
             tblAcctSpecial.OnBoardDate,
-            tblAcctSpecial.ServLevel
+            tblAcctSpecial.ServLevel,
+            tblAcctSpecial.AcctStatus
         ORDER BY tblAcctSpecial.CustomerName;
     """,
     "CustomerNum": """
@@ -38,7 +39,8 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerNum,
             tblAcctSpecial.CustomerName,
             tblAcctSpecial.OnBoardDate,
-            tblAcctSpecial.ServLevel
+            tblAcctSpecial.ServLevel,
+            tblAcctSpecial.AcctStatus
         ORDER BY tblAcctSpecial.CustomerNum;
     """,
     "PolicyNum": """
@@ -58,7 +60,8 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerNum,
             tblAcctSpecial.CustomerName,
             tblAcctSpecial.OnBoardDate,
-            tblAcctSpecial.ServLevel
+            tblAcctSpecial.ServLevel,
+            tblAcctSpecial.AcctStatus
         HAVING tblPOLICIES.PolicyNum IS NOT NULL
         ORDER BY tblPOLICIES.PolicyNum;
     """,
@@ -100,7 +103,8 @@ SEARCH_QUERIES = {
             tblPolicies.AcctOnPolicyName,
             tblAcctSpecial.CustomerName,
             tblAcctSpecial.AcctOwner,
-            tblPolicies.CustomerNum
+            tblPolicies.CustomerNum,
+            tblAcctSpecial.AcctStatus
         HAVING tblPolicies.AcctOnPolicyName IS NOT NULL
         ORDER BY tblPolicies.AcctOnPolicyName;
     """,
@@ -115,7 +119,7 @@ SEARCH_QUERIES = {
                 tblAffiliates INNER JOIN tblAcctSpecial
                   ON tblAffiliates.CustomerNum=tblAcctSpecial.CustomerNum
                     GROUP BY 
-                    tblAffiliates.AffiliateName, tblAcctSpecial.CustomerName, tblAcctSpecial.CustomerNum, tblAcctSpecial.OnBoardDate, tblAcctSpecial.ServLevel
+                    tblAffiliates.AffiliateName, tblAcctSpecial.CustomerName, tblAcctSpecial.CustomerNum, tblAcctSpecial.OnBoardDate, tblAcctSpecial.ServLevel, tblAcctSpecial.AcctStatus
                       ORDER BY tblAffiliates.AffiliateName;""",
 }
 
