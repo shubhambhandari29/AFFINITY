@@ -7,6 +7,7 @@ from core.db_helpers import (
     delete_records_async,
     fetch_records_async,
     insert_records_async,
+    run_raw_query_async,
     sanitize_filters,
 )
 
@@ -135,15 +136,27 @@ async def delete_associations(payload: dict[str, Any]):
 async def get_associations(query_params: dict[str, Any]):
     try:
         filters = sanitize_filters(query_params, ALLOWED_FILTERS)
-        if "ParentAccount" not in filters:
+        parent_account = filters.get("ParentAccount")
+        if not parent_account:
             raise HTTPException(status_code=400, detail={"error": "ParentAccount is required"})
 
-        records = await fetch_records_async(table=TABLE_NAME, filters=filters)
-        return [
-            row.get("AssociatedAccount")
-            for row in records
-            if row.get("AssociatedAccount") not in (None, "")
-        ]
+        query = """
+            SELECT
+                assoc.ParentAccount,
+                parent.CustomerName AS ParentCustomerName,
+                parent.AcctStatus AS ParentAcctStatus,
+                assoc.AssociatedAccount,
+                child.CustomerName AS AssociatedCustomerName,
+                child.AcctStatus AS AssociatedAcctStatus
+            FROM tblSACAccountAssociations AS assoc
+            LEFT JOIN tblAcctSpecial AS parent
+                ON assoc.ParentAccount = parent.CustomerNum
+            LEFT JOIN tblAcctSpecial AS child
+                ON assoc.AssociatedAccount = child.CustomerNum
+            WHERE assoc.ParentAccount = ?
+            ORDER BY assoc.AssociatedAccount
+        """
+        return await run_raw_query_async(query, [parent_account])
     except HTTPException:
         raise
     except ValueError as exc:

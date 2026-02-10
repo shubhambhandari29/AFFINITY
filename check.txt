@@ -1,9 +1,54 @@
+SAC Account Associations API (UI contract)
+
+Add associations (auto-inserts both directions, skips self-links)
+Endpoint: POST /sac_account_associations/add
+Payload:
 {
   "parent_account": "111",
-  "parent_customer_name": "Acme Corp",
-  "parent_acct_status": "Active",
-  "child_account": [
-    { "account": "222", "customer_name": "Beta LLC", "acct_status": "Active" },
-    { "account": "333", "customer_name": "Gamma Inc", "acct_status": "Inactive" }
-  ]
+  "child_account": ["222", "333", "444"]
 }
+Response (when inserted):
+{
+  "message": "Insertion successful",
+  "count": 6
+}
+Response (when nothing new):
+{
+  "message": "No new associations to add",
+  "count": 0
+}
+
+Delete associations (deletes both directions, skips self-links)
+Endpoint: POST /sac_account_associations/delete
+Payload:
+{
+  "parent_account": "111",
+  "child_account": ["222", "333"]
+}
+Response:
+{
+  "message": "Deletion successful",
+  "count": 4
+}
+
+Get associations for a parent account
+Endpoint: GET /sac_account_associations?ParentAccount=111
+Response:
+[
+  {
+    "ParentAccount": "111",
+    "ParentCustomerName": "Acme Corp",
+    "ParentAcctStatus": "Active",
+    "AssociatedAccount": "222",
+    "AssociatedCustomerName": "Beta LLC",
+    "AssociatedAcctStatus": "Active"
+  },
+  {
+    "ParentAccount": "111",
+    "ParentCustomerName": "Acme Corp",
+    "ParentAcctStatus": "Active",
+    "AssociatedAccount": "333",
+    "AssociatedCustomerName": "Gamma Inc",
+    "AssociatedAcctStatus": "Inactive"
+  }
+]
