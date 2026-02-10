@@ -68,14 +68,20 @@ SEARCH_QUERIES = {
             tblPolicies.AgentName AS Producer,
             tblPolicies.AccountName AS [Customer Name],
             tblPolicies.InceptDate AS [Inception Date],
-            tblPolicies.CustomerNum AS [Customer Number]
+            tblPolicies.CustomerNum AS [Customer Number],
+            tblAcctSpecial.AcctStatus AS [Account Status]
         FROM tblPolicies
+        LEFT JOIN tblAcctSpecial
+            ON tblPolicies.CustomerNum = tblAcctSpecial.CustomerNum
+            AND tblAcctSpecial.Stage = 'Admin'
+            AND tblAcctSpecial.IsSubmitted = 1
         GROUP BY
             tblPolicies.AgentCode,
             tblPolicies.AgentName,
             tblPolicies.AccountName,
             tblPolicies.InceptDate,
-            tblPolicies.CustomerNum
+            tblPolicies.CustomerNum,
+            tblAcctSpecial.AcctStatus
         HAVING tblPolicies.AgentCode IS NOT NULL
         ORDER BY tblPolicies.AgentCode;
     """,
