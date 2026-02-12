@@ -15,10 +15,7 @@ router = APIRouter(dependencies=[Depends(get_current_user_from_token)])
 
 
 @router.get("/{dropdown_name}")
-async def get_dropdown(dropdown_name: str, response: Response):
-    response.headers["Cache-Control"] = "no-store"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
+async def get_dropdown(dropdown_name: str):
     return await get_dropdown_values_service(dropdown_name)
 
 
