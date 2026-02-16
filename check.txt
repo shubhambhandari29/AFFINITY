@@ -1,7 +1,6 @@
 BEGIN TRAN;
 
--- 1) Drop PK constraint on tblBranch (find actual name)
-DECLARE @pk NVARCHAR(128);
+DECLARE @pk sysname;
 
 SELECT @pk = kc.name
 FROM sys.key_constraints kc
@@ -9,10 +8,9 @@ JOIN sys.tables t ON t.object_id = kc.parent_object_id
 WHERE t.name = 'tblBranch' AND kc.type = 'PK';
 
 IF @pk IS NOT NULL
-    EXEC('ALTER TABLE dbo.tblBranch DROP CONSTRAINT ' + QUOTENAME(@pk));
+    EXEC('ALTER TABLE dbo.tblBranch DROP CONSTRAINT [' + @pk + ']');
 
--- 2) Drop any default constraint on BranchNmb (if exists)
-DECLARE @df NVARCHAR(128);
+DECLARE @df sysname;
 
 SELECT @df = dc.name
 FROM sys.default_constraints dc
@@ -21,16 +19,13 @@ JOIN sys.tables t ON t.object_id = c.object_id
 WHERE t.name = 'tblBranch' AND c.name = 'BranchNmb';
 
 IF @df IS NOT NULL
-    EXEC('ALTER TABLE dbo.tblBranch DROP CONSTRAINT ' + QUOTENAME(@df));
+    EXEC('ALTER TABLE dbo.tblBranch DROP CONSTRAINT [' + @df + ']');
 
--- 3) Drop old column
 ALTER TABLE dbo.tblBranch DROP COLUMN BranchNmb;
 
--- 4) Add identity column
 ALTER TABLE dbo.tblBranch
 ADD BranchNmb INT IDENTITY(1,1) NOT NULL;
 
--- 5) Recreate PK
 ALTER TABLE dbo.tblBranch
 ADD CONSTRAINT PK_tblBranch PRIMARY KEY (BranchNmb);
 
