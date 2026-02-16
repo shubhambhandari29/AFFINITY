@@ -148,7 +148,7 @@ _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
 }
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_ ]*$")
-_IDENTITY_PRIMARY_KEYS = {"DD_Key", "PK_Number"}
+_IDENTITY_PRIMARY_KEYS = {"LANID","BranchNmb","DD_Key", "PK_Number"}
 
 
 def _ensure_safe_identifier(identifier: str) -> None:
