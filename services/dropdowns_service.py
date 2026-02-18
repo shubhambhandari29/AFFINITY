@@ -1,3 +1,4 @@
+
 import logging
 import re
 from functools import partial
@@ -68,11 +69,6 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
         FROM tblEDW_AGENT_LIST
         ORDER BY Agent_Code
     """,
-    "tblGrpCode": """
-        SELECT PK_Number, tblGrpCode.Code, tblGrpCode.[Prgram Expanded Name] AS ProgramExpandedName
-        FROM tblGrpCode
-        ORDER BY tblGrpCode.Code
-    """,
     "LossCtl": """
 SELECT tblLossCtrl.PK_Number, tblLossCtrl.RepName, tblLossCtrl.LCEmail
  FROM tblLossCtrl 
@@ -132,14 +128,6 @@ _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
         "primary_key": "PK_Number",
         "columns": ["Agent_Code", "Agent_Name"],
     },
-    "tblGrpCode": {
-        "table": "tblGrpCode",
-        "primary_key": "PK_Number",
-        "columns": {
-            "Code": "Code",
-            "ProgramExpandedName": "Prgram Expanded Name",
-        },
-    },
     "LossCtl": {
         "table": "tblLossCtrl",
         "primary_key": "PK_Number",
@@ -148,7 +136,7 @@ _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
 }
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_ ]*$")
-_IDENTITY_PRIMARY_KEYS = {"LANID","BranchNmb","DD_Key", "PK_Number"}
+_IDENTITY_PRIMARY_KEYS = {"DD_Key", "PK_Number"}
 
 
 def _ensure_safe_identifier(identifier: str) -> None:
