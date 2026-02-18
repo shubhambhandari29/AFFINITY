@@ -109,4 +109,3 @@ app.include_router(policy_type_distribution_affinity_router, prefix="/policy_typ
 
 app.include_router(loss_run_frequency_affinity_router, prefix="/loss_run_frequency_affinity", tags=["loss_run_frequency_affinity"])
 app.include_router(claim_review_frequency_affinity_router, prefix="/claim_review_frequency_affinity", tags=["claim_review_frequency_affinity"])
-
