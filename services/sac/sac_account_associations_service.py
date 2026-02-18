@@ -1,3 +1,4 @@
+
 import logging
 from typing import Any
 
@@ -143,8 +144,6 @@ async def get_associations(query_params: dict[str, Any]):
         query = """
             SELECT
                 assoc.ParentAccount,
-                parent.CustomerName AS ParentCustomerName,
-                parent.AcctStatus AS ParentAcctStatus,
                 assoc.AssociatedAccount,
                 child.CustomerName AS AssociatedCustomerName,
                 child.AcctStatus AS AssociatedAcctStatus

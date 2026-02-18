@@ -135,3 +135,4 @@ async def search_sac_account_records(search_by: str):
     except Exception as e:
         logger.warning(f"Search failed - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
+    
