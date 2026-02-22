@@ -25,3 +25,51 @@ Cutover readiness
 Delta migration strategy, rollback plan, validation scripts 
 
 As part of the migration from the on‑premises SQL Server database to the Azure SQL Managed Instance, we carried out comprehensive data migration testing to ensure that all schema objects and data were transferred accurately and completely. 
+
+
+
+
+
+Table Name 
+
+SAC TABLES 
+
+tblAcctSpecial 
+
+tblDistribute_ClaimReview 
+
+tblDistribute_DeductBill 
+
+tblDistribute_LossRun 
+
+tblLossRunFrequency 
+
+tblClaimReviewFrequency 
+
+tblDeductBillFrequency 
+
+tblHCMUsers 
+
+tblAffiliates 
+
+tblPolicies 
+
+AFFINITY TABLES 
+
+tblAcctAffinityProgram 
+
+tblDist_ClaimRev_AFFIN 
+
+tblDist_LossRun_AFFIN 
+
+tblClaimRevFreq_AFFIN 
+
+tblLossRunFreq_AFFIN 
+
+tblDIST_PolicyTypeScheduler_AFFIN 
+
+tblAffinityAgents 
+
+tblAffinityPolicyType 
+
+
