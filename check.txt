@@ -1,93 +1,27 @@
-2) Testing Scope: What Testing Is Possible (and Expected)
-2.1 Functional Testing (Core)
-Goal: Validate features match requirements and legacy behavior.
-Includes:
-Feature-based testing: each module/workflow
-Workflow testing: end-to-end business flows
-Role-based testing: permissions & access paths
-Error handling: validation, warnings, exception flows
-Key migration focus: Identify “hidden behaviors” in VB Forms (e.g., implicit validations, default values, auto-calculations triggered on field change).
-2.2 Unit Testing (React + FastAPI)
-React Unit/Component Tests
-Render tests, state changes, form validation, component logic
-Mock APIs and verify UI behavior
-FastAPI Unit Tests
-Service functions, business rules, validation, DTO mapping
-Test edge cases, calculation rules, decision logic
-Unit tests are your first line of defense and are crucial because desktop apps often mixed UI + logic; now you must ensure logic is reliably tested in the service layer.
-2.3 API Testing (FastAPI Layer)
-Goal: Ensure REST endpoints behave correctly.
-Covers:
-Request/response schema validation
-Status codes and error messages
-Authentication/authorization on endpoints
-Pagination, filtering, sorting
-Idempotency (PUT/PATCH), concurrency behavior
-Types
-Functional API tests
-Negative tests (invalid payloads, missing headers)
-Contract tests (React ↔ API agreement)
-2.4 Integration Testing (Service ↔ Azure SQL)
-Goal: Validate correctness of real integration between FastAPI and Azure SQL.
-Includes:
-SQL queries correctness
-Transaction integrity (commit/rollback)
-Stored procedures/functions (if any)
-Connection pooling, timeouts
-Azure-specific behavior (e.g., collation differences, compatibility level, performance)
-2.5 UI Testing (React)
-Goal: Validate UI flows work correctly in the browser.
-Includes:
-Form validation behavior (client + server validation)
-Navigation, routing, session handling
-File upload/download flows
-UX regressions compared to VB (where required)
-Recommended: Keep UI automation focused on core E2E flows, not every field.
-2.6 End-to-End (E2E) Testing
-Goal: Validate full workflows through UI → API → DB.
-Use E2E for:
-“Happy path” of critical workflows
-Key negative flows (permission denied, validation failures)
-Smoke suite for each release
-2.7 Regression Testing
-Goal: Ensure new changes don’t break existing features.
-Approach:
-Maintain a Regression Suite mapped to business capabilities
-Automate smoke + core regression first
-Run full regression before major releases
-2.8 Data Migration Testing (Most Important in Migration Projects)
-If data is migrated from on‑prem SQL Server to Azure SQL, test:
-Schema validation
-Tables, columns, data types, constraints, indexes
-Row count reconciliation
-Per table counts, per partition/date range
-Data correctness sampling
-Record-level comparisons for critical entities
-Data integrity
-Foreign keys, orphan records, duplicate keys
-Business rule reconciliation
-Aggregates, reports totals, computed fields
-Cutover readiness
-delta migration strategy, rollback plan, validation scripts
-Industry standard: define reconciliation rules and acceptable tolerances (e.g., totals must match exactly; non-critical logs can differ).
-2.9 Performance & Load Testing (Especially for Web + API + Cloud DB)
-Test:
-API response times under load
-Concurrency handling
-DB query performance (slow query detection)
-Web app performance (bundle size, rendering time)
-Soak tests (memory leaks, long duration stability)
-Important scenarios:
-Peak hour usage
-Batch jobs/reports
-Heavy search/filter usage
-2.10 Security Testing
-You typically do:
-Authentication (SSO/OAuth if used)
-Authorization (RBAC, row-level access)
-Input validation (SQL injection, XSS)
-Secrets management (no keys in code/config)
-Audit logging (who did what, when)
-Also recommended:
-Dependency scanning (React and Python libs)
-API security testing (OWASP API Top 10 patterns)
+If data is migrated from on Prem SQL Server to Azure SQL, test: 
+
+Schema validation 
+
+Tables, columns, data types, constraints, indexes 
+
+Row count reconciliation 
+
+Per table counts, per partition/date range 
+
+Data correctness sampling 
+
+Record-level comparisons for critical entities 
+
+Data integrity 
+
+Foreign keys, orphan records, duplicate keys 
+
+Business rule reconciliation 
+
+Aggregates, reports totals, computed fields 
+
+Cutover readiness 
+
+Delta migration strategy, rollback plan, validation scripts 
+
+As part of the migration from the on‑premises SQL Server database to the Azure SQL Managed Instance, we carried out comprehensive data migration testing to ensure that all schema objects and data were transferred accurately and completely. 
