@@ -1,21 +1,22 @@
-2.10 Security Testing
-You typically do:
-Authentication (SSO/OAuth if used)
-Authorization (RBAC, row-level access)
-Input validation (SQL injection, XSS)
-Secrets management (no keys in code/config)
-Audit logging (who did what, when)
-Also recommended:
-Dependency scanning (React and Python libs)
-API security testing (OWASP API Top 10 patterns)
-
-
-
-2.4 Integration Testing (Service ↔ Azure SQL)
-Goal: Validate correctness of real integration between FastAPI and Azure SQL.
-Includes:
-SQL queries correctness
-Transaction integrity (commit/rollback)
-Stored procedures/functions (if any)
-Connection pooling, timeouts
-Azure-specific behavior (e.g., collation differences, compatibility level, performance)
+ALTER TABLE dbo.tblAffinityPolicyType
+ADD
+    [AdjusterContact1]     NVARCHAR(200) NULL,
+    [AdjusterTitle1]       NVARCHAR(200) NULL,
+    [AdjusterPhone1]       NVARCHAR(50)  NULL,
+    [AdjusterCell1]        NVARCHAR(50)  NULL,
+    [AdjusterEMail1]       NVARCHAR(255) NULL,
+    [AdjusterContact2]     NVARCHAR(200) NULL,
+    [AdjusterTitle2]       NVARCHAR(200) NULL,
+    [AdjusterPhone2]       NVARCHAR(50)  NULL,
+    [AdjusterCell2]        NVARCHAR(50)  NULL,
+    [AdjusterEMail2]       NVARCHAR(255) NULL,
+    [FirmName]             NVARCHAR(255) NULL,
+    [FirmAddress]          NVARCHAR(255) NULL,
+    [FirmCityStateZip]     NVARCHAR(255) NULL,
+    [FirmWebsite]          NVARCHAR(255) NULL,
+    [CounselName]          NVARCHAR(255) NULL,
+    [CounselPhone]         NVARCHAR(50)  NULL,
+    [CounselEmail]         NVARCHAR(255) NULL,
+    [HourlyRatesPartner]   DECIMAL(10,2) NULL,
+    [HourlyRatesAssociate] DECIMAL(10,2) NULL,
+    [HourlyRatesParalegal] DECIMAL(10,2) NULL;
