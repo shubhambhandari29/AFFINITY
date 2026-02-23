@@ -24,6 +24,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     password = os.getenv("SAC_TEST_PASSWORD", "12345678")
     sac_customer_num = os.getenv("SAC_TEST_CUSTOMER_NUM", "LT_CUST_001")
     affinity_program_name = os.getenv("AFF_TEST_PROGRAM_NAME", "LT_PROGRAM_001")
+    no_claims_default = 0
     enable_mutating_posts = os.getenv("ENABLE_MUTATING_POSTS", "true").strip().lower() in {
         "1",
         "true",
@@ -105,7 +106,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(4)
     def sac_account_get(self) -> None:
         self._get(
-            "/sac_account",
+            "/sac_account/",
             name="GET /sac_account",
             params={"CustomerNum": self.sac_customer_num},
         )
@@ -113,7 +114,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(4)
     def sac_policies_get(self) -> None:
         self._get(
-            "/sac_policies",
+            "/sac_policies/",
             name="GET /sac_policies",
             params={"CustomerNum": self.sac_customer_num},
         )
@@ -129,7 +130,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(2)
     def sac_search_get(self) -> None:
         self._get(
-            "/search_sac_account",
+            "/search_sac_account/",
             name="GET /search_sac_account",
             params={"search_by": random.choice(self.sac_search_modes)},
         )
@@ -137,7 +138,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(2)
     def sac_loss_run_frequency_get(self) -> None:
         self._get(
-            "/loss_run_frequency",
+            "/loss_run_frequency/",
             name="GET /loss_run_frequency",
             params={"CustomerNum": self.sac_customer_num},
         )
@@ -145,7 +146,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(2)
     def sac_claim_review_frequency_get(self) -> None:
         self._get(
-            "/claim_review_frequency",
+            "/claim_review_frequency/",
             name="GET /claim_review_frequency",
             params={"CustomerNum": self.sac_customer_num},
         )
@@ -153,7 +154,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(2)
     def sac_deduct_bill_frequency_get(self) -> None:
         self._get(
-            "/deduct_bill_frequency",
+            "/deduct_bill_frequency/",
             name="GET /deduct_bill_frequency",
             params={"CustomerNum": self.sac_customer_num},
         )
@@ -170,7 +171,7 @@ class SacAffinityMixedLoadUser(HttpUser):
                 "CustomerNum": self.sac_customer_num,
                 "MthNum": random.randint(1, 12),
                 "RptMth": random.randint(1, 12),
-                "NoClaims": "No",
+                "NoClaims": self.no_claims_default,
             }
         ]
         self._post(
@@ -185,7 +186,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(3)
     def affinity_program_get(self) -> None:
         self._get(
-            "/affinity_program",
+            "/affinity_program/",
             name="GET /affinity_program",
             params={"ProgramName": self.affinity_program_name},
         )
@@ -193,7 +194,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(2)
     def affinity_agents_get(self) -> None:
         self._get(
-            "/affinity_agents",
+            "/affinity_agents/",
             name="GET /affinity_agents",
             params={"ProgramName": self.affinity_program_name},
         )
@@ -201,7 +202,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(2)
     def affinity_policy_types_get(self) -> None:
         self._get(
-            "/affinity_policy_types",
+            "/affinity_policy_types/",
             name="GET /affinity_policy_types",
             params={"ProgramName": self.affinity_program_name},
         )
@@ -209,7 +210,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(2)
     def affinity_search_get(self) -> None:
         self._get(
-            "/search_affinity_program",
+            "/search_affinity_program/",
             name="GET /search_affinity_program",
             params={"search_by": random.choice(self.affinity_search_modes)},
         )
@@ -217,7 +218,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(2)
     def affinity_loss_run_frequency_get(self) -> None:
         self._get(
-            "/loss_run_frequency_affinity",
+            "/loss_run_frequency_affinity/",
             name="GET /loss_run_frequency_affinity",
             params={"ProgramName": self.affinity_program_name},
         )
@@ -225,7 +226,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     @task(2)
     def affinity_claim_review_frequency_get(self) -> None:
         self._get(
-            "/claim_review_frequency_affinity",
+            "/claim_review_frequency_affinity/",
             name="GET /claim_review_frequency_affinity",
             params={"ProgramName": self.affinity_program_name},
         )
@@ -242,7 +243,7 @@ class SacAffinityMixedLoadUser(HttpUser):
                 "ProgramName": self.affinity_program_name,
                 "MthNum": random.randint(1, 12),
                 "RptMth": random.randint(1, 12),
-                "NoClaims": "No",
+                "NoClaims": self.no_claims_default,
             }
         ]
         self._post(
