@@ -1,6 +1,21 @@
-SAC_TEST_EMAIL='your_email' SAC_TEST_PASSWORD='your_password' \
-locust -f locustfile.py -H http://localhost:8000
+2.10 Security Testing
+You typically do:
+Authentication (SSO/OAuth if used)
+Authorization (RBAC, row-level access)
+Input validation (SQL injection, XSS)
+Secrets management (no keys in code/config)
+Audit logging (who did what, when)
+Also recommended:
+Dependency scanning (React and Python libs)
+API security testing (OWASP API Top 10 patterns)
 
 
-SAC_TEST_EMAIL='your_email' SAC_TEST_PASSWORD='your_password' \
-locust -f locustfile.py -H http://localhost:8000 --headless -u 20 -r 2 -t 5m
+
+2.4 Integration Testing (Service ↔ Azure SQL)
+Goal: Validate correctness of real integration between FastAPI and Azure SQL.
+Includes:
+SQL queries correctness
+Transaction integrity (commit/rollback)
+Stored procedures/functions (if any)
+Connection pooling, timeouts
+Azure-specific behavior (e.g., collation differences, compatibility level, performance)
