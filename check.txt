@@ -1,22 +1,23 @@
-ALTER TABLE dbo.tblAffinityPolicyType
-ADD
-    [AdjusterContact1]     NVARCHAR(200) NULL,
-    [AdjusterTitle1]       NVARCHAR(200) NULL,
-    [AdjusterPhone1]       NVARCHAR(50)  NULL,
-    [AdjusterCell1]        NVARCHAR(50)  NULL,
-    [AdjusterEMail1]       NVARCHAR(255) NULL,
-    [AdjusterContact2]     NVARCHAR(200) NULL,
-    [AdjusterTitle2]       NVARCHAR(200) NULL,
-    [AdjusterPhone2]       NVARCHAR(50)  NULL,
-    [AdjusterCell2]        NVARCHAR(50)  NULL,
-    [AdjusterEMail2]       NVARCHAR(255) NULL,
-    [FirmName]             NVARCHAR(255) NULL,
-    [FirmAddress]          NVARCHAR(255) NULL,
-    [FirmCityStateZip]     NVARCHAR(255) NULL,
-    [FirmWebsite]          NVARCHAR(255) NULL,
-    [CounselName]          NVARCHAR(255) NULL,
-    [CounselPhone]         NVARCHAR(50)  NULL,
-    [CounselEmail]         NVARCHAR(255) NULL,
-    [HourlyRatesPartner]   DECIMAL(10,2) NULL,
-    [HourlyRatesAssociate] DECIMAL(10,2) NULL,
-    [HourlyRatesParalegal] DECIMAL(10,2) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterContact1] VARCHAR(200) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterTitle1] VARCHAR(200) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterPhone1] VARCHAR(50) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterCell1] VARCHAR(50) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterEMail1] VARCHAR(255) NULL;
+
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterContact2] VARCHAR(200) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterTitle2] VARCHAR(200) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterPhone2] VARCHAR(50) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterCell2] VARCHAR(50) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterEMail2] VARCHAR(255) NULL;
+
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [FirmName] VARCHAR(255) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [FirmAddress] VARCHAR(255) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [FirmCityStateZip] VARCHAR(255) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [FirmWebsite] VARCHAR(255) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [CounselName] VARCHAR(255) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [CounselPhone] VARCHAR(50) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [CounselEmail] VARCHAR(255) NULL;
+
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [HourlyRatesPartner] VARCHAR(50) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [HourlyRatesAssociate] VARCHAR(50) NULL;
+ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [HourlyRatesParalegal] VARCHAR(50) NULL;
