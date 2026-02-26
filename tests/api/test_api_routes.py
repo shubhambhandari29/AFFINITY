@@ -197,8 +197,8 @@ def test_auth_endpoints(monkeypatch, request_factory):
     module = importlib.import_module("api.auth")
     captured = {"login": None, "me": None, "logout": None, "refresh": None}
 
-    async def fake_login(payload, response):
-        captured["login"] = (payload, response)
+    async def fake_login(payload, response, request):
+        captured["login"] = (payload, response, request)
         return {"ok": "login"}
 
     async def fake_me(request):
@@ -221,12 +221,13 @@ def test_auth_endpoints(monkeypatch, request_factory):
     response = Response()
     request = request_factory()
 
-    assert asyncio.run(module.login(DummyModel({"user": "u"}), response)) == {"ok": "login"}
+    assert asyncio.run(module.login(request, response, DummyModel({"user": "u"}))) == {"ok": "login"}
     assert asyncio.run(module.get_current_user(request)) == {"ok": "me"}
     assert asyncio.run(module.logout(response)) == {"ok": "logout"}
     assert asyncio.run(module.refresh_token(request, response, token="abc")) == {"ok": "refresh"}
 
     assert captured["login"][0] == {"user": "u"}
+    assert captured["login"][2] is request
     assert captured["logout"] is response
     assert captured["refresh"][2] == "abc"
 

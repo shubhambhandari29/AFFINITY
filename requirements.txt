@@ -3,7 +3,6 @@ pandas==2.3.2
 PyJWT==2.10.1
 pyodbc==5.2.0
 uvicorn==0.22.0
-bcrypt==4.2.0
 python-dotenv==1.0.1
 black==24.10.0
 ruff==0.6.9

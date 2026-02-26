@@ -5,7 +5,7 @@ Backend services for Special Accounts Center (SAC). The app authenticates intern
 ## Highlights
 - FastAPI application with modular routers per feature domain (`api/`) and thin service layer (`services/`).
 - Centralized SQL Server access helpers (`core/db_helpers.py`) that validate filters, run parameterized queries, and support upserts/deletes.
-- JWT + secure cookie authentication managed in `services/auth_service.py` with bcrypt hashing for migrated accounts.
+- JWT + secure cookie authentication managed in `services/auth_service.py`.
 - Pydantic models under `core/models/` enforce request validation and give automatic OpenAPI documentation.
 - Structured application logging with log rotation (`core/logging_config.py`).
 

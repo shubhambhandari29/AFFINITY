@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Body, Depends, Request, Response
 from fastapi.security import OAuth2PasswordBearer
 
 from core.models.auth import LoginRequest
@@ -14,8 +14,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login", auto_error=False)
 
 
 @router.post("/login")
-async def login(payload: LoginRequest, response: Response):
-    return await login_user(payload.model_dump(), response)
+async def login(
+    request: Request,
+    response: Response,
+    payload: LoginRequest | None = Body(default=None),
+):
+    return await login_user(payload.model_dump() if payload else None, response, request)
 
 
 @router.get("/me")
