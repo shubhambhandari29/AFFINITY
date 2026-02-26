@@ -13,9 +13,6 @@ from core.jwt_handler import (
 )
 
 logger = logging.getLogger(__name__)
-
-ROLE_PRIORITY = ("admin", "director", "underwriter")
-SESSION_COOKIE_NAME = "session"
 COOKIE_OPTIONS = {
     "httponly": True,
     "secure": settings.SECURE_COOKIE,
@@ -24,9 +21,9 @@ COOKIE_OPTIONS = {
 }
 
 
-def _set_session_cookie(response: Response, token: str) -> None:
+def set_session_cookie(response: Response, token: str) -> None:
     response.set_cookie(
-        key=SESSION_COOKIE_NAME,
+        key="session",
         value=token,
         max_age=ACCESS_TOKEN_VALIDITY * 60,
         expires=datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_VALIDITY),
@@ -34,8 +31,8 @@ def _set_session_cookie(response: Response, token: str) -> None:
     )
 
 
-def _clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=SESSION_COOKIE_NAME, path=COOKIE_OPTIONS["path"])
+def clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(key="session", path=COOKIE_OPTIONS["path"])
 
 
 # -------------------------
@@ -95,15 +92,7 @@ def get_user_by_id(user_id: int) -> dict[str, Any] | None:
 # -------------------------
 
 
-def _is_local_environment() -> bool:
-    return settings.ENVIRONMENT.strip().lower() == "local"
-
-
-def _normalize_claim_value(value: str) -> str:
-    return value.strip().lower()
-
-
-def _build_user_payload(
+def build_user_payload(
     user_record: dict[str, Any],
     role_override: str | None = None,
 ) -> dict[str, Any]:
@@ -118,7 +107,7 @@ def _build_user_payload(
     }
 
 
-def _extract_user_id_from_payload(payload: dict[str, Any]) -> int | None:
+def extract_user_id_from_payload(payload: dict[str, Any]) -> int | None:
     user_id = payload.get("sub")
     if not user_id and isinstance(payload.get("user"), dict):
         user_id = payload["user"].get("id")
@@ -129,64 +118,7 @@ def _extract_user_id_from_payload(payload: dict[str, Any]) -> int | None:
     return None
 
 
-def _parse_f5_groups(raw_groups: str | None) -> list[str]:
-    if not raw_groups:
-        return []
-
-    delimiter = settings.F5_GROUPS_DELIMITER or ","
-    normalized_groups = raw_groups.replace(";", ",")
-    if delimiter != ",":
-        normalized_groups = normalized_groups.replace(delimiter, ",")
-
-    return [group.strip() for group in normalized_groups.split(",") if group.strip()]
-
-
-def _f5_group_to_role_mapping() -> dict[str, str]:
-    mapping: dict[str, str] = {}
-    if settings.F5_UNDERWRITER_GROUP:
-        mapping[_normalize_claim_value(settings.F5_UNDERWRITER_GROUP)] = "underwriter"
-    if settings.F5_DIRECTOR_GROUP:
-        mapping[_normalize_claim_value(settings.F5_DIRECTOR_GROUP)] = "director"
-    if settings.F5_ADMIN_GROUP:
-        mapping[_normalize_claim_value(settings.F5_ADMIN_GROUP)] = "admin"
-
-    for role in ROLE_PRIORITY:
-        mapping.setdefault(role, role)
-
-    return mapping
-
-
-def _resolve_role_from_f5_groups(groups: list[str]) -> str:
-    mapping = _f5_group_to_role_mapping()
-    resolved_roles = {
-        mapping[normalized]
-        for normalized in (_normalize_claim_value(group) for group in groups)
-        if normalized in mapping
-    }
-
-    for role in ROLE_PRIORITY:
-        if role in resolved_roles:
-            return role
-
-    raise HTTPException(status_code=403, detail={"error": "Unauthorized group"})
-
-
-def _resolve_user_record_for_identity(identity: str) -> dict[str, Any] | None:
-    identity_value = identity.strip()
-    if not identity_value:
-        return None
-
-    user_record = get_user_by_email(identity_value)
-    if user_record:
-        return user_record
-
-    if identity_value.isdigit():
-        return get_user_by_id(int(identity_value))
-
-    return None
-
-
-async def _login_with_local_credentials(login_data: dict[str, Any], response: Response):
+async def login_with_local_credentials(login_data: dict[str, Any], response: Response):
     """
     Validates user email/password.
     Sets HTTP-only cookie.
@@ -210,20 +142,20 @@ async def _login_with_local_credentials(login_data: dict[str, Any], response: Re
         logger.warning(f"Login failed: wrong password ({email})")
         raise HTTPException(status_code=401, detail={"error": "Wrong password"})
 
-    user = _build_user_payload(user_record)
+    user = build_user_payload(user_record)
 
     # Create JWT
     token = create_access_token(user["id"], user.get("role"))
 
     # Set cookie
-    _set_session_cookie(response, token)
+    set_session_cookie(response, token)
 
     logger.info(f"User {email} logged in successfully")
 
     return {"message": "Sign in successful", "user": user, "token": token}
 
 
-async def _login_with_f5_headers(request: Request | None, response: Response):
+async def login_with_f5_headers(request: Request | None, response: Response):
     """
     Validates identity headers inserted by F5 APM.
     Sets HTTP-only cookie.
@@ -233,25 +165,35 @@ async def _login_with_f5_headers(request: Request | None, response: Response):
     if request is None:
         raise HTTPException(status_code=400, detail={"error": "Missing request context"})
 
-    identity = request.headers.get(settings.F5_USER_HEADER)
+    identity = request.headers.get("X-Auth-User")
     if not identity:
         logger.warning("F5 login failed: missing user header")
         raise HTTPException(status_code=401, detail={"error": "Not authenticated"})
 
-    groups = _parse_f5_groups(request.headers.get(settings.F5_GROUPS_HEADER))
-    if not groups:
+    group = request.headers.get("X-Auth-Groups")
+    if not group:
         logger.warning(f"F5 login failed: missing groups header for user {identity}")
         raise HTTPException(status_code=403, detail={"error": "Unauthorized group"})
 
-    role = _resolve_role_from_f5_groups(groups)
-    user_record = _resolve_user_record_for_identity(identity)
+    group = group.strip()
+    if group == "AD_ADMIN":
+        role = "admin"
+    elif group == "AD_DIRECTOR":
+        role = "director"
+    elif group == "AD_UW":
+        role = "underwriter"
+    else:
+        raise HTTPException(status_code=403, detail={"error": "Unauthorized group"})
+
+    identity = identity.strip()
+    user_record = get_user_by_email(identity) if identity else None
     if not user_record:
         logger.warning(f"F5 login failed: user not found ({identity})")
         raise HTTPException(status_code=404, detail={"error": "User not found"})
 
-    user = _build_user_payload(user_record, role_override=role)
+    user = build_user_payload(user_record, role_override=role)
     token = create_access_token(user["id"], user.get("role"))
-    _set_session_cookie(response, token)
+    set_session_cookie(response, token)
 
     logger.info(f"User {identity} logged in through F5 as {role}")
     return {"message": "Sign in successful", "user": user, "token": token}
@@ -262,9 +204,9 @@ async def login_user(
     response: Response,
     request: Request | None = None,
 ):
-    if _is_local_environment():
-        return await _login_with_local_credentials(login_data or {}, response)
-    return await _login_with_f5_headers(request, response)
+    if settings.ENVIRONMENT == "LOCAL":
+        return await login_with_local_credentials(login_data or {}, response)
+    return await login_with_f5_headers(request, response)
 
 
 async def get_current_user_from_token(request: Request):
@@ -273,19 +215,19 @@ async def get_current_user_from_token(request: Request):
     Returns decoded user.
     """
 
-    token = request.cookies.get(SESSION_COOKIE_NAME)
+    token = request.cookies.get("session")
     if not token:
         raise HTTPException(status_code=401, detail={"error": "Not authenticated"})
 
     try:
         payload = decode_access_token(token)
-        user_id = _extract_user_id_from_payload(payload)
+        user_id = extract_user_id_from_payload(payload)
         if not user_id:
             raise HTTPException(status_code=401, detail={"error": "Invalid token"})
         user_record = get_user_by_id(user_id)
         if not user_record:
             raise HTTPException(status_code=401, detail={"error": "Invalid token"})
-        user = _build_user_payload(user_record, role_override=payload.get("role"))
+        user = build_user_payload(user_record, role_override=payload.get("role"))
     except Exception as e:
         logger.error(f"Token decode failed: {e}")
         raise HTTPException(status_code=401, detail={"error": "Invalid token"}) from e
@@ -297,7 +239,7 @@ async def logout_user(response: Response):
     """
     Deletes the session cookie.
     """
-    _clear_session_cookie(response)
+    clear_session_cookie(response)
     logger.info("User logged out successfully")
     return {"message": "Logged out successfully"}
 
@@ -309,14 +251,14 @@ async def refresh_user_token(request: Request, response: Response, token: str | 
 
     # If dependency didn't supply token, check cookie
     if not token:
-        token = request.cookies.get(SESSION_COOKIE_NAME)
+        token = request.cookies.get("session")
 
     if not token:
         raise HTTPException(status_code=401, detail={"error": "No token found"})
 
     try:
         payload = decode_access_token(token)
-        user_id = _extract_user_id_from_payload(payload)
+        user_id = extract_user_id_from_payload(payload)
         if not user_id:
             raise HTTPException(status_code=401, detail={"error": "Invalid token"})
         user_record = get_user_by_id(user_id)
@@ -329,7 +271,7 @@ async def refresh_user_token(request: Request, response: Response, token: str | 
     # Generate new token
     new_token = create_access_token(user_id, payload.get("role"))
 
-    _set_session_cookie(response, new_token)
+    set_session_cookie(response, new_token)
 
     logger.info(f"Token refreshed for user {user_record['Email']}")
 

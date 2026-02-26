@@ -38,14 +38,6 @@ class Settings:
     SECURE_COOKIE: bool = _as_bool(os.getenv("SECURE_COOKIE"))
     SAME_SITE: str = os.getenv("SAME_SITE")
 
-    # F5 APM header-based SSO settings (used outside local environment)
-    F5_USER_HEADER: str = os.getenv("F5_USER_HEADER", "X-Auth-User")
-    F5_GROUPS_HEADER: str = os.getenv("F5_GROUPS_HEADER", "X-Auth-Groups")
-    F5_GROUPS_DELIMITER: str = os.getenv("F5_GROUPS_DELIMITER", ",")
-    F5_UNDERWRITER_GROUP: str | None = os.getenv("F5_UNDERWRITER_GROUP")
-    F5_DIRECTOR_GROUP: str | None = os.getenv("F5_DIRECTOR_GROUP")
-    F5_ADMIN_GROUP: str | None = os.getenv("F5_ADMIN_GROUP")
-
     # Outlook compose settings
     OUTLOOK_COMPOSE_BASE_URL: str = os.getenv("OUTLOOK_COMPOSE_BASE_URL")
 
