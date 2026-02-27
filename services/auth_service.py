@@ -9,19 +9,29 @@ from core.db_helpers import run_raw_query
 from core.encrypt import hash_password, verify_password
 from core.jwt_handler import (
     ACCESS_TOKEN_VALIDITY,
+    REFRESH_TOKEN_VALIDITY,
     create_access_token,
+    create_refresh_token,
     decode_access_token,
+    decode_refresh_token,
 )
 from db import db_connection
 
 logger = logging.getLogger(__name__)
 
 SESSION_COOKIE_NAME = "session"
-COOKIE_OPTIONS = {
+REFRESH_COOKIE_NAME = "refresh_session"
+ACCESS_COOKIE_OPTIONS = {
     "httponly": True,
     "secure": settings.SECURE_COOKIE,
     "samesite": settings.SAME_SITE,
     "path": "/",
+}
+REFRESH_COOKIE_OPTIONS = {
+    "httponly": True,
+    "secure": settings.SECURE_COOKIE,
+    "samesite": settings.SAME_SITE,
+    "path": "/auth/refresh_token",
 }
 
 
@@ -31,12 +41,31 @@ def _set_session_cookie(response: Response, token: str) -> None:
         value=token,
         max_age=ACCESS_TOKEN_VALIDITY * 60,
         expires=datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_VALIDITY),
-        **COOKIE_OPTIONS,
+        **ACCESS_COOKIE_OPTIONS,
+    )
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=token,
+        max_age=REFRESH_TOKEN_VALIDITY * 60,
+        expires=datetime.now(UTC) + timedelta(minutes=REFRESH_TOKEN_VALIDITY),
+        **REFRESH_COOKIE_OPTIONS,
     )
 
 
 def _clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=SESSION_COOKIE_NAME, path=COOKIE_OPTIONS["path"])
+    response.delete_cookie(key=SESSION_COOKIE_NAME, path=ACCESS_COOKIE_OPTIONS["path"])
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(key=REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_OPTIONS["path"])
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    _clear_session_cookie(response)
+    _clear_refresh_cookie(response)
 
 
 def _persist_hashed_password(user_id: int, new_hash: str) -> None:
@@ -160,11 +189,13 @@ async def login_user(login_data: dict[str, Any], response: Response):
         "branch": user_record["BranchName"],
     }
 
-    # Create JWT
+    # Create JWT pair
     token = create_access_token(user["id"], user.get("role"))
+    refresh_token = create_refresh_token(user["id"])
 
-    # Set cookie
+    # Set cookies
     _set_session_cookie(response, token)
+    _set_refresh_cookie(response, refresh_token)
 
     logger.info(f"User {email} logged in successfully")
 
@@ -208,43 +239,47 @@ async def get_current_user_from_token(request: Request):
 
 async def logout_user(response: Response):
     """
-    Deletes the session cookie.
+    Deletes auth cookies.
     """
-    _clear_session_cookie(response)
+    _clear_auth_cookies(response)
     logger.info("User logged out successfully")
     return {"message": "Logged out successfully"}
 
 
 async def refresh_user_token(request: Request, response: Response, token: str | None):
     """
-    Creates a new token using an existing valid token.
+    Creates a new access token using a valid refresh token.
     """
 
-    # If dependency didn't supply token, check cookie
-    if not token:
-        token = request.cookies.get(SESSION_COOKIE_NAME)
+    refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
+    if not refresh_token:
+        # Backward-compatible fallback for non-cookie clients.
+        refresh_token = token
 
-    if not token:
-        raise HTTPException(status_code=401, detail={"error": "No token found"})
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail={"error": "No refresh token found"})
 
     try:
-        payload = decode_access_token(token)
+        payload = decode_refresh_token(refresh_token)
         user_id = payload.get("sub")
         if not user_id and isinstance(payload.get("user"), dict):
             user_id = payload["user"].get("id")
         if not user_id:
-            raise HTTPException(status_code=401, detail={"error": "Invalid token"})
+            raise HTTPException(status_code=401, detail={"error": "Invalid refresh token"})
         user_record = get_user_by_id(user_id)
         if not user_record:
-            raise HTTPException(status_code=401, detail={"error": "Invalid token"})
+            raise HTTPException(status_code=401, detail={"error": "Invalid refresh token"})
     except Exception as e:
         logger.error(f"Token refresh failed: {e}")
-        raise HTTPException(status_code=401, detail={"error": "Invalid token"}) from e
+        _clear_auth_cookies(response)
+        raise HTTPException(status_code=401, detail={"error": "Invalid refresh token"}) from e
 
-    # Generate new token
-    new_token = create_access_token(user_id, payload.get("role"))
+    # Rotate both tokens so refresh token cannot be replayed indefinitely.
+    new_token = create_access_token(user_id, user_record.get("Role"))
+    new_refresh_token = create_refresh_token(user_id)
 
     _set_session_cookie(response, new_token)
+    _set_refresh_cookie(response, new_refresh_token)
 
     logger.info(f"Token refreshed for user {user_record['Email']}")
 

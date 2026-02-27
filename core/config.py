@@ -30,6 +30,7 @@ class Settings:
     # JWT / Auth config (still used for existing flows)
     SECRET_KEY: str = os.getenv("SECRET_KEY")
     ACCESS_TOKEN_VALIDITY: int = int(os.getenv("ACCESS_TOKEN_VALIDITY"))
+    REFRESH_TOKEN_VALIDITY: int = int(os.getenv("REFRESH_TOKEN_VALIDITY", "10080"))
 
     # CORS settings
     ALLOWED_ORIGINS: list = [os.getenv("FRONTEND_URL")]

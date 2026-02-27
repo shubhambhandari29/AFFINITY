@@ -50,6 +50,7 @@ Each route validates input with a Pydantic schema, enforces authentication via d
    DB_AUTH=ActiveDirectoryIntegrated
    SECRET_KEY=<random-64-character-string>
    ACCESS_TOKEN_VALIDITY=480
+   REFRESH_TOKEN_VALIDITY=10080
    FRONTEND_URL=http://localhost:3000
    ```
    > Do **not** commit real secrets. Use Key Vault, AWS Secrets Manager, or your chosen secret store in deployed environments.

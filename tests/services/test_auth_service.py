@@ -11,10 +11,19 @@ from services import auth_service
 def test_set_and_clear_session_cookie():
     response = Response()
     auth_service._set_session_cookie(response, "token")
-    assert auth_service.SESSION_COOKIE_NAME in response.headers.get("set-cookie", "")
+    auth_service._set_refresh_cookie(response, "refresh-token")
+    headers = "\n".join(
+        value.decode() for key, value in response.raw_headers if key == b"set-cookie"
+    )
+    assert auth_service.SESSION_COOKIE_NAME in headers
+    assert auth_service.REFRESH_COOKIE_NAME in headers
 
-    auth_service._clear_session_cookie(response)
-    assert auth_service.SESSION_COOKIE_NAME in response.headers.get("set-cookie", "")
+    auth_service._clear_auth_cookies(response)
+    headers = "\n".join(
+        value.decode() for key, value in response.raw_headers if key == b"set-cookie"
+    )
+    assert auth_service.SESSION_COOKIE_NAME in headers
+    assert auth_service.REFRESH_COOKIE_NAME in headers
 
 
 def test_login_user_missing_data():
@@ -63,7 +72,7 @@ def test_login_user_wrong_password(monkeypatch):
 
 
 def test_login_user_legacy_password_rehash(monkeypatch):
-    captured = {"rehash": None, "cookie": None}
+    captured = {"rehash": None, "session_cookie": None, "refresh_cookie": None}
 
     monkeypatch.setattr(
         auth_service,
@@ -91,14 +100,22 @@ def test_login_user_legacy_password_rehash(monkeypatch):
     def fake_create_access_token(user_id, role):
         return "token"
 
-    def fake_set_cookie(response, token):
-        captured["cookie"] = token
+    def fake_create_refresh_token(user_id):
+        return "refresh-token"
+
+    def fake_set_session_cookie(response, token):
+        captured["session_cookie"] = token
+
+    def fake_set_refresh_cookie(response, token):
+        captured["refresh_cookie"] = token
 
     monkeypatch.setattr(auth_service, "verify_password", fake_verify_password)
     monkeypatch.setattr(auth_service, "hash_password", fake_hash_password)
     monkeypatch.setattr(auth_service, "_persist_hashed_password", fake_persist)
     monkeypatch.setattr(auth_service, "create_access_token", fake_create_access_token)
-    monkeypatch.setattr(auth_service, "_set_session_cookie", fake_set_cookie)
+    monkeypatch.setattr(auth_service, "create_refresh_token", fake_create_refresh_token)
+    monkeypatch.setattr(auth_service, "_set_session_cookie", fake_set_session_cookie)
+    monkeypatch.setattr(auth_service, "_set_refresh_cookie", fake_set_refresh_cookie)
 
     response = Response()
     result = asyncio.run(
@@ -108,7 +125,8 @@ def test_login_user_legacy_password_rehash(monkeypatch):
     assert result["message"] == "Sign in successful"
     assert result["token"] == "token"
     assert captured["rehash"] == (2, "newhash")
-    assert captured["cookie"] == "token"
+    assert captured["session_cookie"] == "token"
+    assert captured["refresh_cookie"] == "refresh-token"
 
 
 def test_login_user_valid_password(monkeypatch):
@@ -127,7 +145,9 @@ def test_login_user_valid_password(monkeypatch):
     )
     monkeypatch.setattr(auth_service, "verify_password", lambda p, s: True)
     monkeypatch.setattr(auth_service, "create_access_token", lambda uid, role: "token")
+    monkeypatch.setattr(auth_service, "create_refresh_token", lambda uid: "refresh-token")
     monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
+    monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
 
     result = asyncio.run(
         auth_service.login_user({"email": "a@example.com", "password": "x"}, Response())
@@ -181,22 +201,48 @@ def test_refresh_user_token_no_token():
         asyncio.run(auth_service.refresh_user_token(request, response, token=None))
 
     assert excinfo.value.status_code == 401
-    assert excinfo.value.detail == {"error": "No token found"}
+    assert excinfo.value.detail == {"error": "No refresh token found"}
 
 
 def test_refresh_user_token_success(monkeypatch):
-    monkeypatch.setattr(auth_service, "decode_access_token", lambda token: {"sub": 1})
+    monkeypatch.setattr(auth_service, "decode_refresh_token", lambda token: {"sub": 1})
     monkeypatch.setattr(
         auth_service,
         "get_user_by_id",
-        lambda user_id: {"ID": 1, "Email": "a@example.com"},
+        lambda user_id: {"ID": 1, "Email": "a@example.com", "Role": "User"},
     )
     monkeypatch.setattr(auth_service, "create_access_token", lambda uid, role: "newtoken")
+    monkeypatch.setattr(auth_service, "create_refresh_token", lambda uid: "new-refresh-token")
     monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
+    monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
 
     request = Request({"type": "http", "headers": [], "query_string": b""})
-    request._cookies = {auth_service.SESSION_COOKIE_NAME: "token"}
+    request._cookies = {auth_service.REFRESH_COOKIE_NAME: "refresh-token"}
     response = Response()
 
     result = asyncio.run(auth_service.refresh_user_token(request, response, token=None))
     assert result == {"message": "Token refreshed", "token": "newtoken"}
+
+
+def test_refresh_user_token_invalid_clears_cookies(monkeypatch):
+    captured = {"cleared": False}
+
+    def fake_decode_refresh_token(token):
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+
+    def fake_clear_auth_cookies(response):
+        captured["cleared"] = True
+
+    monkeypatch.setattr(auth_service, "decode_refresh_token", fake_decode_refresh_token)
+    monkeypatch.setattr(auth_service, "_clear_auth_cookies", fake_clear_auth_cookies)
+
+    request = Request({"type": "http", "headers": [], "query_string": b""})
+    request._cookies = {auth_service.REFRESH_COOKIE_NAME: "refresh-token"}
+    response = Response()
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(auth_service.refresh_user_token(request, response, token=None))
+
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == {"error": "Invalid refresh token"}
+    assert captured["cleared"] is True
