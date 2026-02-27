@@ -1,23 +1,51 @@
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterContact1] VARCHAR(200) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterTitle1] VARCHAR(200) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterPhone1] VARCHAR(50) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterCell1] VARCHAR(50) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterEMail1] VARCHAR(255) NULL;
+How to Fix Your Backend
+To fix this properly, you need to implement a two-token architecture. Here is the blueprint of what needs to change in your FastAPI code:
+1. Generate Two Tokens on Login
+Update your create_access_token logic (or add a new function) to generate both.
+Python
+ 
+Plain Text
+# During login_user():access_token = create_access_token(user["id"], user.get("role"), expires_minutes=15)
+refresh_token = create_refresh_token(user["id"], expires_days=7) 
 
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterContact2] VARCHAR(200) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterTitle2] VARCHAR(200) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterPhone2] VARCHAR(50) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterCell2] VARCHAR(50) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [AdjusterEMail2] VARCHAR(255) NULL;
 
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [FirmName] VARCHAR(255) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [FirmAddress] VARCHAR(255) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [FirmCityStateZip] VARCHAR(255) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [FirmWebsite] VARCHAR(255) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [CounselName] VARCHAR(255) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [CounselPhone] VARCHAR(50) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [CounselEmail] VARCHAR(255) NULL;
+2. Set Two Separate Cookies
+You need two different cookies with different max_age values.
+Python
+ 
+Plain Text
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str):# Short-lived cookie for normal API calls    response.set_cookie(        key="session", 
+        value=access_token,         max_age=15 * 60, # 15 minutes        httponly=True,
+        # ... secure, samesite, etc.    )        # Long-lived cookie strictly for the /refresh route    response.set_cookie(        key="refresh_session", 
+        value=refresh_token, 
+        max_age=7 * 24 * 60 * 60, # 7 days
+        httponly=True,
+        path="/auth/refresh" # Only send this cookie to the refresh endpoint!
+    )
+ 
 
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [HourlyRatesPartner] VARCHAR(50) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [HourlyRatesAssociate] VARCHAR(50) NULL;
-ALTER TABLE dbo.tblAffinityPolicyType ALTER COLUMN [HourlyRatesParalegal] VARCHAR(50) NULL;
+
+3. Rewrite the Refresh Endpoint
+Your /auth/refresh endpoint must completely ignore the expired session (access token) cookie, and instead look strictly for the refresh_session cookie.
+Python
+ 
+Plain Text
+async def refresh_user_token(request: Request, response: Response):# 1. Look ONLY for the refresh token    refresh_token = request.cookies.get("refresh_session")
+        if not refresh_token:
+        raise HTTPException(status_code=401, detail={"error": "No refresh token found. Please log in again."})
+    try:
+        # 2. Decode the refresh token (which shouldn't be expired yet)        payload = decode_refresh_token(refresh_token)        user_id = payload.get("sub")
+                # ... user validation logic ...# 3. Issue a BRAND NEW Access Token        new_access_token = create_access_token(user_id, user_record["Role"])
+                # 4. (Optional but recommended) Issue a new refresh token (Refresh Token Rotation)        new_refresh_token = create_refresh_token(user_id)
+        # 5. Set the new cookies        _set_auth_cookies(response, new_access_token, new_refresh_token)
+        return {"message": "Token refreshed successfully"}
+    except Exception as e:
+        # If the REFRESH token is expired/invalid, clear cookies and force login
+        _clear_session_cookie(response)
+        raise HTTPException(status_code=401, detail={"error": "Refresh token expired. Force logout."})
+ 
+
+
+Summary of why your frontend was hanging:
+Your frontend Axios interceptor hit a 401. It faithfully called /auth/refresh/. Your backend looked at the expired cookie, threw its own 401 error, and rejected the request. Your frontend received another 401 during the refresh attempt, which triggered the infinite deadlock we solved earlier!
+Would you like me to help write the actual create_refresh_token and decode_refresh_token functions for your core.jwt_handler file so you can implement this Two-Token system?
