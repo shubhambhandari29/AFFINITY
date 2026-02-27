@@ -10,7 +10,10 @@ from services.sac import sac_account_service
 
 def test_get_sac_account_without_branch(monkeypatch):
     async def fake_fetch_records_async(*, table, filters):
-        return [{"CustomerNum": "1"}]
+        return [
+            {"CustomerNum": "1", "Stage": "Retired"},
+            {"CustomerNum": "2", "Stage": "Active"},
+        ]
 
     def fake_format_records_dates(records, fields=None):
         return records
@@ -20,12 +23,15 @@ def test_get_sac_account_without_branch(monkeypatch):
     monkeypatch.setattr(sac_account_service, "format_records_dates", fake_format_records_dates)
 
     result = asyncio.run(sac_account_service.get_sac_account({"CustomerNum": "1"}))
-    assert result == [{"CustomerNum": "1"}]
+    assert result == [{"CustomerNum": "2", "Stage": "Active"}]
 
 
 def test_get_sac_account_with_branch_filter(monkeypatch):
     async def fake_run_raw_query_async(query, params):
-        return [{"CustomerNum": "1"}]
+        return [
+            {"CustomerNum": "1", "Stage": "Retired"},
+            {"CustomerNum": "2", "Stage": "Active"},
+        ]
 
     def fake_format_records_dates(records, fields=None):
         return records
@@ -39,7 +45,7 @@ def test_get_sac_account_with_branch_filter(monkeypatch):
     monkeypatch.setattr(sac_account_service, "format_records_dates", fake_format_records_dates)
 
     result = asyncio.run(sac_account_service.get_sac_account({"BranchName": "NY, LA"}))
-    assert result == [{"CustomerNum": "1"}]
+    assert result == [{"CustomerNum": "2", "Stage": "Active"}]
 
 
 def test_get_sac_account_invalid_filters(monkeypatch):

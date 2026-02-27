@@ -10,8 +10,8 @@ from services.affinity import affinity_program_service
 
 def test_get_affinity_program_without_branch_filter_uses_fetch(monkeypatch):
     captured = {"filters": None, "formatted": False}
-    records = [{"ProgramName": "Alpha"}]
-    formatted_records = [{"ProgramName": "Alpha", "OnBoardDt": "01-01-2024"}]
+    records = [{"ProgramName": "Alpha", "Stage": "Retired"}, {"ProgramName": "Beta"}]
+    formatted_records = [{"ProgramName": "Beta", "OnBoardDt": "01-01-2024"}]
 
     def fake_sanitize_filters(query_params):
         return {"ProgramName": "Alpha"}
@@ -22,7 +22,7 @@ def test_get_affinity_program_without_branch_filter_uses_fetch(monkeypatch):
         return list(records)
 
     def fake_format_records_dates(rows):
-        assert rows == records
+        assert rows == [{"ProgramName": "Beta"}]
         captured["formatted"] = True
         return list(formatted_records)
 
@@ -45,7 +45,7 @@ def test_get_affinity_program_without_branch_filter_uses_fetch(monkeypatch):
 
 def test_get_affinity_program_with_branch_filter_builds_like_query(monkeypatch):
     captured = {"query": None, "params": None}
-    formatted_records = [{"ProgramName": "Alpha"}]
+    records = [{"ProgramName": "Alpha", "Stage": "Retired"}, {"ProgramName": "Beta"}]
 
     def fake_sanitize_filters(query_params):
         return {"BranchVal": "NY, LA & SF", "ProgramName": "Alpha"}
@@ -53,7 +53,7 @@ def test_get_affinity_program_with_branch_filter_builds_like_query(monkeypatch):
     async def fake_run_raw_query_async(query, params):
         captured["query"] = query
         captured["params"] = params
-        return list(formatted_records)
+        return list(records)
 
     def fake_format_records_dates(rows):
         return rows
@@ -72,7 +72,7 @@ def test_get_affinity_program_with_branch_filter_builds_like_query(monkeypatch):
 
     assert "BranchVal LIKE ?" in captured["query"]
     assert captured["params"] == ["Alpha", "NY%", "LA%", "SF%"]
-    assert result == formatted_records
+    assert result == [{"ProgramName": "Beta"}]
 
 
 def test_get_affinity_program_validation_error_returns_http_400(monkeypatch):

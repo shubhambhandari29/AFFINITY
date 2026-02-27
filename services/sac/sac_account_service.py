@@ -45,6 +45,14 @@ _DATE_FIELDS = {
 }
 
 
+def _exclude_retired_stage(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        record
+        for record in records
+        if str(record.get("Stage", "")).strip().lower() != "retired"
+    ]
+
+
 async def get_sac_account(query_params: dict[str, Any]):
     try:
         filters = sanitize_filters(query_params, ALLOWED_FILTERS)
@@ -52,6 +60,7 @@ async def get_sac_account(query_params: dict[str, Any]):
 
         if not branch_filter:
             records = await fetch_records_async(table=TABLE_NAME, filters=filters)
+            records = _exclude_retired_stage(records)
             if not records:
                 return []
             return format_records_dates(records, fields=_DATE_FIELDS)
@@ -61,6 +70,7 @@ async def get_sac_account(query_params: dict[str, Any]):
         # Fall back to simple filtering if nothing usable came from the branch filter.
         if not branch_terms:
             records = await fetch_records_async(table=TABLE_NAME, filters=filters)
+            records = _exclude_retired_stage(records)
             if not records:
                 return []
             return format_records_dates(records, fields=_DATE_FIELDS)
@@ -81,6 +91,7 @@ async def get_sac_account(query_params: dict[str, Any]):
             query += " WHERE " + " AND ".join(clauses)
 
         records = await run_raw_query_async(query, list(params))
+        records = _exclude_retired_stage(records)
         if not records:
             return []
         return format_records_dates(records, fields=_DATE_FIELDS)

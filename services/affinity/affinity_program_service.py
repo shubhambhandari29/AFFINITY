@@ -20,6 +20,14 @@ PRIMARY_KEY = "AcctAffinityProgramKey"
 KEY_COLUMNS = ["ProgramName"]
 
 
+def _exclude_retired_stage(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        record
+        for record in records
+        if str(record.get("Stage", "")).strip().lower() != "retired"
+    ]
+
+
 async def get_affinity_program(query_params: dict[str, Any]):
     """
     Fetch account(s) from tblAcctAffinityProgram.
@@ -33,12 +41,14 @@ async def get_affinity_program(query_params: dict[str, Any]):
 
         if not branch_filter:
             records = await fetch_records_async(table=TABLE_NAME, filters=filters)
+            records = _exclude_retired_stage(records)
             return format_records_dates(records)
 
         branch_terms = [term for term in re.split(r"[ ,&]+", str(branch_filter)) if term.strip()]
 
         if not branch_terms:
             records = await fetch_records_async(table=TABLE_NAME, filters=filters)
+            records = _exclude_retired_stage(records)
             return format_records_dates(records)
 
         clauses: list[str] = []
@@ -57,6 +67,7 @@ async def get_affinity_program(query_params: dict[str, Any]):
             query += " WHERE " + " AND ".join(clauses)
 
         records = await run_raw_query_async(query, list(params))
+        records = _exclude_retired_stage(records)
         return format_records_dates(records)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
