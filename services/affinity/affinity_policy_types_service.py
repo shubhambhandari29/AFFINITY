@@ -21,14 +21,6 @@ logger = logging.getLogger(__name__)
 TABLE_NAME = "tblAffinityPolicyType"
 AGENTS_TABLE = "tblAffinityAgents"
 
-
-def _normalize_text(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text.lower() if text else None
-
-
 async def _lookup_pk_number(record: dict[str, Any]) -> int | None:
     """
     Fetch the latest PK_Number for a policy type identified by its natural key fields.
@@ -146,8 +138,17 @@ async def upsert_affinity_policy_types(data: dict[str, Any]):
                     detail={"error": f"Primary key {pk_value} not found"},
                 )
             existing_row = existing[0]
-            existing_policy_type = _normalize_text(existing_row.get("PolicyType"))
-            incoming_policy_type = _normalize_text(normalized.get("PolicyType"))
+            existing_policy_type = existing_row.get("PolicyType")
+            incoming_policy_type = normalized.get("PolicyType")
+
+            if existing_policy_type is not None:
+                existing_policy_type = str(existing_policy_type).strip().lower()
+                if existing_policy_type == "":
+                    existing_policy_type = None
+            if incoming_policy_type is not None:
+                incoming_policy_type = str(incoming_policy_type).strip().lower()
+                if incoming_policy_type == "":
+                    incoming_policy_type = None
 
             if (
                 incoming_policy_type is not None
