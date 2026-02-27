@@ -184,6 +184,119 @@ def test_upsert_affinity_policy_types_updates_when_pk_found(monkeypatch):
     assert result == {"message": "Transaction successful", "count": 1, "pk": 1}
 
 
+def test_upsert_affinity_policy_types_inserts_when_policy_type_changes(monkeypatch):
+    captured: dict[str, object] = {"insert_records": None}
+
+    monkeypatch.setattr(
+        affinity_policy_types_service,
+        "apply_affinity_policy_type_defaults",
+        lambda data: data,
+    )
+    monkeypatch.setattr(
+        affinity_policy_types_service,
+        "validate_affinity_policy_type_payload",
+        lambda data: [],
+    )
+    monkeypatch.setattr(
+        affinity_policy_types_service,
+        "normalize_payload_dates",
+        lambda data: {
+            "PK_Number": 1,
+            "ProgramName": "A",
+            "PolicyType": "New Policy",
+            "SpecHand": "Manual",
+        },
+    )
+
+    async def fake_fetch_records_async(*, table, filters):
+        return [
+            {
+                "PK_Number": 1,
+                "ProgramName": "A",
+                "PolicyType": "Old Policy",
+                "SpecHand": "Auto Assign",
+                "AddLDocs": "No",
+            }
+        ]
+
+    async def fake_insert_records_async(*, table, records):
+        captured["insert_records"] = records
+        return {"count": len(records)}
+
+    async def fake_merge_upsert_records_async(*, table, data_list, key_columns, **kwargs):
+        raise AssertionError("merge_upsert_records_async should not be called when PolicyType changes")
+
+    async def fake_lookup(record):
+        return 25
+
+    monkeypatch.setattr(
+        affinity_policy_types_service, "fetch_records_async", fake_fetch_records_async
+    )
+    monkeypatch.setattr(
+        affinity_policy_types_service, "insert_records_async", fake_insert_records_async
+    )
+    monkeypatch.setattr(
+        affinity_policy_types_service,
+        "merge_upsert_records_async",
+        fake_merge_upsert_records_async,
+    )
+    monkeypatch.setattr(affinity_policy_types_service, "_lookup_pk_number", fake_lookup)
+
+    result = asyncio.run(affinity_policy_types_service.upsert_affinity_policy_types({"PK_Number": 1}))
+
+    assert captured["insert_records"] == [
+        {
+            "ProgramName": "A",
+            "PolicyType": "New Policy",
+            "SpecHand": "Manual",
+            "AddLDocs": "No",
+        }
+    ]
+    assert result == {"message": "Transaction successful", "count": 1, "pk": 25}
+
+
+def test_upsert_affinity_policy_types_updates_when_policy_type_changes_only_by_case(monkeypatch):
+    monkeypatch.setattr(
+        affinity_policy_types_service,
+        "apply_affinity_policy_type_defaults",
+        lambda data: data,
+    )
+    monkeypatch.setattr(
+        affinity_policy_types_service,
+        "validate_affinity_policy_type_payload",
+        lambda data: [],
+    )
+    monkeypatch.setattr(
+        affinity_policy_types_service,
+        "normalize_payload_dates",
+        lambda data: {"PK_Number": 1, "ProgramName": "A", "PolicyType": "auto"},
+    )
+
+    async def fake_fetch_records_async(*, table, filters):
+        return [{"PK_Number": 1, "ProgramName": "A", "PolicyType": "Auto"}]
+
+    async def fake_insert_records_async(*, table, records):
+        raise AssertionError("insert_records_async should not be called for case-only PolicyType changes")
+
+    async def fake_merge_upsert_records_async(*, table, data_list, key_columns, **kwargs):
+        return {"count": len(data_list)}
+
+    monkeypatch.setattr(
+        affinity_policy_types_service, "fetch_records_async", fake_fetch_records_async
+    )
+    monkeypatch.setattr(
+        affinity_policy_types_service, "insert_records_async", fake_insert_records_async
+    )
+    monkeypatch.setattr(
+        affinity_policy_types_service,
+        "merge_upsert_records_async",
+        fake_merge_upsert_records_async,
+    )
+
+    result = asyncio.run(affinity_policy_types_service.upsert_affinity_policy_types({"PK_Number": 1}))
+    assert result == {"message": "Transaction successful", "count": 1, "pk": 1}
+
+
 def test_upsert_affinity_policy_types_inserts_without_pk(monkeypatch):
     monkeypatch.setattr(
         affinity_policy_types_service,

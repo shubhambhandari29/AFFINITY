@@ -21,6 +21,14 @@ logger = logging.getLogger(__name__)
 TABLE_NAME = "tblAffinityPolicyType"
 AGENTS_TABLE = "tblAffinityAgents"
 
+
+def _normalize_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text.lower() if text else None
+
+
 async def _lookup_pk_number(record: dict[str, Any]) -> int | None:
     """
     Fetch the latest PK_Number for a policy type identified by its natural key fields.
@@ -137,13 +145,32 @@ async def upsert_affinity_policy_types(data: dict[str, Any]):
                     status_code=404,
                     detail={"error": f"Primary key {pk_value} not found"},
                 )
-            await merge_upsert_records_async(
-                table=TABLE_NAME,
-                data_list=[normalized],
-                key_columns=["PK_Number"],
-                exclude_key_columns_from_insert=True,
-            )
-            pk_response = pk_value
+            existing_row = existing[0]
+            existing_policy_type = _normalize_text(existing_row.get("PolicyType"))
+            incoming_policy_type = _normalize_text(normalized.get("PolicyType"))
+
+            if (
+                incoming_policy_type is not None
+                and existing_policy_type is not None
+                and incoming_policy_type != existing_policy_type
+            ):
+                # PolicyType changed: insert a new row by cloning current DB row
+                # and overlaying incoming edits from the payload.
+                cloned_record = {k: v for k, v in existing_row.items() if k != "PK_Number"}
+                for key, value in normalized.items():
+                    if key != "PK_Number":
+                        cloned_record[key] = value
+
+                await insert_records_async(table=TABLE_NAME, records=[cloned_record])
+                pk_response = await _lookup_pk_number(cloned_record)
+            else:
+                await merge_upsert_records_async(
+                    table=TABLE_NAME,
+                    data_list=[normalized],
+                    key_columns=["PK_Number"],
+                    exclude_key_columns_from_insert=True,
+                )
+                pk_response = pk_value
         else:
             sanitized = {k: v for k, v in normalized.items() if k != "PK_Number"}
             if sanitized:
