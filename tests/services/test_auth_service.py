@@ -212,9 +212,17 @@ def test_refresh_user_token_success(monkeypatch):
         lambda user_id: {"ID": 1, "Email": "a@example.com", "Role": "User"},
     )
     monkeypatch.setattr(auth_service, "create_access_token", lambda uid, role: "newtoken")
-    monkeypatch.setattr(auth_service, "create_refresh_token", lambda uid: "new-refresh-token")
     monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
-    monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
+    monkeypatch.setattr(
+        auth_service,
+        "create_refresh_token",
+        lambda uid: pytest.fail("refresh token must not be rotated during refresh"),
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "_set_refresh_cookie",
+        lambda response, token: pytest.fail("refresh cookie must not be reset during refresh"),
+    )
 
     request = Request({"type": "http", "headers": [], "query_string": b""})
     request._cookies = {auth_service.REFRESH_COOKIE_NAME: "refresh-token"}

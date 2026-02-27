@@ -274,12 +274,10 @@ async def refresh_user_token(request: Request, response: Response, token: str | 
         _clear_auth_cookies(response)
         raise HTTPException(status_code=401, detail={"error": "Invalid refresh token"}) from e
 
-    # Rotate both tokens so refresh token cannot be replayed indefinitely.
+    # Fixed refresh token strategy: only issue a new access token.
     new_token = create_access_token(user_id, user_record.get("Role"))
-    new_refresh_token = create_refresh_token(user_id)
 
     _set_session_cookie(response, new_token)
-    _set_refresh_cookie(response, new_refresh_token)
 
     logger.info(f"Token refreshed for user {user_record['Email']}")
 
