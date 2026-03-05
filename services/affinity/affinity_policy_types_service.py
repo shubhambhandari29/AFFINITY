@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblAffinityPolicyType"
 AGENTS_TABLE = "tblAffinityAgents"
+NOT_RETIRED_CONDITION = (
+    f"({TABLE_NAME}.Stage IS NULL OR LOWER(LTRIM(RTRIM({TABLE_NAME}.Stage))) <> 'retired')"
+)
 
 async def _lookup_pk_number(record: dict[str, Any]) -> int | None:
     """
@@ -82,8 +85,8 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
                  AND primary_agents.rn = 1
             """
             params.insert(0, "yes")
-            if filters:
-                query += " WHERE " + " AND ".join(filters)
+            conditions = [NOT_RETIRED_CONDITION, *filters]
+            query += " WHERE " + " AND ".join(conditions)
         else:
             primary_agt = query_params.get("PrimaryAgt")
             if primary_agt not in (None, ""):
@@ -98,12 +101,13 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
                     )
                 """
                 params.insert(0, primary_agt)
+                query += f" AND {NOT_RETIRED_CONDITION}"
                 if filters:
                     query += " AND " + " AND ".join(filters)
             else:
                 query = f"SELECT {TABLE_NAME}.* FROM {TABLE_NAME}"
-                if filters:
-                    query += " WHERE " + " AND ".join(filters)
+                conditions = [NOT_RETIRED_CONDITION, *filters]
+                query += " WHERE " + " AND ".join(conditions)
 
         records = await run_raw_query_async(query, params)
         return format_records_dates(records)

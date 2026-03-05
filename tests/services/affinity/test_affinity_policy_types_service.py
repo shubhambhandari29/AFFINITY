@@ -62,6 +62,7 @@ def test_get_affinity_policy_types_program_name_path(monkeypatch):
     )
 
     assert "WITH primary_agents" in captured["query"]
+    assert "LOWER(LTRIM(RTRIM(tblAffinityPolicyType.Stage))) <> 'retired'" in captured["query"]
     assert captured["params"][0] == "yes"
     assert result == [{"ProgramName": "A"}]
 
@@ -86,7 +87,30 @@ def test_get_affinity_policy_types_primary_agt_path(monkeypatch):
     )
 
     assert "WHERE EXISTS" in captured["query"]
+    assert "LOWER(LTRIM(RTRIM(tblAffinityPolicyType.Stage))) <> 'retired'" in captured["query"]
     assert captured["params"][0] == "yes"
+    assert result == [{"ProgramName": "A"}]
+
+
+def test_get_affinity_policy_types_default_path_applies_retired_filter(monkeypatch):
+    captured = {}
+
+    async def fake_run_raw_query_async(query, params):
+        captured["query"] = query
+        captured["params"] = params
+        return [{"ProgramName": "A"}]
+
+    monkeypatch.setattr(
+        affinity_policy_types_service, "run_raw_query_async", fake_run_raw_query_async
+    )
+    monkeypatch.setattr(
+        affinity_policy_types_service, "format_records_dates", lambda records: records
+    )
+
+    result = asyncio.run(affinity_policy_types_service.get_affinity_policy_types({}))
+
+    assert "LOWER(LTRIM(RTRIM(tblAffinityPolicyType.Stage))) <> 'retired'" in captured["query"]
+    assert captured["params"] == []
     assert result == [{"ProgramName": "A"}]
 
 

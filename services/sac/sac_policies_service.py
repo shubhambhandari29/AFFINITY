@@ -28,6 +28,14 @@ ALLOWED_FILTERS = {"CustomerNum", "PolicyNum", "PolMod", "PK_Number"}
 PREMIUM_ALLOWED_FILTERS = {"CustomerNum", "PolicyNum", "PolMod", "PolicyStatus"}
 
 
+def _exclude_retired_stage(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        record
+        for record in records
+        if str(record.get("Stage", "")).strip().lower() != "retired"
+    ]
+
+
 async def _lookup_pk_number(record: dict[str, Any]) -> int | None:
     """
     Fetch the latest PK_Number for a policy identified by its natural key fields.
@@ -52,6 +60,7 @@ async def get_sac_policies(query_params: dict[str, Any]):
     try:
         filters = sanitize_filters(query_params, ALLOWED_FILTERS)
         records = await fetch_records_async(table=TABLE_NAME, filters=filters)
+        records = _exclude_retired_stage(records)
         formatted = format_records_dates(records)
         for record in formatted:
             if "PremiumAmt" in record:

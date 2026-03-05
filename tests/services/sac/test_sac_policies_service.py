@@ -14,7 +14,10 @@ def test_get_sac_policies_formats_and_normalizes_premium(monkeypatch):
         return {"CustomerNum": "1"}
 
     async def fake_fetch_records_async(*, table, filters):
-        return [{"PremiumAmt": 100, "Other": "x"}]
+        return [
+            {"PremiumAmt": 100, "Other": "retired", "Stage": "Retired"},
+            {"PremiumAmt": 200, "Other": "active", "Stage": "Active"},
+        ]
 
     def fake_format_records_dates(records):
         return records
@@ -22,10 +25,14 @@ def test_get_sac_policies_formats_and_normalizes_premium(monkeypatch):
     monkeypatch.setattr(sac_policies_service, "sanitize_filters", fake_sanitize_filters)
     monkeypatch.setattr(sac_policies_service, "fetch_records_async", fake_fetch_records_async)
     monkeypatch.setattr(sac_policies_service, "format_records_dates", fake_format_records_dates)
-    monkeypatch.setattr(sac_policies_service, "normalize_money_string", lambda value: "100.00")
+    monkeypatch.setattr(
+        sac_policies_service,
+        "normalize_money_string",
+        lambda value: "200.00" if value == 200 else "100.00",
+    )
 
     result = asyncio.run(sac_policies_service.get_sac_policies({"CustomerNum": "1"}))
-    assert result[0]["PremiumAmt"] == "100.00"
+    assert result == [{"PremiumAmt": "200.00", "Other": "active", "Stage": "Active"}]
 
 
 def test_get_sac_policies_invalid_filters():
