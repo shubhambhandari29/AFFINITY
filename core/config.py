@@ -11,6 +11,17 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
     return value.strip().lower() == "true"
 
 
+def _parse_origins(value: str | None) -> list[str]:
+    if not value:
+        return []
+    origins: list[str] = []
+    for origin in value.split(","):
+        cleaned = origin.strip().rstrip("/")
+        if cleaned:
+            origins.append(cleaned)
+    return origins
+
+
 class Settings:
 
     # Feature flags / environment toggles
@@ -33,7 +44,7 @@ class Settings:
     REFRESH_TOKEN_VALIDITY: int = int(os.getenv("REFRESH_TOKEN_VALIDITY", "10080"))
 
     # CORS settings
-    ALLOWED_ORIGINS: list = [os.getenv("FRONTEND_URL")]
+    ALLOWED_ORIGINS: list[str] = list(dict.fromkeys(_parse_origins(os.getenv("FRONTEND_URL"))))
 
     # Cookie settings
     SECURE_COOKIE: bool = _as_bool(os.getenv("SECURE_COOKIE"))

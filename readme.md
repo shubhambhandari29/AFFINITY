@@ -53,6 +53,9 @@ Each route validates input with a Pydantic schema, enforces authentication via d
    REFRESH_TOKEN_VALIDITY=10080
    FRONTEND_URL=http://localhost:3000
    ```
+   For multiple allowed frontend origins, use a comma-separated value:
+   `FRONTEND_URL=https://sacplatformwebpreprd.azurewebsites.net,https://sacplatformpreprd.allmerica.com`
+
    > Do **not** commit real secrets. Use Key Vault, AWS Secrets Manager, or your chosen secret store in deployed environments.
 
 4. **Run the API**
