@@ -1,40 +1,5 @@
 
-This token was issued by Azure Active Directory.
-Decoded Token
-Claims
-{
-  "typ": "JWT",
-  "nonce": "ThD2kmpKkjkv9Gtn79jkKkP-sBE11NDifJMst6TFOPE",
-  "alg": "RS256",
-  "x5t": "sM1_yAxV8GV4yN-B6j2xzmik5Ao",
-  "kid": "sM1_yAxV8GV4yN-B6j2xzmik5Ao"
-}.{
-  "aud": "https://graph.microsoft.com",
-  "iss": "https://sts.windows.net/3ea62a99-e446-48ea-b404-0ac8d9c9b14a/",
-  "iat": 1773154086,
-  "nbf": 1773154086,
-  "exp": 1773240786,
-  "aio": "ASQA2/8bAAAA9EOzXrkOsQ6zta+n+ADoGN5DRWRf/LbIG6jVx6/fPUQ=",
-  "app_displayname": "SACPlatformAPIPreprd",
-  "appid": "51e5ae1c-40a5-4bfe-b891-9ae228406519",
-  "appidacr": "2",
-  "idp": "https://sts.windows.net/3ea62a99-e446-48ea-b404-0ac8d9c9b14a/",
-  "idtyp": "app",
-  "oid": "bb8645bb-88c9-4a65-bb39-adf60bd93fd8",
-  "rh": "1.AVoAmSqmPkbk6ki0BArI2cmxSgMAAAAAAAAAwAAAAAAAAAAAAABaAA.",
-  "sub": "bb8645bb-88c9-4a65-bb39-adf60bd93fd8",
-  "tenant_region_scope": "NA",
-  "tid": "3ea62a99-e446-48ea-b404-0ac8d9c9b14a",
-  "uti": "dDFaRfOmn02QqN23Rn3EBQ",
-  "ver": "1.0",
-  "wids": [
-    "0997a1d0-0d1d-4acb-b408-d5ca73121e90"
-  ],
-  "xms_act_fct": "3 9",
-  "xms_ftd": "opWeU3bzUVFftl5WKb0LqBePkr6dXjRupR47fydQsSIBdXNlYXN0Mi1kc21z",
-  "xms_idrel": "7 2",
-  "xms_rd": "0.42LlYBJijBIS4eAUErBPnyQQea7Tc9eewK43VWG_hEQ4OIQEmBkg4ACUFhLh4BYSWGIgtIQx9qyHULpAd4bMCg0A",
-  "xms_sub_fct": "9 3",
-  "xms_tcdt": "1324239089",
-  "xms_tnt_fct": "3 18"
-}.[Signature]
+Permission granted to the wrong principal (user/app registration instead of the managed identity service principal).
+Admin consent not completed for that assignment.
+Permission assigned via group membership (service principals in groups can fail to get roles claim reliably).
+Managed identity token cache delay. Microsoft says MI tokens/claims can take hours, up to around 24h, to reflect changes.
