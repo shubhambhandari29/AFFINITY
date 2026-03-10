@@ -1,216 +1,109 @@
-Entra ID Group Authorization for FastAPI Backend
-(F5 APM + React + Azure App Service + Microsoft Graph)
-1. Overview
-This document describes the design and implementation for retrieving Microsoft Entra ID (Azure AD) group memberships for authenticated users in our application.
-The application uses F5 APM for authentication, and the backend determines the user's role based on Entra ID group membership.
-End-to-End Flow
-User accesses the application URL protected by F5 APM.
-F5 authenticates the user using enterprise authentication.
-After authentication, F5 injects the User ID in an HTTP header.
-The React UI receives the request and forwards the User ID to the backend.
-The FastAPI backend queries Microsoft Graph API.
-Microsoft Graph returns the list of AD groups the user belongs to.
-Backend filters only the groups relevant to the application.
-Backend determines the application role.
-Role information is returned to React UI.
-Example Role Mapping
-AD Group	Application Role
-SAC_Admin	Admin
-SAC_Director	Director
-SAC_Underwriter	Underwriter
-2. Methods to Access Microsoft Graph
-Two possible approaches exist for the backend to authenticate with Microsoft Graph.
-1️⃣ App Registration (Client ID + Secret)
-2️⃣ Managed Identity (Recommended)
-3. Method 1 – Entra App Registration
-This method uses an application identity registered in Microsoft Entra ID.
-The FastAPI backend authenticates using Client Credentials OAuth flow.
-Admin Setup Steps
-Go to Microsoft Entra Admin Center
-Navigate to:
-App Registrations → New Registration
-Create a new application.
-Example name:
-SAC-FastAPI-Backend
-After creation note the following:
-Field	Purpose
-Application (Client) ID	Used by backend to request token
-Directory (Tenant) ID	Azure tenant identifier
-Create Client Secret
-Navigate to:
-Certificates & Secrets → New Client Secret
-Save the generated secret.
-⚠️ Store the secret securely in Azure Key Vault.
-Grant Microsoft Graph Permissions
-Navigate to:
-API Permissions → Add Permission
-Select:
-Microsoft Graph
-Then choose:
-Application Permissions
-Add:
-Directory.Read.All
-Admin Consent
-After adding permission:
-Grant Admin Consent
-Without admin consent the Graph calls will fail.
-Backend Implementation Steps
-Backend stores:
-Tenant ID
-Client ID
-Client Secret
-Then performs the OAuth Client Credentials Flow.
-Request token:
-POST https://login.microsoftonline.com/{tenant-id}/oauth2/v2.0/token
-Scope:
-https://graph.microsoft.com/.default
-Use returned access token to call Microsoft Graph.
-4. Method 2 – Managed Identity (Recommended)
-This is the preferred approach for this project.
-Because the FastAPI backend is running in Azure App Service, it can use System Assigned Managed Identity.
-Managed Identity allows the application to authenticate with Microsoft services without storing any secrets.
-Advantages
-No client secrets
-No secret rotation
-More secure
-Azure automatically manages identity
-Simpler operational maintenance
-Admin Setup Steps
-Step 1 — Verify Managed Identity
-In Azure Portal:
-App Service → Identity → System Assigned → Enabled
-When enabled, Azure automatically creates a service principal in Entra ID.
-Step 2 — Locate the Identity
-In Microsoft Entra Admin Center:
-Enterprise Applications
-Search for the App Service name.
-This is the service principal for the managed identity.
-Step 3 — Grant Graph Permissions
-Navigate to:
-Enterprise Application
-→ Permissions
-→ Add Permission
-Add:
-Microsoft Graph
-→ Application Permissions
-→ Directory.Read.All
-Step 4 — Grant Admin Consent
-Click:
-Grant Admin Consent
-Without admin consent Graph will return 403 errors.
-5. Microsoft Graph API for Group Retrieval
-Since our system uses group names, we must retrieve group objects instead of just IDs.
-Recommended API:
-GET /users/{id}/transitiveMemberOf/microsoft.graph.group?$select=id,displayName
+Alternate Login and Authorization Model (Application Database Based)
+Overview
+In addition to the Azure AD group–based authorization approach described earlier, an alternate method can be implemented where user authentication is handled by F5, while user authorization and role management are handled by the SAC application database.
+In this approach, once a user is authenticated through F5, the SAC application will use the user identifier provided by F5 to determine the user’s role and access level from the application database (tblUsers).
+This design removes the dependency on Azure AD group membership and Microsoft Graph queries while maintaining secure authentication through the enterprise SSO layer.
+Authentication Flow
+The following steps describe the authentication and authorization process using this alternate method:
+1. User Access
+The user accesses the SAC application using the corporate URL.
 Example:
-GET https://graph.microsoft.com/v1.0/users/{user}/transitiveMemberOf/microsoft.graph.group?$select=id,displayName
-Example Graph Response
+https://sacplatformpreprd.allmerica.com
+The request is routed through F5 APM.
+2. Authentication through F5
+F5 APM validates the user through the organization’s enterprise authentication mechanism (SSO / Azure AD).
+If the user is successfully authenticated, F5 extracts the user identifier (User ID / Email) and forwards the request to the SAC React application.
+Authentication responsibility is therefore handled entirely at the F5 layer.
+3. React Application Receives Authenticated User Identity
+After successful authentication, the React application receives the authenticated user identifier.
+This user identifier is then sent to the backend FastAPI service through a login/bootstrap API.
+Example request:
+POST /auth/login
 {
-  "value": [
-    {
-      "id": "7c92d21f-xxxx",
-      "displayName": "SAC_Admin"
-    },
-    {
-      "id": "8b21c111-xxxx",
-      "displayName": "Finance_ReadOnly"
-    }
-  ]
+    "user_id": "<authenticated_user_id>"
 }
-6. Backend Role Mapping Logic
-Backend receives list of groups.
-Example Python logic:
-if "SAC_Admin" in groups:
-    role = "admin"
-
-elif "SAC_Director" in groups:
-    role = "director"
-
-elif "SAC_Underwriter" in groups:
-    role = "underwriter"
-Backend returns resolved role to UI.
+4. FastAPI Validates User Against Application Database
+The FastAPI backend checks the SAC application database table:
+tblUsers
+The backend verifies whether the authenticated user exists in the application database.
+If the user record exists and is marked as active, the backend retrieves the user profile information, such as:
+User ID
+First Name
+Last Name
+Email
+Role
+Branch
+5. Role and Access Determination
+The user’s application role is determined based on the values stored in the tblUsers table.
+Example roles may include:
+Underwriter
+Director
+Admin
+CCT
+These roles control both:
+Backend API authorization
+Frontend page visibility
+6. Token Generation
+Once the user is validated against the application database, the FastAPI service generates an application authentication token, similar to the current implementation used for password-based login.
+The token is returned to the React application along with the user profile and role information.
 Example response:
 {
-  "user": "john.doe@company.com",
-  "role": "admin"
+  "message": "Sign in successful",
+  "user": {
+      "id": 101,
+      "first_name": "John",
+      "last_name": "Doe",
+      "email": "john.doe@company.com",
+      "role": "Underwriter",
+      "branch": "New York"
+  },
+  "token": "<jwt_token>"
 }
-7. Information Required from Infrastructure/Admin Team
-The backend team requires the following:
-Identity Setup
-Managed Identity enabled on backend App Service
-Graph Permissions
-Microsoft Graph Application Permission:
-Directory.Read.All
-Admin Consent
-Admin must approve the permission.
-AD Group Information
-Provide the exact group names:
-SAC_Admin
-SAC_Director
-SAC_Underwriter
-F5 Header Details
-Confirm:
-Item	Needed
-Header name	Example: X-User-ID
-Value format	UPN / Email / Object ID
-Example value	john.doe@company.com
-8. Backend Implementation Steps
-FastAPI backend will perform:
-Step 1 — Receive User ID
-React sends the user identifier.
-Example:
-POST /auth/login
-Header:
-X-User-ID: john.doe@company.com
-Step 2 — Acquire Graph Token
-Using Managed Identity:
-ManagedIdentityCredential
-Scope:
-https://graph.microsoft.com/.default
-Step 3 — Query Microsoft Graph
-Call:
-GET /users/{user}/transitiveMemberOf
-Step 4 — Extract Groups
-Retrieve:
-displayName
-from response.
-Step 5 — Determine Role
-Match group names against configured role groups.
-Step 6 — Return Role
-Send role information back to React.
-9. Recommended Architecture
-The preferred architecture for this application is:
-User
- ↓
-F5 APM Authentication
- ↓
-React Application
- ↓
-FastAPI Backend
- ↓
-Microsoft Graph API
- ↓
-Role Resolution
-Security Principles
-Authentication handled by F5
-Authorization handled by FastAPI
-Backend calls Microsoft Graph
-No secrets stored in code
-Managed Identity used for service authentication
-10. Final Recommendation
-For this project the recommended approach is:
-✅ Managed Identity
-✅ Microsoft Graph API
-✅ transitiveMemberOf endpoint
-✅ Group Name based filtering
-This approach provides:
-Strong security
-No secret management
-Simple architecture
-Native Azure integration
-If you want, I can also give you one more extremely useful section you can add to this document (which will impress the infra/security team):
-Architecture diagram
-Exact FastAPI code using Managed Identity
-Exact Graph API call example
-Common errors (403 / permissions issues)
-That would make this a complete enterprise design document.
+The React application then uses this token for subsequent API requests.
+User and Role Management
+In this alternate design, user access and role assignments are managed directly within the SAC application, rather than through Azure AD group membership.
+Administrative User Management
+The SAC application already includes a List Management module, which allows administrators to manage dropdown values used throughout the application.
+This module will be extended to include user management functionality.
+Administrators will be able to:
+Add new users
+Remove existing users
+Activate or deactivate users
+Update user roles
+Modify user attributes stored in the tblUsers table
+This allows application administrators to manage user access without requiring changes to Azure AD group memberships.
+Advantages of this Approach
+This alternate design provides several operational advantages:
+Reduced Dependency on Azure AD Group Management
+User access and roles are maintained directly within the application database, eliminating the need to manage Azure AD groups.
+Simpler Architecture
+This method removes the need for:
+Microsoft Graph API calls
+Azure AD group membership lookups
+Managed Identity authorization for role resolution
+Faster Login Performance
+User authorization is determined through a direct database lookup, avoiding additional external service calls.
+Administrative Flexibility
+Application administrators can modify user roles and permissions directly from the SAC application UI without requiring infrastructure or identity team intervention.
+Reuse of Existing Authentication Logic
+The existing FastAPI token generation and session handling logic can continue to be used with minimal changes.
+Security Considerations
+Although authentication is handled by F5, the backend must ensure that the user identifier received from the frontend originates from a valid authenticated session.
+Recommended safeguards include:
+Ensuring that backend APIs are only accessible through the protected application domain.
+Validating that requests originate from the React application hosted within the secured environment.
+Maintaining server-side validation of users against the tblUsers table before issuing application tokens.
+Comparison with Azure AD Group-Based Authorization
+Feature	Azure AD Group Model	Application Database Model
+Authentication	F5 + Azure AD	F5
+Authorization Source	Azure AD Groups	Application Database (tblUsers)
+Role Management	Managed in Azure AD	Managed in SAC Application
+Graph API Required	Yes	No
+Managed Identity Required for Authorization	Yes	No
+Admin UI Role Management	Not required	Required
+Recommended Usage
+This alternate method is suitable when:
+Role management needs to be controlled within the application.
+Administrative teams require flexibility to manage user access directly.
+Dependence on Azure AD group maintenance should be minimized.
+Both approaches can coexist, allowing the organization to choose the model that best aligns with operational and security requirements.
