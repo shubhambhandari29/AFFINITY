@@ -1,58 +1,216 @@
+Entra ID Group Authorization for FastAPI Backend
+(F5 APM + React + Azure App Service + Microsoft Graph)
+1. Overview
+This document describes the design and implementation for retrieving Microsoft Entra ID (Azure AD) group memberships for authenticated users in our application.
+The application uses F5 APM for authentication, and the backend determines the user's role based on Entra ID group membership.
+End-to-End Flow
+User accesses the application URL protected by F5 APM.
+F5 authenticates the user using enterprise authentication.
+After authentication, F5 injects the User ID in an HTTP header.
+The React UI receives the request and forwards the User ID to the backend.
+The FastAPI backend queries Microsoft Graph API.
+Microsoft Graph returns the list of AD groups the user belongs to.
+Backend filters only the groups relevant to the application.
+Backend determines the application role.
+Role information is returned to React UI.
+Example Role Mapping
+AD Group	Application Role
+SAC_Admin	Admin
+SAC_Director	Director
+SAC_Underwriter	Underwriter
+2. Methods to Access Microsoft Graph
+Two possible approaches exist for the backend to authenticate with Microsoft Graph.
+1️⃣ App Registration (Client ID + Secret)
+2️⃣ Managed Identity (Recommended)
+3. Method 1 – Entra App Registration
+This method uses an application identity registered in Microsoft Entra ID.
+The FastAPI backend authenticates using Client Credentials OAuth flow.
+Admin Setup Steps
+Go to Microsoft Entra Admin Center
+Navigate to:
+App Registrations → New Registration
+Create a new application.
+Example name:
+SAC-FastAPI-Backend
+After creation note the following:
+Field	Purpose
+Application (Client) ID	Used by backend to request token
+Directory (Tenant) ID	Azure tenant identifier
+Create Client Secret
+Navigate to:
+Certificates & Secrets → New Client Secret
+Save the generated secret.
+⚠️ Store the secret securely in Azure Key Vault.
+Grant Microsoft Graph Permissions
+Navigate to:
+API Permissions → Add Permission
+Select:
+Microsoft Graph
+Then choose:
+Application Permissions
+Add:
+Directory.Read.All
+Admin Consent
+After adding permission:
+Grant Admin Consent
+Without admin consent the Graph calls will fail.
+Backend Implementation Steps
+Backend stores:
+Tenant ID
+Client ID
+Client Secret
+Then performs the OAuth Client Credentials Flow.
+Request token:
+POST https://login.microsoftonline.com/{tenant-id}/oauth2/v2.0/token
+Scope:
+https://graph.microsoft.com/.default
+Use returned access token to call Microsoft Graph.
+4. Method 2 – Managed Identity (Recommended)
+This is the preferred approach for this project.
+Because the FastAPI backend is running in Azure App Service, it can use System Assigned Managed Identity.
+Managed Identity allows the application to authenticate with Microsoft services without storing any secrets.
+Advantages
+No client secrets
+No secret rotation
+More secure
+Azure automatically manages identity
+Simpler operational maintenance
+Admin Setup Steps
+Step 1 — Verify Managed Identity
+In Azure Portal:
+App Service → Identity → System Assigned → Enabled
+When enabled, Azure automatically creates a service principal in Entra ID.
+Step 2 — Locate the Identity
+In Microsoft Entra Admin Center:
+Enterprise Applications
+Search for the App Service name.
+This is the service principal for the managed identity.
+Step 3 — Grant Graph Permissions
+Navigate to:
+Enterprise Application
+→ Permissions
+→ Add Permission
+Add:
+Microsoft Graph
+→ Application Permissions
+→ Directory.Read.All
+Step 4 — Grant Admin Consent
+Click:
+Grant Admin Consent
+Without admin consent Graph will return 403 errors.
+5. Microsoft Graph API for Group Retrieval
+Since our system uses group names, we must retrieve group objects instead of just IDs.
+Recommended API:
+GET /users/{id}/transitiveMemberOf/microsoft.graph.group?$select=id,displayName
+Example:
+GET https://graph.microsoft.com/v1.0/users/{user}/transitiveMemberOf/microsoft.graph.group?$select=id,displayName
+Example Graph Response
+{
+  "value": [
+    {
+      "id": "7c92d21f-xxxx",
+      "displayName": "SAC_Admin"
+    },
+    {
+      "id": "8b21c111-xxxx",
+      "displayName": "Finance_ReadOnly"
+    }
+  ]
+}
+6. Backend Role Mapping Logic
+Backend receives list of groups.
+Example Python logic:
+if "SAC_Admin" in groups:
+    role = "admin"
 
-Summary​
+elif "SAC_Director" in groups:
+    role = "director"
 
-I'm a Python Backend Developer with experience across insurance, banking, healthcare and pharma domains. Skilled in Python, FastAPI, Flask, Kafka, PostgreSQL, Docker, Kubernetes (Openshift), MS Azure and Airflow. Currently at EXL, I work on backend engineering for internal insurance platform, building secure FastAPI services, SQL-backed workflows, authentication system & APIs that support account, policy, search and reporting use cases. My work focuses on building reliable, maintainable backend systems with strong validation, testing and deployment practices.  I look forward to work on projects that combine backend engineering, automation, and applied AI to deliver measurable business impact.​
-
-Key Projects​
-
-Python FastAPI developer | Developed internal platform for insurance client with robust APIs​
-
-Overview : Worked on backend engineering for internal insurance operation platform, building secure FastAPI services and SQL server-backed workflows that support account, policy, search and reporting operations.​
-
-Activities:  Built and maintained FastAPI route modules covering various workflows such as account management, policy handling, loss run, deduct billing, program search and user administration.​
-
-Design and architecture : Designed reusable SQL server data-access helpers with parameterized queries, filter sanitization, async wrappers and merge based upsert/delete patterns to standardize CRUD operations and reduce duplicate service logic.​
-
-Authentication – Implemented secure authentication using JWT access/refresh tokens, HTTP-only cookies, password hashing/rehashing and protected internal APIs for enterprise users.​
-
-Testing -  Strenghtened engineering quality by expanding automated coverage across core, service and API layers with tests for auth, validation and business critical workflows. Also created Locust-based load tests for a user journey and supported azure DevOps deployment to linux wev app environments.  ​
-
-Logging and Utilities – Added platform capabilities such as structured logging, pydantic validation, dropdown management and outlook compose intergration to improve reliability and user productivity.​
-
-Tech stack – Python, FastAPI, Rest APIs, git, SQL, MS Azure, pydantic, PyODBC, JWT, Locust​
-
-​
-
-Python FastAPIdeveloper | Designed and created Python based banking microservices using event-driven protocols such as Kafka​
-
-Overview:  Contributed to Agentic AI platform that automates trade confirmation document review with a 93% automation rate, reducing manual risk and freeing up ~20000 annual hours, supporting over 14 additonal use cases helping unlock an estimated 70000-80000 hours of future productivity capacity and driving operation excellence.​
-
-Activities : Designed and built scalable backend systems in Python/FastAPI for a leading backend client. Develoiping a Kafka-based intergration platform for seamless event-driven messaging and API connectivity.​
-
-Database & deployments: Manage PostGreSQL databases and ensure efficient deployments using docker and CI/CD pipelines, with utizing RedHat OpenShift for container orchestration, enhancing system reliability and performance.​
-
-Testing –Wrote and maintained unit test cases to improve code quality and ensure robust production deployments,​
-
-Tech stack – python, FastAPI, Kafka, jira, git, pytest, docker, redhat openshift, postgreSQL​
-
-​
-
-Python Flask developer | Flask project for a leading banking client to extract data from PDF, excel word and load on UI with apache airflow​
-
-Overview: Developed and maintained Flask backend APIs for a platform that ingested and processed documents to extract required fields and display them on UI by using apache  airflow workflows to schedule ingestion and extraction for documents.​
-
-Activities : Designed and built scalable backend systems in Python/FastAPI for a leading backend client. Develoiping a Kafka-based intergration platform for seamless event-driven messaging and API connectivity.​
-
-Business geography:  Built and optimized APIs to support multiple tenants, each requiring custom workflows for different document formats and geographies.​
-
-Event driven architecture–Utilized Solace messaging service for inter-application communication and ensured smooth integration.​
-
-Tech stack – python, Flask, Solace, jira, git, pytest, docker, redhat openshift, MongoDB​
-
-Education & ​
-Technical Skills/Certifications​
-
-Key Skills: Python, Pandas, FastAPI, Flask, Kafka, Solace, MySQL, PostgreSQL, MongoDB, Jira, AWS, Azure, pytest, locust, docker, kubernetes, redhat openshift, jenkins, git, BDD, selenium​
-
-Education: MCA , Graphic Era Hill University, Dehradun, 2019​
-
+elif "SAC_Underwriter" in groups:
+    role = "underwriter"
+Backend returns resolved role to UI.
+Example response:
+{
+  "user": "john.doe@company.com",
+  "role": "admin"
+}
+7. Information Required from Infrastructure/Admin Team
+The backend team requires the following:
+Identity Setup
+Managed Identity enabled on backend App Service
+Graph Permissions
+Microsoft Graph Application Permission:
+Directory.Read.All
+Admin Consent
+Admin must approve the permission.
+AD Group Information
+Provide the exact group names:
+SAC_Admin
+SAC_Director
+SAC_Underwriter
+F5 Header Details
+Confirm:
+Item	Needed
+Header name	Example: X-User-ID
+Value format	UPN / Email / Object ID
+Example value	john.doe@company.com
+8. Backend Implementation Steps
+FastAPI backend will perform:
+Step 1 — Receive User ID
+React sends the user identifier.
+Example:
+POST /auth/login
+Header:
+X-User-ID: john.doe@company.com
+Step 2 — Acquire Graph Token
+Using Managed Identity:
+ManagedIdentityCredential
+Scope:
+https://graph.microsoft.com/.default
+Step 3 — Query Microsoft Graph
+Call:
+GET /users/{user}/transitiveMemberOf
+Step 4 — Extract Groups
+Retrieve:
+displayName
+from response.
+Step 5 — Determine Role
+Match group names against configured role groups.
+Step 6 — Return Role
+Send role information back to React.
+9. Recommended Architecture
+The preferred architecture for this application is:
+User
+ ↓
+F5 APM Authentication
+ ↓
+React Application
+ ↓
+FastAPI Backend
+ ↓
+Microsoft Graph API
+ ↓
+Role Resolution
+Security Principles
+Authentication handled by F5
+Authorization handled by FastAPI
+Backend calls Microsoft Graph
+No secrets stored in code
+Managed Identity used for service authentication
+10. Final Recommendation
+For this project the recommended approach is:
+✅ Managed Identity
+✅ Microsoft Graph API
+✅ transitiveMemberOf endpoint
+✅ Group Name based filtering
+This approach provides:
+Strong security
+No secret management
+Simple architecture
+Native Azure integration
+If you want, I can also give you one more extremely useful section you can add to this document (which will impress the infra/security team):
+Architecture diagram
+Exact FastAPI code using Managed Identity
+Exact Graph API call example
+Common errors (403 / permissions issues)
+That would make this a complete enterprise design document.
