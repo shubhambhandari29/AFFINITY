@@ -1,109 +1,40 @@
-Alternate Login and Authorization Model (Application Database Based)
-Overview
-In addition to the Azure AD group–based authorization approach described earlier, an alternate method can be implemented where user authentication is handled by F5, while user authorization and role management are handled by the SAC application database.
-In this approach, once a user is authenticated through F5, the SAC application will use the user identifier provided by F5 to determine the user’s role and access level from the application database (tblUsers).
-This design removes the dependency on Azure AD group membership and Microsoft Graph queries while maintaining secure authentication through the enterprise SSO layer.
-Authentication Flow
-The following steps describe the authentication and authorization process using this alternate method:
-1. User Access
-The user accesses the SAC application using the corporate URL.
-Example:
-https://sacplatformpreprd.allmerica.com
-The request is routed through F5 APM.
-2. Authentication through F5
-F5 APM validates the user through the organization’s enterprise authentication mechanism (SSO / Azure AD).
-If the user is successfully authenticated, F5 extracts the user identifier (User ID / Email) and forwards the request to the SAC React application.
-Authentication responsibility is therefore handled entirely at the F5 layer.
-3. React Application Receives Authenticated User Identity
-After successful authentication, the React application receives the authenticated user identifier.
-This user identifier is then sent to the backend FastAPI service through a login/bootstrap API.
-Example request:
-POST /auth/login
+
+This token was issued by Azure Active Directory.
+Decoded Token
+Claims
 {
-    "user_id": "<authenticated_user_id>"
-}
-4. FastAPI Validates User Against Application Database
-The FastAPI backend checks the SAC application database table:
-tblUsers
-The backend verifies whether the authenticated user exists in the application database.
-If the user record exists and is marked as active, the backend retrieves the user profile information, such as:
-User ID
-First Name
-Last Name
-Email
-Role
-Branch
-5. Role and Access Determination
-The user’s application role is determined based on the values stored in the tblUsers table.
-Example roles may include:
-Underwriter
-Director
-Admin
-CCT
-These roles control both:
-Backend API authorization
-Frontend page visibility
-6. Token Generation
-Once the user is validated against the application database, the FastAPI service generates an application authentication token, similar to the current implementation used for password-based login.
-The token is returned to the React application along with the user profile and role information.
-Example response:
-{
-  "message": "Sign in successful",
-  "user": {
-      "id": 101,
-      "first_name": "John",
-      "last_name": "Doe",
-      "email": "john.doe@company.com",
-      "role": "Underwriter",
-      "branch": "New York"
-  },
-  "token": "<jwt_token>"
-}
-The React application then uses this token for subsequent API requests.
-User and Role Management
-In this alternate design, user access and role assignments are managed directly within the SAC application, rather than through Azure AD group membership.
-Administrative User Management
-The SAC application already includes a List Management module, which allows administrators to manage dropdown values used throughout the application.
-This module will be extended to include user management functionality.
-Administrators will be able to:
-Add new users
-Remove existing users
-Activate or deactivate users
-Update user roles
-Modify user attributes stored in the tblUsers table
-This allows application administrators to manage user access without requiring changes to Azure AD group memberships.
-Advantages of this Approach
-This alternate design provides several operational advantages:
-Reduced Dependency on Azure AD Group Management
-User access and roles are maintained directly within the application database, eliminating the need to manage Azure AD groups.
-Simpler Architecture
-This method removes the need for:
-Microsoft Graph API calls
-Azure AD group membership lookups
-Managed Identity authorization for role resolution
-Faster Login Performance
-User authorization is determined through a direct database lookup, avoiding additional external service calls.
-Administrative Flexibility
-Application administrators can modify user roles and permissions directly from the SAC application UI without requiring infrastructure or identity team intervention.
-Reuse of Existing Authentication Logic
-The existing FastAPI token generation and session handling logic can continue to be used with minimal changes.
-Security Considerations
-Although authentication is handled by F5, the backend must ensure that the user identifier received from the frontend originates from a valid authenticated session.
-Recommended safeguards include:
-Ensuring that backend APIs are only accessible through the protected application domain.
-Validating that requests originate from the React application hosted within the secured environment.
-Maintaining server-side validation of users against the tblUsers table before issuing application tokens.
-Comparison with Azure AD Group-Based Authorization
-Feature	Azure AD Group Model	Application Database Model
-Authentication	F5 + Azure AD	F5
-Authorization Source	Azure AD Groups	Application Database (tblUsers)
-Role Management	Managed in Azure AD	Managed in SAC Application
-Graph API Required	Yes	No
-Managed Identity Required for Authorization	Yes	No
-Admin UI Role Management	Not required	Required
-Recommended Usage
-This alternate method is suitable when:
-Role management needs to be controlled within the application.
-Administrative teams require flexibility to manage user access directly.
-Dependence on Azure AD group maintenance should be minimized.
-Both approaches can coexist, allowing the organization to choose the model that best aligns with operational and security requirements.
+  "typ": "JWT",
+  "nonce": "ThD2kmpKkjkv9Gtn79jkKkP-sBE11NDifJMst6TFOPE",
+  "alg": "RS256",
+  "x5t": "sM1_yAxV8GV4yN-B6j2xzmik5Ao",
+  "kid": "sM1_yAxV8GV4yN-B6j2xzmik5Ao"
+}.{
+  "aud": "https://graph.microsoft.com",
+  "iss": "https://sts.windows.net/3ea62a99-e446-48ea-b404-0ac8d9c9b14a/",
+  "iat": 1773154086,
+  "nbf": 1773154086,
+  "exp": 1773240786,
+  "aio": "ASQA2/8bAAAA9EOzXrkOsQ6zta+n+ADoGN5DRWRf/LbIG6jVx6/fPUQ=",
+  "app_displayname": "SACPlatformAPIPreprd",
+  "appid": "51e5ae1c-40a5-4bfe-b891-9ae228406519",
+  "appidacr": "2",
+  "idp": "https://sts.windows.net/3ea62a99-e446-48ea-b404-0ac8d9c9b14a/",
+  "idtyp": "app",
+  "oid": "bb8645bb-88c9-4a65-bb39-adf60bd93fd8",
+  "rh": "1.AVoAmSqmPkbk6ki0BArI2cmxSgMAAAAAAAAAwAAAAAAAAAAAAABaAA.",
+  "sub": "bb8645bb-88c9-4a65-bb39-adf60bd93fd8",
+  "tenant_region_scope": "NA",
+  "tid": "3ea62a99-e446-48ea-b404-0ac8d9c9b14a",
+  "uti": "dDFaRfOmn02QqN23Rn3EBQ",
+  "ver": "1.0",
+  "wids": [
+    "0997a1d0-0d1d-4acb-b408-d5ca73121e90"
+  ],
+  "xms_act_fct": "3 9",
+  "xms_ftd": "opWeU3bzUVFftl5WKb0LqBePkr6dXjRupR47fydQsSIBdXNlYXN0Mi1kc21z",
+  "xms_idrel": "7 2",
+  "xms_rd": "0.42LlYBJijBIS4eAUErBPnyQQea7Tc9eewK43VWG_hEQ4OIQEmBkg4ACUFhLh4BYSWGIgtIQx9qyHULpAd4bMCg0A",
+  "xms_sub_fct": "9 3",
+  "xms_tcdt": "1324239089",
+  "xms_tnt_fct": "3 18"
+}.[Signature]
