@@ -22,6 +22,33 @@ def _parse_origins(value: str | None) -> list[str]:
     return origins
 
 
+def _parse_csv(value: str | None) -> list[str]:
+    if not value:
+        return []
+    items: list[str] = []
+    for raw_item in value.split(","):
+        item = raw_item.strip()
+        if item:
+            items.append(item)
+    return items
+
+
+def _parse_mapping(value: str | None) -> dict[str, str]:
+    if not value:
+        return {}
+    mapping: dict[str, str] = {}
+    for raw_entry in value.split(","):
+        entry = raw_entry.strip()
+        if not entry or ":" not in entry:
+            continue
+        key, mapped_value = entry.split(":", 1)
+        key = key.strip()
+        mapped_value = mapped_value.strip()
+        if key and mapped_value:
+            mapping[key] = mapped_value
+    return mapping
+
+
 class Settings:
 
     # Feature flags / environment toggles
@@ -37,6 +64,14 @@ class Settings:
     AZURE_TENANT_ID: str | None = os.getenv("AZURE_TENANT_ID")
     AZURE_CLIENT_ID: str | None = os.getenv("AZURE_CLIENT_ID")
     AZURE_CLIENT_SECRET: str | None = os.getenv("AZURE_CLIENT_SECRET")
+
+    # Microsoft Graph settings used by F5 header-based login
+    GRAPH_BASE_URL: str = os.getenv("GRAPH_BASE_URL", "https://graph.microsoft.com/v1.0").rstrip(
+        "/"
+    )
+    GRAPH_SCOPE: str = os.getenv("GRAPH_SCOPE", "https://graph.microsoft.com/.default")
+    F5_ALLOWED_GROUP_NAMES: list[str] = _parse_csv(os.getenv("F5_ALLOWED_GROUP_NAMES"))
+    F5_GROUP_ROLE_MAP: dict[str, str] = _parse_mapping(os.getenv("F5_GROUP_ROLE_MAP"))
 
     # JWT / Auth config (still used for existing flows)
     SECRET_KEY: str = os.getenv("SECRET_KEY")

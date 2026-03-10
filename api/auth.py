@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from fastapi.security import OAuth2PasswordBearer
 
 from core.models.auth import LoginRequest
@@ -8,6 +8,7 @@ from services.auth_service import (
     logout_user,
     refresh_user_token,
 )
+from services.graph_auth_service import login_with_f5_identifier
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login", auto_error=False)
@@ -35,3 +36,8 @@ async def refresh_token(
     token: str | None = Depends(oauth2_scheme),
 ):
     return await refresh_user_token(request, response, token)
+
+
+@router.post("/f5-login")
+async def f5_login(x_user_id: str | None = Header(default=None, alias="X-User-ID")):
+    return await login_with_f5_identifier(x_user_id)

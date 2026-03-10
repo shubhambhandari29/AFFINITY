@@ -195,7 +195,7 @@ def test_dropdown_endpoints(monkeypatch):
 
 def test_auth_endpoints(monkeypatch, request_factory):
     module = importlib.import_module("api.auth")
-    captured = {"login": None, "me": None, "logout": None, "refresh": None}
+    captured = {"login": None, "me": None, "logout": None, "refresh": None, "f5": None}
 
     async def fake_login(payload, response):
         captured["login"] = (payload, response)
@@ -213,10 +213,15 @@ def test_auth_endpoints(monkeypatch, request_factory):
         captured["refresh"] = (request, response, token)
         return {"ok": "refresh"}
 
+    async def fake_f5_login(user_id):
+        captured["f5"] = user_id
+        return {"ok": "f5"}
+
     monkeypatch.setattr(module, "login_user", fake_login)
     monkeypatch.setattr(module, "get_current_user_from_token", fake_me)
     monkeypatch.setattr(module, "logout_user", fake_logout)
     monkeypatch.setattr(module, "refresh_user_token", fake_refresh)
+    monkeypatch.setattr(module, "login_with_f5_identifier", fake_f5_login)
 
     response = Response()
     request = request_factory()
@@ -225,10 +230,12 @@ def test_auth_endpoints(monkeypatch, request_factory):
     assert asyncio.run(module.get_current_user(request)) == {"ok": "me"}
     assert asyncio.run(module.logout(response)) == {"ok": "logout"}
     assert asyncio.run(module.refresh_token(request, response, token="abc")) == {"ok": "refresh"}
+    assert asyncio.run(module.f5_login("SXB640")) == {"ok": "f5"}
 
     assert captured["login"][0] == {"user": "u"}
     assert captured["logout"] is response
     assert captured["refresh"][2] == "abc"
+    assert captured["f5"] == "SXB640"
 
 
 def test_outlook_compose_endpoint(monkeypatch):
