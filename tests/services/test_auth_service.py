@@ -60,7 +60,6 @@ def test_login_user_wrong_password(monkeypatch):
             "Password": "hashed",
         },
     )
-    monkeypatch.setattr(auth_service, "verify_password", lambda p, s: False)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -71,8 +70,8 @@ def test_login_user_wrong_password(monkeypatch):
     assert excinfo.value.detail == {"error": "Wrong password"}
 
 
-def test_login_user_legacy_password_rehash(monkeypatch):
-    captured = {"rehash": None, "session_cookie": None, "refresh_cookie": None}
+def test_login_user_plain_password_match(monkeypatch):
+    captured = {"session_cookie": None, "refresh_cookie": None}
 
     monkeypatch.setattr(
         auth_service,
@@ -88,15 +87,6 @@ def test_login_user_legacy_password_rehash(monkeypatch):
         },
     )
 
-    def fake_verify_password(password, stored):
-        raise ValueError("not bcrypt")
-
-    def fake_hash_password(password):
-        return "newhash"
-
-    def fake_persist(user_id, new_hash):
-        captured["rehash"] = (user_id, new_hash)
-
     def fake_create_access_token(user_id, role):
         return "token"
 
@@ -109,9 +99,6 @@ def test_login_user_legacy_password_rehash(monkeypatch):
     def fake_set_refresh_cookie(response, token):
         captured["refresh_cookie"] = token
 
-    monkeypatch.setattr(auth_service, "verify_password", fake_verify_password)
-    monkeypatch.setattr(auth_service, "hash_password", fake_hash_password)
-    monkeypatch.setattr(auth_service, "_persist_hashed_password", fake_persist)
     monkeypatch.setattr(auth_service, "create_access_token", fake_create_access_token)
     monkeypatch.setattr(auth_service, "create_refresh_token", fake_create_refresh_token)
     monkeypatch.setattr(auth_service, "_set_session_cookie", fake_set_session_cookie)
@@ -124,7 +111,6 @@ def test_login_user_legacy_password_rehash(monkeypatch):
 
     assert result["message"] == "Sign in successful"
     assert result["token"] == "token"
-    assert captured["rehash"] == (2, "newhash")
     assert captured["session_cookie"] == "token"
     assert captured["refresh_cookie"] == "refresh-token"
 
@@ -140,10 +126,9 @@ def test_login_user_valid_password(monkeypatch):
             "Email": email,
             "Role": "User",
             "BranchName": "HQ",
-            "Password": "hashed",
+            "Password": "x",
         },
     )
-    monkeypatch.setattr(auth_service, "verify_password", lambda p, s: True)
     monkeypatch.setattr(auth_service, "create_access_token", lambda uid, role: "token")
     monkeypatch.setattr(auth_service, "create_refresh_token", lambda uid: "refresh-token")
     monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)

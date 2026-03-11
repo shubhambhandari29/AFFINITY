@@ -6,7 +6,6 @@ from fastapi import HTTPException, Request, Response
 
 from core.config import settings
 from core.db_helpers import run_raw_query
-from core.encrypt import hash_password, verify_password
 from core.jwt_handler import (
     ACCESS_TOKEN_VALIDITY,
     REFRESH_TOKEN_VALIDITY,
@@ -15,7 +14,6 @@ from core.jwt_handler import (
     decode_access_token,
     decode_refresh_token,
 )
-from db import db_connection
 
 logger = logging.getLogger(__name__)
 
@@ -66,16 +64,6 @@ def _clear_refresh_cookie(response: Response) -> None:
 def _clear_auth_cookies(response: Response) -> None:
     _clear_session_cookie(response)
     _clear_refresh_cookie(response)
-
-
-def _persist_hashed_password(user_id: int, new_hash: str) -> None:
-    with db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE tblUsers SET password = ? WHERE id = ?",
-            (new_hash, user_id),
-        )
-        conn.commit()
 
 
 # -------------------------
@@ -154,30 +142,10 @@ async def login_user(login_data: dict[str, Any], response: Response):
     if not user_record:
         logger.warning(f"Login failed: user not found ({email})")
         raise HTTPException(status_code=404, detail={"error": "User not found"})
-    stored_password = str(user_record.get("Password", ""))
-    password_valid = False
-    needs_rehash = False
-
-    try:
-        password_valid = verify_password(password, stored_password)
-    except ValueError:
-        if password == stored_password:
-            password_valid = True
-            needs_rehash = True
-        else:
-            password_valid = False
-
-    if not password_valid:
+    stored_password = user_record.get("Password")
+    if stored_password is None or password != str(stored_password):
         logger.warning(f"Login failed: wrong password ({email})")
         raise HTTPException(status_code=401, detail={"error": "Wrong password"})
-
-    if needs_rehash:
-        try:
-            new_hash = hash_password(password)
-            _persist_hashed_password(user_record["ID"], new_hash)
-            logger.info(f"Rehashed legacy password for user {email}")
-        except Exception as exc:
-            logger.error(f"Failed to rehash password for user {email}: {exc}", exc_info=True)
 
     # Prepare user payload (only safe fields)
     user = {
