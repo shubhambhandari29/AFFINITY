@@ -1,70 +1,24 @@
-Do not call backend /auth/login as an AJAX login bootstrap anymore.
-Instead, do one of these:
-redirect browser to backend Easy Auth login endpoint, or
-authenticate on frontend first and then call backend with authenticated session/token
-If your frontend and backend are on separate App Services, the common pattern is to initiate login by full-page navigation, not fetch, because interactive sign-in is a browser redirect flow. The CORS troubleshooting guidance from Microsoft also points to redirect/auth flows being a common cause of these browser-side failures.
-What to change in code
-Current bad pattern
-Your React code is probably doing something like:
+-- 1) Create or reset sequence to MAX(ID)+1
+DECLARE @next_id INT = ISNULL((SELECT MAX(ID) FROM dbo.tblUsers), 0) + 1;
 
-await fetch("https://sacplatformapipreprd.azurewebsites.net/auth/login", {
-  method: "POST",
-  credentials: "include",
-  headers: { "Content-Type": "application/json" }
-})
+IF OBJECT_ID('dbo.Seq_tblUsers_ID', 'SO') IS NULL
+BEGIN
+    EXEC('CREATE SEQUENCE dbo.Seq_tblUsers_ID AS INT START WITH ' + CAST(@next_id AS VARCHAR(20)) + ' INCREMENT BY 1');
+END
+ELSE
+BEGIN
+    EXEC('ALTER SEQUENCE dbo.Seq_tblUsers_ID RESTART WITH ' + CAST(@next_id AS VARCHAR(20)));
+END
 
-
-
-
-
-1) Stop using your custom /auth/login API as the cross-origin login entry point
-When Easy Auth is enabled, login should usually be initiated by browser navigation to the Easy Auth endpoint, not by fetch('/auth/login') from React. If you keep calling /auth/login from React as an AJAX call, the browser will keep issuing preflights and Easy Auth will keep getting in the way. App Service Authentication is designed to authenticate the request before your code runs.
-Use a full-page redirect from the frontend, for example:
-
-window.location.href =
-  "https://sacplatformapipreprd.azurewebsites.net/.auth/login/aad?post_login_redirect_uri=https://sacplatformwebpreprd.azurewebsites.net";
-
-
-
-After login succeeds, React should call a lightweight endpoint like /auth/me to read the logged-in user context.
-
-
-What I’d do next, in order
-In React, temporarily stop calling backend /auth/login with fetch.
-Trigger login by browser redirect to /.auth/login/aad.
-In API App Service, verify built-in CORS includes the exact frontend URL.
-Keep FastAPI CORS middleware as well.
-Add a simple authenticated endpoint like /auth/me that reads Easy Auth headers.
-If business insists on keeping /auth/login, configure Easy Auth path exclusion for that route using file-based auth config and excludedPaths.
-
-
-
-Option 2 — Fully switch to Azure App Service / Entra login
-This means:
-remove or stop using email/password login from React
-stop posting to /auth/login
-frontend redirects browser to Azure login
-FastAPI reads authenticated user from X-MS-CLIENT-PRINCIPAL
-then you map that user to your DB role/branch
-Microsoft documents that App Service forwards user identity in the X-MS-CLIENT-PRINCIPAL header, which you decode in the app.
-In this model
-Your React code would no longer do:
-api.post("/auth/login", { email, password })
-Instead it would do browser redirect login, and your backend would expose something like /auth/me to return current authenticated user info.
-Best fit when
-This is right only if your Azure team wants Entra/App Service auth to be the real login mechanism.
-
-
-
-
-
-No — in the F5 APM model you described, Easy Auth is not an important required component. If F5 is the system doing the user sign-in and then forwarding trusted identity information to your app, then F5 is the authentication gateway. Easy Auth is another upstream authentication layer for App Service, so using both usually means two different systems trying to authenticate the same request before it reaches your code. That is useful only if you want Azure App Service itself to own sign-in.
-For your target flow, the clean design is:
-user opens the F5-protected URL
-F5 performs SSO with Entra ID
-after success, F5 forwards the request to your app
-F5 injects trusted identity information, such as a user ID or email/UPN header
-your app uses that identity to look up the app user, role, branch, and permissions in your own database
-
-That means authentication happens in F5, while authorization stays in your FastAPI app. F5 documents header-based SSO patterns for backend applications, and Azure’s Easy Auth docs describe a very similar “authenticate-before-app” pattern, which is why the two can overlap or conflict.
-
+-- 2) Add default for ID (only once)
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.default_constraints dc
+    JOIN sys.columns c ON c.default_object_id = dc.object_id
+    JOIN sys.tables t ON t.object_id = c.object_id
+    WHERE t.name = 'tblUsers' AND c.name = 'ID'
+)
+BEGIN
+    ALTER TABLE dbo.tblUsers
+    ADD CONSTRAINT DF_tblUsers_ID DEFAULT (NEXT VALUE FOR dbo.Seq_tblUsers_ID) FOR ID;
+END

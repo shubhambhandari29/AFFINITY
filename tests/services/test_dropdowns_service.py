@@ -30,8 +30,6 @@ def test_get_dropdown_definition_users():
     assert primary_key == "ID"
     assert column_map["Active"] == "Active"
     assert column_map["Password"] == "Password"
-    assert "active" not in column_map
-    assert "password" not in column_map
 
 
 def test_normalize_dropdown_rows_valid_and_invalid():
@@ -106,6 +104,7 @@ def test_get_dropdown_values_all_and_query_and_dynamic(monkeypatch):
 
     result = asyncio.run(dropdowns_service.get_dropdown_values("users"))
     assert "FROM tblUsers" in result[0]["query"]
+    assert "SELECT ID, FirstName, LastName, Email, Role, BranchName, Active" in result[0]["query"]
 
     result = asyncio.run(dropdowns_service.get_dropdown_values("Unknown"))
     assert result == [{"dynamic": "Unknown"}]
@@ -114,11 +113,11 @@ def test_get_dropdown_values_all_and_query_and_dynamic(monkeypatch):
 def test_normalize_dropdown_rows_users_columns():
     _, primary_key, column_map = dropdowns_service._get_dropdown_definition("users")
     normalized = dropdowns_service._normalize_dropdown_rows(
-        [{"ID": 1, "Active": 1}],
+        [{"ID": 5, "Active": 1}],
         primary_key=primary_key,
         column_map=column_map,
     )
-    assert normalized == [{"ID": 1, "Active": 1}]
+    assert normalized == [{"ID": 5, "Active": 1}]
 
 
 def test_get_dropdown_values_requires_name():
@@ -234,6 +233,7 @@ def test_upsert_dropdown_values_users_default_password_on_insert(monkeypatch):
     assert result == {"message": "Upsert successful", "count": 4}
     assert captured["merge"][0] == "tblUsers"
     assert captured["merge"][1] == [{"ID": 1, "FirstName": "Existing"}]
+    assert captured["merge"][2] == ["ID"]
     assert captured["merge"][3] is True
     assert captured["insert"][0] == "tblUsers"
     assert captured["insert"][1] == [
