@@ -53,3 +53,18 @@ api.post("/auth/login", { email, password })
 Instead it would do browser redirect login, and your backend would expose something like /auth/me to return current authenticated user info.
 Best fit when
 This is right only if your Azure team wants Entra/App Service auth to be the real login mechanism.
+
+
+
+
+
+No — in the F5 APM model you described, Easy Auth is not an important required component. If F5 is the system doing the user sign-in and then forwarding trusted identity information to your app, then F5 is the authentication gateway. Easy Auth is another upstream authentication layer for App Service, so using both usually means two different systems trying to authenticate the same request before it reaches your code. That is useful only if you want Azure App Service itself to own sign-in.
+For your target flow, the clean design is:
+user opens the F5-protected URL
+F5 performs SSO with Entra ID
+after success, F5 forwards the request to your app
+F5 injects trusted identity information, such as a user ID or email/UPN header
+your app uses that identity to look up the app user, role, branch, and permissions in your own database
+
+That means authentication happens in F5, while authorization stays in your FastAPI app. F5 documents header-based SSO patterns for backend applications, and Azure’s Easy Auth docs describe a very similar “authenticate-before-app” pattern, which is why the two can overlap or conflict.
+
