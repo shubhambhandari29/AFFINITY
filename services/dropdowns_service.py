@@ -60,9 +60,9 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
         ORDER BY SortNum
     """,
     "Underwriters": """
-        SELECT PK_Number, [UW Last], [UW Email]
+        SELECT PK_Number, [UW Name], [UW Email]
         FROM tblUnderwriters
-        ORDER BY [UW Last]
+        ORDER BY [UW Name]
     """,
     "EDW_AGENT_LIST": """
         SELECT PK_Number, Agent_Code, Agent_Name
@@ -126,7 +126,7 @@ _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
     "Underwriters": {
         "table": "tblUnderwriters",
         "primary_key": "PK_Number",
-        "columns": ["UW Last", "UW Email"],
+        "columns": ["UW Name", "UW Email"],
     },
     "EDW_AGENT_LIST": {
         "table": "tblEDW_AGENT_LIST",
