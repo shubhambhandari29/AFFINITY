@@ -75,6 +75,11 @@ SELECT tblLossCtrl.PK_Number, tblLossCtrl.RepName, tblLossCtrl.LCEmail
  WHERE (((tblLossCtrl.Active)='Yes')) 
  ORDER BY tblLossCtrl.RepName
 """,
+    "users": """
+        SELECT ID, FirstName, LastName, Email, Role, BranchName, Active
+        FROM tblUsers
+        ORDER BY FirstName, LastName, Email
+    """,
 }
 
 _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
@@ -133,10 +138,15 @@ _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
         "primary_key": "PK_Number",
         "columns": ["RepName", "LCEmail"],
     },
+    "users": {
+        "table": "tblUsers",
+        "primary_key": "ID",
+        "columns": ["FirstName", "LastName", "Email", "Password", "Role", "BranchName", "Active"],
+    },
 }
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_ ]*$")
-_IDENTITY_PRIMARY_KEYS = {"DD_Key", "PK_Number"}
+_IDENTITY_PRIMARY_KEYS = {"DD_Key", "PK_Number", "ID"}
 
 
 def _ensure_safe_identifier(identifier: str) -> None:

@@ -24,6 +24,16 @@ def test_get_dropdown_definition_default():
     assert column_map == {"DD_Value": "DD_Value", "DD_SortOrder": "DD_SortOrder"}
 
 
+def test_get_dropdown_definition_users():
+    table, primary_key, column_map = dropdowns_service._get_dropdown_definition("users")
+    assert table == "tblUsers"
+    assert primary_key == "ID"
+    assert column_map["Active"] == "Active"
+    assert column_map["Password"] == "Password"
+    assert "active" not in column_map
+    assert "password" not in column_map
+
+
 def test_normalize_dropdown_rows_valid_and_invalid():
     rows = [{"LANID": "x", "SACName": "A"}]
     normalized = dropdowns_service._normalize_dropdown_rows(
@@ -94,8 +104,21 @@ def test_get_dropdown_values_all_and_query_and_dynamic(monkeypatch):
     result = asyncio.run(dropdowns_service.get_dropdown_values("LossCtlRep2"))
     assert result[0]["params"] == ["Yes"]
 
+    result = asyncio.run(dropdowns_service.get_dropdown_values("users"))
+    assert "FROM tblUsers" in result[0]["query"]
+
     result = asyncio.run(dropdowns_service.get_dropdown_values("Unknown"))
     assert result == [{"dynamic": "Unknown"}]
+
+
+def test_normalize_dropdown_rows_users_columns():
+    _, primary_key, column_map = dropdowns_service._get_dropdown_definition("users")
+    normalized = dropdowns_service._normalize_dropdown_rows(
+        [{"ID": 1, "Active": 1}],
+        primary_key=primary_key,
+        column_map=column_map,
+    )
+    assert normalized == [{"ID": 1, "Active": 1}]
 
 
 def test_get_dropdown_values_requires_name():
