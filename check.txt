@@ -1,109 +1,55 @@
-Alternate Login and Authorization Model (Application Database Based)
-Overview
-In addition to the Azure AD group–based authorization approach described earlier, an alternate method can be implemented where user authentication is handled by F5, while user authorization and role management are handled by the SAC application database.
-In this approach, once a user is authenticated through F5, the SAC application will use the user identifier provided by F5 to determine the user’s role and access level from the application database (tblUsers).
-This design removes the dependency on Azure AD group membership and Microsoft Graph queries while maintaining secure authentication through the enterprise SSO layer.
-Authentication Flow
-The following steps describe the authentication and authorization process using this alternate method:
-1. User Access
-The user accesses the SAC application using the corporate URL.
-Example:
-https://sacplatformpreprd.allmerica.com
-The request is routed through F5 APM.
-2. Authentication through F5
-F5 APM validates the user through the organization’s enterprise authentication mechanism (SSO / Azure AD).
-If the user is successfully authenticated, F5 extracts the user identifier (User ID / Email) and forwards the request to the SAC React application.
-Authentication responsibility is therefore handled entirely at the F5 layer.
-3. React Application Receives Authenticated User Identity
-After successful authentication, the React application receives the authenticated user identifier.
-This user identifier is then sent to the backend FastAPI service through a login/bootstrap API.
-Example request:
-POST /auth/login
-{
-    "user_id": "<authenticated_user_id>"
-}
-4. FastAPI Validates User Against Application Database
-The FastAPI backend checks the SAC application database table:
-tblUsers
-The backend verifies whether the authenticated user exists in the application database.
-If the user record exists and is marked as active, the backend retrieves the user profile information, such as:
-User ID
-First Name
-Last Name
-Email
-Role
-Branch
-5. Role and Access Determination
-The user’s application role is determined based on the values stored in the tblUsers table.
-Example roles may include:
-Underwriter
-Director
-Admin
-CCT
-These roles control both:
-Backend API authorization
-Frontend page visibility
-6. Token Generation
-Once the user is validated against the application database, the FastAPI service generates an application authentication token, similar to the current implementation used for password-based login.
-The token is returned to the React application along with the user profile and role information.
-Example response:
-{
-  "message": "Sign in successful",
-  "user": {
-      "id": 101,
-      "first_name": "John",
-      "last_name": "Doe",
-      "email": "john.doe@company.com",
-      "role": "Underwriter",
-      "branch": "New York"
-  },
-  "token": "<jwt_token>"
-}
-The React application then uses this token for subsequent API requests.
-User and Role Management
-In this alternate design, user access and role assignments are managed directly within the SAC application, rather than through Azure AD group membership.
-Administrative User Management
-The SAC application already includes a List Management module, which allows administrators to manage dropdown values used throughout the application.
-This module will be extended to include user management functionality.
-Administrators will be able to:
-Add new users
-Remove existing users
-Activate or deactivate users
-Update user roles
-Modify user attributes stored in the tblUsers table
-This allows application administrators to manage user access without requiring changes to Azure AD group memberships.
-Advantages of this Approach
-This alternate design provides several operational advantages:
-Reduced Dependency on Azure AD Group Management
-User access and roles are maintained directly within the application database, eliminating the need to manage Azure AD groups.
-Simpler Architecture
-This method removes the need for:
-Microsoft Graph API calls
-Azure AD group membership lookups
-Managed Identity authorization for role resolution
-Faster Login Performance
-User authorization is determined through a direct database lookup, avoiding additional external service calls.
-Administrative Flexibility
-Application administrators can modify user roles and permissions directly from the SAC application UI without requiring infrastructure or identity team intervention.
-Reuse of Existing Authentication Logic
-The existing FastAPI token generation and session handling logic can continue to be used with minimal changes.
-Security Considerations
-Although authentication is handled by F5, the backend must ensure that the user identifier received from the frontend originates from a valid authenticated session.
-Recommended safeguards include:
-Ensuring that backend APIs are only accessible through the protected application domain.
-Validating that requests originate from the React application hosted within the secured environment.
-Maintaining server-side validation of users against the tblUsers table before issuing application tokens.
-Comparison with Azure AD Group-Based Authorization
-Feature	Azure AD Group Model	Application Database Model
-Authentication	F5 + Azure AD	F5
-Authorization Source	Azure AD Groups	Application Database (tblUsers)
-Role Management	Managed in Azure AD	Managed in SAC Application
-Graph API Required	Yes	No
-Managed Identity Required for Authorization	Yes	No
-Admin UI Role Management	Not required	Required
-Recommended Usage
-This alternate method is suitable when:
-Role management needs to be controlled within the application.
-Administrative teams require flexibility to manage user access directly.
-Dependence on Azure AD group maintenance should be minimized.
-Both approaches can coexist, allowing the organization to choose the model that best aligns with operational and security requirements.
+Do not call backend /auth/login as an AJAX login bootstrap anymore.
+Instead, do one of these:
+redirect browser to backend Easy Auth login endpoint, or
+authenticate on frontend first and then call backend with authenticated session/token
+If your frontend and backend are on separate App Services, the common pattern is to initiate login by full-page navigation, not fetch, because interactive sign-in is a browser redirect flow. The CORS troubleshooting guidance from Microsoft also points to redirect/auth flows being a common cause of these browser-side failures.
+What to change in code
+Current bad pattern
+Your React code is probably doing something like:
+
+await fetch("https://sacplatformapipreprd.azurewebsites.net/auth/login", {
+  method: "POST",
+  credentials: "include",
+  headers: { "Content-Type": "application/json" }
+})
+
+
+
+
+
+1) Stop using your custom /auth/login API as the cross-origin login entry point
+When Easy Auth is enabled, login should usually be initiated by browser navigation to the Easy Auth endpoint, not by fetch('/auth/login') from React. If you keep calling /auth/login from React as an AJAX call, the browser will keep issuing preflights and Easy Auth will keep getting in the way. App Service Authentication is designed to authenticate the request before your code runs.
+Use a full-page redirect from the frontend, for example:
+
+window.location.href =
+  "https://sacplatformapipreprd.azurewebsites.net/.auth/login/aad?post_login_redirect_uri=https://sacplatformwebpreprd.azurewebsites.net";
+
+
+
+After login succeeds, React should call a lightweight endpoint like /auth/me to read the logged-in user context.
+
+
+What I’d do next, in order
+In React, temporarily stop calling backend /auth/login with fetch.
+Trigger login by browser redirect to /.auth/login/aad.
+In API App Service, verify built-in CORS includes the exact frontend URL.
+Keep FastAPI CORS middleware as well.
+Add a simple authenticated endpoint like /auth/me that reads Easy Auth headers.
+If business insists on keeping /auth/login, configure Easy Auth path exclusion for that route using file-based auth config and excludedPaths.
+
+
+
+Option 2 — Fully switch to Azure App Service / Entra login
+This means:
+remove or stop using email/password login from React
+stop posting to /auth/login
+frontend redirects browser to Azure login
+FastAPI reads authenticated user from X-MS-CLIENT-PRINCIPAL
+then you map that user to your DB role/branch
+Microsoft documents that App Service forwards user identity in the X-MS-CLIENT-PRINCIPAL header, which you decode in the app.
+In this model
+Your React code would no longer do:
+api.post("/auth/login", { email, password })
+Instead it would do browser redirect login, and your backend would expose something like /auth/me to return current authenticated user info.
+Best fit when
+This is right only if your Azure team wants Entra/App Service auth to be the real login mechanism.
