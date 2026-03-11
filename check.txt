@@ -1,29 +1,95 @@
--- 1) Compute next ID
-DECLARE @next_id BIGINT = ISNULL((SELECT MAX(ID) FROM dbo.tblUsers), 0) + 1;
+Hi Team,
+As part of the SAC platform authentication design, we have evaluated multiple approaches for implementing user login and role-based access control for the application. Based on our analysis, we have identified two possible approaches that can be used to support secure user authentication and authorization.
+Below is a summary of both approaches.
+Approach 1: Azure AD Group-Based Authorization
+In this approach, user authentication is handled through F5 APM integrated with the organization’s enterprise authentication system (Azure AD / Microsoft Entra ID).
+The high-level flow would work as follows:
+A user accesses the SAC platform URL.
+The request is routed through F5 APM, which validates the user using enterprise Single Sign-On.
+Once authenticated, F5 extracts the user identifier and passes it to the application.
+The SAC React application forwards this user identifier to the backend FastAPI service.
+The FastAPI backend then queries Microsoft Entra ID using Microsoft Graph API to determine the Azure AD groups that the user belongs to.
+Based on the returned AD group membership, the backend determines the user's application role (for example: Underwriter, Director, Admin, etc.).
+The backend generates an authentication token and returns the user profile and role to the application.
+In this model, authorization is controlled through Azure AD group memberships, and any role changes would typically be managed through the organization's identity management process.
+Key characteristics of this approach:
+Authentication handled through F5 + Azure AD
+Authorization based on Azure AD group membership
+Requires Microsoft Graph API integration
+Role changes are managed through AD group administration
+Approach 2: Application Database-Based Authorization (Alternate Approach)
+In addition to the Azure AD group-based model, we have identified an alternate approach that simplifies the authorization process while still leveraging F5 for secure authentication.
+In this model, F5 continues to handle user authentication, but user roles are managed directly within the SAC application database.
+The flow would work as follows:
+The user accesses the SAC platform through the corporate URL.
+F5 APM authenticates the user through the enterprise SSO mechanism.
+Once authenticated, F5 passes the user identifier to the React application.
+The React application sends the user identifier to the FastAPI backend through a login/bootstrap API.
+The backend checks whether the user exists in the SAC application database table (tblUsers).
+If the user exists and is active, the backend retrieves the user’s stored role and profile information from the database.
+The backend then generates an authentication token and returns the user profile and role to the application.
+In this model, authorization is controlled within the application database rather than Azure AD groups.
+To support this approach, the SAC application will provide administrative functionality within the existing List Management module, allowing authorized administrators to manage users directly within the application.
+Administrators will be able to:
+Add new users
+Remove existing users
+Update user roles
+Manage user access records stored in the tblUsers table
+Key characteristics of this approach:
+Authentication handled through F5
+Authorization managed through application database
+No dependency on Azure AD group membership or Graph API
+User roles managed through application administration UI
+Summary
+Both approaches provide secure authentication through F5, but they differ in how user roles and access control are managed.
+Feature	Azure AD Group Approach	Application Database Approach
+Authentication	F5 + Azure AD	F5
+Authorization Source	Azure AD Groups	SAC Application Database
+Role Management	Managed via AD groups	Managed via application admin UI
+External Dependencies	Microsoft Graph API required	No external identity lookup required
+We have prepared architecture diagrams for both approaches to help illustrate the flows. These are attached for reference.
+Please review the options and let us know if you have any preferences or guidance on which model aligns better with your operational and governance requirements.
+Thanks,
+Shubham
 
--- 2) Ensure sequence exists
-IF OBJECT_ID(N'dbo.Seq_tblUsers_ID', N'SO') IS NULL
-BEGIN
-    EXEC(N'CREATE SEQUENCE dbo.Seq_tblUsers_ID AS BIGINT START WITH 1 INCREMENT BY 1;');
-END;
 
--- 3) Restart sequence at MAX(ID)+1
-DECLARE @sql NVARCHAR(300);
-SET @sql = N'ALTER SEQUENCE dbo.Seq_tblUsers_ID RESTART WITH ' + CONVERT(NVARCHAR(30), @next_id) + N';';
-EXEC sys.sp_executesql @sql;
 
--- 4) Add default on tblUsers.ID (only if missing)
-IF NOT EXISTS (
-    SELECT 1
-    FROM sys.default_constraints dc
-    JOIN sys.columns c
-      ON c.object_id = dc.parent_object_id
-     AND c.column_id = dc.parent_column_id
-    WHERE dc.parent_object_id = OBJECT_ID(N'dbo.tblUsers')
-      AND c.name = N'ID'
-)
-BEGIN
-    ALTER TABLE dbo.tblUsers
-    ADD CONSTRAINT DF_tblUsers_ID
-    DEFAULT (NEXT VALUE FOR dbo.Seq_tblUsers_ID) FOR ID;
-END;
+
+
+
+Subject: SAC Platform – Login and Authorization Approaches
+Hi Team,
+As part of the SAC platform authentication design, we have evaluated two possible approaches for implementing login and role-based access control for the application.
+Below is a brief overview of both options.
+Approach 1: Azure AD Group-Based Authorization
+In this approach, user authentication is handled through F5 integrated with Azure AD (Microsoft Entra ID).
+High-level flow:
+The user accesses the SAC application URL.
+F5 authenticates the user using enterprise SSO.
+F5 passes the user identifier to the application.
+The React application forwards this identifier to the FastAPI backend.
+FastAPI queries Azure AD via Microsoft Graph API to determine the AD groups the user belongs to.
+Based on the group membership, the backend determines the user’s role (Underwriter, Director, Admin, etc.) and returns the authentication token and profile to the application.
+In this model, user roles are managed through Azure AD group membership, and any role updates would be handled through AD group administration.
+Approach 2: Application Database-Based Authorization (Alternate Option)
+We also identified an alternate approach where F5 handles authentication, but user roles are managed within the SAC application database.
+High-level flow:
+The user is authenticated through F5 SSO.
+F5 provides the user identifier to the React application.
+The React application sends this identifier to the FastAPI backend.
+The backend checks the user in the application database (tblUsers).
+If the user exists and is active, the backend retrieves the user’s role and profile from the database.
+The backend then generates the authentication token and returns the user details to the application.
+In this model, user roles are maintained within the SAC application itself.
+The SAC application will provide administrative functionality through the existing List Management page, allowing admins to:
+Add or remove users
+Update user roles
+Manage user access stored in the tblUsers table
+Summary
+Both approaches use F5 for user authentication, but differ in how roles are managed:
+Feature	Azure AD Group Approach	Application DB Approach
+Authentication	F5 + Azure AD	F5
+Authorization Source	Azure AD Groups	SAC Application Database
+Role Management	AD group administration	Application Admin UI
+External Dependencies	Microsoft Graph API	None
+We have prepared architecture diagrams for both approaches and attached them for reference. Please review and let us know if you have any preference or guidance on which model aligns better with the expected operating model.
