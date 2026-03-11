@@ -147,6 +147,7 @@ _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_ ]*$")
 _IDENTITY_PRIMARY_KEYS = {"DD_Key", "PK_Number", "ID"}
+_DEFAULT_USER_PASSWORD = "12345678"
 
 
 def _ensure_safe_identifier(identifier: str) -> None:
@@ -545,6 +546,14 @@ async def upsert_dropdown_values(name: str, rows: list[dict[str, Any]]) -> dict[
                 rows_without_pk.append(row)
             else:
                 rows_with_pk.append(row)
+
+        if table == "tblUsers":
+            for row in rows_without_pk:
+                password_value = row.get("Password")
+                if password_value is None or (
+                    isinstance(password_value, str) and not password_value.strip()
+                ):
+                    row["Password"] = _DEFAULT_USER_PASSWORD
 
         total_count = 0
         if rows_with_pk:

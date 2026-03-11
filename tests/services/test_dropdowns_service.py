@@ -187,6 +187,62 @@ def test_upsert_dropdown_values_splits_rows(monkeypatch):
     assert captured["insert"][1][0]["DD_Type"] == "TestType"
 
 
+def test_upsert_dropdown_values_users_default_password_on_insert(monkeypatch):
+    captured = {"merge": None, "insert": None}
+
+    monkeypatch.setattr(
+        dropdowns_service,
+        "_get_dropdown_definition",
+        lambda name: (
+            "tblUsers",
+            "ID",
+            {
+                "FirstName": "FirstName",
+                "LastName": "LastName",
+                "Email": "Email",
+                "Password": "Password",
+                "Role": "Role",
+                "BranchName": "BranchName",
+                "Active": "Active",
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        dropdowns_service,
+        "_normalize_dropdown_rows",
+        lambda rows, pk, cmap: [
+            {"ID": 1, "FirstName": "Existing"},
+            {"FirstName": "New1"},
+            {"FirstName": "New2", "Password": ""},
+            {"FirstName": "New3", "Password": "Custom@123"},
+        ],
+    )
+
+    async def fake_merge(*, table, data_list, key_columns, exclude_key_columns_from_insert):
+        captured["merge"] = (table, data_list, key_columns, exclude_key_columns_from_insert)
+        return {"count": len(data_list)}
+
+    async def fake_insert(*, table, records):
+        captured["insert"] = (table, records)
+        return {"count": len(records)}
+
+    monkeypatch.setattr(dropdowns_service, "_merge_upsert_dropdown_records_async", fake_merge)
+    monkeypatch.setattr(dropdowns_service, "_insert_dropdown_records_async", fake_insert)
+
+    result = asyncio.run(dropdowns_service.upsert_dropdown_values("users", [{"FirstName": "x"}]))
+
+    assert result == {"message": "Upsert successful", "count": 4}
+    assert captured["merge"][0] == "tblUsers"
+    assert captured["merge"][1] == [{"ID": 1, "FirstName": "Existing"}]
+    assert captured["merge"][3] is True
+    assert captured["insert"][0] == "tblUsers"
+    assert captured["insert"][1] == [
+        {"FirstName": "New1", "Password": "12345678"},
+        {"FirstName": "New2", "Password": "12345678"},
+        {"FirstName": "New3", "Password": "Custom@123"},
+    ]
+
+
 def test_upsert_dropdown_values_requires_name():
     with pytest.raises(HTTPException):
         asyncio.run(dropdowns_service.upsert_dropdown_values("  ", []))
