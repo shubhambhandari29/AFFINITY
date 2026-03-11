@@ -29,7 +29,7 @@ REFRESH_COOKIE_OPTIONS = {
     "httponly": True,
     "secure": settings.SECURE_COOKIE,
     "samesite": settings.SAME_SITE,
-    "path": "/auth/refresh_token",
+    "path": "/auth/refresh",
 }
 
 
