@@ -1,24 +1,29 @@
--- 1) Create or reset sequence to MAX(ID)+1
-DECLARE @next_id INT = ISNULL((SELECT MAX(ID) FROM dbo.tblUsers), 0) + 1;
+-- 1) Compute next ID
+DECLARE @next_id BIGINT = ISNULL((SELECT MAX(ID) FROM dbo.tblUsers), 0) + 1;
 
-IF OBJECT_ID('dbo.Seq_tblUsers_ID', 'SO') IS NULL
+-- 2) Ensure sequence exists
+IF OBJECT_ID(N'dbo.Seq_tblUsers_ID', N'SO') IS NULL
 BEGIN
-    EXEC('CREATE SEQUENCE dbo.Seq_tblUsers_ID AS INT START WITH ' + CAST(@next_id AS VARCHAR(20)) + ' INCREMENT BY 1');
-END
-ELSE
-BEGIN
-    EXEC('ALTER SEQUENCE dbo.Seq_tblUsers_ID RESTART WITH ' + CAST(@next_id AS VARCHAR(20)));
-END
+    EXEC(N'CREATE SEQUENCE dbo.Seq_tblUsers_ID AS BIGINT START WITH 1 INCREMENT BY 1;');
+END;
 
--- 2) Add default for ID (only once)
+-- 3) Restart sequence at MAX(ID)+1
+DECLARE @sql NVARCHAR(300);
+SET @sql = N'ALTER SEQUENCE dbo.Seq_tblUsers_ID RESTART WITH ' + CONVERT(NVARCHAR(30), @next_id) + N';';
+EXEC sys.sp_executesql @sql;
+
+-- 4) Add default on tblUsers.ID (only if missing)
 IF NOT EXISTS (
     SELECT 1
     FROM sys.default_constraints dc
-    JOIN sys.columns c ON c.default_object_id = dc.object_id
-    JOIN sys.tables t ON t.object_id = c.object_id
-    WHERE t.name = 'tblUsers' AND c.name = 'ID'
+    JOIN sys.columns c
+      ON c.object_id = dc.parent_object_id
+     AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID(N'dbo.tblUsers')
+      AND c.name = N'ID'
 )
 BEGIN
     ALTER TABLE dbo.tblUsers
-    ADD CONSTRAINT DF_tblUsers_ID DEFAULT (NEXT VALUE FOR dbo.Seq_tblUsers_ID) FOR ID;
-END
+    ADD CONSTRAINT DF_tblUsers_ID
+    DEFAULT (NEXT VALUE FOR dbo.Seq_tblUsers_ID) FOR ID;
+END;
