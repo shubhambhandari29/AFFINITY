@@ -69,3 +69,12 @@ if "value" in data:
     print(f"Assignments count: {len(data['value'])}")
 else:
     print("No app role assignments found.")
+
+
+root@4511fcf2e339:/home/site/wwwroot# python3 graph.py
+Managed Identity Object ID: bb8645bb-88c9-4a65-bb39-adf60bd93fd8
+Managed Identity App ID: 51e5ae1c-40a5-4bfe-b891-9ae228406519
+Token roles: None
+SERVICE PRINCIPAL >>> {'@odata.context': 'https://graph.microsoft.com/v1.0/$metadata#servicePrincipals(id,appId,displayName,servicePrincipalType)/$entity', 'id': 'bb8645bb-88c9-4a65-bb39-adf60bd93fd8', 'appId': '51e5ae1c-40a5-4bfe-b891-9ae228406519', 'displayName': 'SACPlatformAPIPreprd', 'servicePrincipalType': 'ManagedIdentity'}
+DATA >>> {'@odata.context': 'https://graph.microsoft.com/v1.0/$metadata#appRoleAssignments(id,appRoleId,resourceId,principalId)', 'value': []}
+Assignments count: 0
