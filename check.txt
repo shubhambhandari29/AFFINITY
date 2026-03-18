@@ -1,5 +1,24 @@
-React-based frontend integrated with a Python FastAPI backend through secure REST APIs for SAC and Affinity workflows.
-Backend is built in Python 3.11 using FastAPI, with modular service architecture and Pydantic validation for structured, reliable APIs.
-Hosted on Azure Linux Web App with Azure DevOps CI/CD pipeline for automated build and deployment.
-Integrated with SQL Server/Azure SQL using ODBC and Azure AD-compatible database authentication for enterprise data access.
-Enterprise authentication is supported through F5/SSO at the access layer, with the API enforcing secure JWT session management using HTTP-only cookies and refresh-token flow.
+import requests
+from azure.identity import ManagedIdentityCredential
+
+GRAPH_SCOPE = "https://graph.microsoft.com/.default"
+GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+
+# UPN or Entra object ID
+USER_ID = "shubhambhandari@hanover.com"
+
+token = ManagedIdentityCredential().get_token(GRAPH_SCOPE).token
+headers = {"Authorization": f"Bearer {token}"}
+
+url = f"{GRAPH_BASE}/users/{USER_ID}/transitiveMemberOf/microsoft.graph.group?$select=id,displayName"
+
+groups = []
+while url:
+    r = requests.get(url, headers=headers, timeout=30)
+    r.raise_for_status()
+    data = r.json()
+    groups.extend(data.get("value", []))
+    url = data.get("@odata.nextLink")
+
+for g in groups:
+    print(f"{g.get('displayName')}  |  {g.get('id')}")
