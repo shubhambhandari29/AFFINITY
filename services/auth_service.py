@@ -1,6 +1,7 @@
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import HTTPException, Request, Response
 
@@ -16,6 +17,14 @@ from core.jwt_handler import (
 )
 
 logger = logging.getLogger(__name__)
+
+GRAPH_SCOPE = "https://graph.microsoft.com/.default"
+GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
+GROUP_ROLE_PRIORITY = {
+    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN": ("admin", 1),
+    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS": ("director", 2),
+    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS": ("underwriter", 3),
+}
 
 SESSION_COOKIE_NAME = "session"
 REFRESH_COOKIE_NAME = "refresh_session"
@@ -64,6 +73,72 @@ def _clear_refresh_cookie(response: Response) -> None:
 def _clear_auth_cookies(response: Response) -> None:
     _clear_session_cookie(response)
     _clear_refresh_cookie(response)
+
+
+def _get_graph_access_token() -> str:
+    try:
+        from azure.identity import ManagedIdentityCredential
+    except ImportError as exc:  # pragma: no cover - runtime dependency guard
+        raise HTTPException(status_code=500, detail={"error": "Missing dependency: azure-identity"}) from exc
+
+    try:
+        credential = ManagedIdentityCredential()
+        return credential.get_token(GRAPH_SCOPE).token
+    except Exception as exc:
+        logger.error("Managed identity token acquisition failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Unable to get Graph access token"},
+        ) from exc
+
+
+def _get_user_groups_from_graph(email: str) -> list[dict[str, Any]]:
+    try:
+        import requests
+    except ImportError as exc:  # pragma: no cover - runtime dependency guard
+        raise HTTPException(status_code=500, detail={"error": "Missing dependency: requests"}) from exc
+
+    token = _get_graph_access_token()
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    url = (
+        f"{GRAPH_BASE_URL}/users/{quote(email, safe='')}"
+        "/transitiveMemberOf/microsoft.graph.group?$select=id,displayName"
+    )
+
+    groups: list[dict[str, Any]] = []
+    while url:
+        response = requests.get(url, headers=headers, timeout=30)
+        if response.status_code == 404:
+            raise HTTPException(status_code=404, detail={"error": "User not found in Entra ID"})
+        if response.status_code >= 400:
+            logger.error("Graph groups lookup failed [%s]: %s", response.status_code, response.text)
+            raise HTTPException(
+                status_code=502,
+                detail={"error": "Failed to fetch AD groups from Graph"},
+            )
+        payload = response.json()
+        groups.extend(payload.get("value", []))
+        url = payload.get("@odata.nextLink")
+
+    return groups
+
+
+def _resolve_role_from_groups(groups: list[dict[str, Any]]) -> tuple[str | None, list[str]]:
+    matched: list[tuple[int, str, str]] = []
+    for group in groups:
+        group_name = str(group.get("displayName", "")).strip()
+        role_priority = GROUP_ROLE_PRIORITY.get(group_name)
+        if role_priority:
+            role, priority = role_priority
+            matched.append((priority, group_name, role))
+
+    if not matched:
+        return None, []
+
+    matched.sort(key=lambda item: item[0])
+    role = matched[0][2]
+    matched_group_names = [group_name for _, group_name, _ in matched]
+    return role, matched_group_names
 
 
 # -------------------------
@@ -125,7 +200,7 @@ def get_user_by_id(user_id: int) -> dict[str, Any] | None:
 
 async def login_user(login_data: dict[str, Any], response: Response):
     """
-    Validates user email/password.
+    Validates user by Entra AD group membership via Graph API.
     Sets HTTP-only cookie.
     Returns user profile + token.
     """
@@ -136,30 +211,26 @@ async def login_user(login_data: dict[str, Any], response: Response):
         logger.warning("Login attempt with missing data")
         raise HTTPException(status_code=400, detail={"error": "Missing email or password"})
 
-    # Fetch user from DB
-    user_record = get_user_by_email(email)
+    groups = _get_user_groups_from_graph(email)
+    role, matched_group_names = _resolve_role_from_groups(groups)
+    if not role:
+        logger.warning("Login failed: no SAC role groups matched (%s)", email)
+        raise HTTPException(status_code=401, detail={"error": "User is not authorized"})
 
-    if not user_record:
-        logger.warning(f"Login failed: user not found ({email})")
-        raise HTTPException(status_code=404, detail={"error": "User not found"})
-    stored_password = user_record.get("Password")
-    if stored_password is None or password != str(stored_password):
-        logger.warning(f"Login failed: wrong password ({email})")
-        raise HTTPException(status_code=401, detail={"error": "Wrong password"})
-
-    # Prepare user payload (only safe fields)
+    # Prepare user payload.
     user = {
-        "id": user_record["ID"],
-        "first_name": user_record["FirstName"],
-        "last_name": user_record["LastName"],
-        "email": user_record["Email"],
-        "role": user_record["Role"],
-        "branch": user_record["BranchName"],
+        "id": email,
+        "first_name": "",
+        "last_name": "",
+        "email": email,
+        "role": role,
+        "branch": None,
+        "matched_ad_groups": matched_group_names,
     }
 
     # Create JWT pair
     token = create_access_token(user["id"], user.get("role"))
-    refresh_token = create_refresh_token(user["id"])
+    refresh_token = create_refresh_token(user["id"], user.get("role"))
 
     # Set cookies
     _set_session_cookie(response, token)
@@ -187,17 +258,29 @@ async def get_current_user_from_token(request: Request):
             user_id = payload["user"].get("id")
         if not user_id:
             raise HTTPException(status_code=401, detail={"error": "Invalid token"})
-        user_record = get_user_by_id(user_id)
-        if not user_record:
-            raise HTTPException(status_code=401, detail={"error": "Invalid token"})
-        user = {
-            "id": user_record["ID"],
-            "first_name": user_record["FirstName"],
-            "last_name": user_record["LastName"],
-            "email": user_record["Email"],
-            "role": user_record["Role"],
-            "branch": user_record["BranchName"],
-        }
+        user_record = None
+        if str(user_id).isdigit():
+            user_record = get_user_by_id(int(str(user_id)))
+
+        if user_record:
+            user = {
+                "id": user_record["ID"],
+                "first_name": user_record["FirstName"],
+                "last_name": user_record["LastName"],
+                "email": user_record["Email"],
+                "role": user_record["Role"],
+                "branch": user_record["BranchName"],
+            }
+        else:
+            role = payload.get("role")
+            user = {
+                "id": user_id,
+                "first_name": "",
+                "last_name": "",
+                "email": user_id if "@" in str(user_id) else "",
+                "role": role,
+                "branch": None,
+            }
     except Exception as e:
         logger.error(f"Token decode failed: {e}")
         raise HTTPException(status_code=401, detail={"error": "Invalid token"}) from e
@@ -234,8 +317,13 @@ async def refresh_user_token(request: Request, response: Response, token: str | 
             user_id = payload["user"].get("id")
         if not user_id:
             raise HTTPException(status_code=401, detail={"error": "Invalid refresh token"})
-        user_record = get_user_by_id(user_id)
-        if not user_record:
+        role = payload.get("role")
+        user_record = None
+        if str(user_id).isdigit():
+            user_record = get_user_by_id(int(str(user_id)))
+            if user_record:
+                role = user_record.get("Role")
+        if not role and not user_record:
             raise HTTPException(status_code=401, detail={"error": "Invalid refresh token"})
     except Exception as e:
         logger.error(f"Token refresh failed: {e}")
@@ -243,10 +331,11 @@ async def refresh_user_token(request: Request, response: Response, token: str | 
         raise HTTPException(status_code=401, detail={"error": "Invalid refresh token"}) from e
 
     # Fixed refresh token strategy: only issue a new access token.
-    new_token = create_access_token(user_id, user_record.get("Role"))
+    new_token = create_access_token(user_id, role)
 
     _set_session_cookie(response, new_token)
 
-    logger.info(f"Token refreshed for user {user_record['Email']}")
+    refreshed_user_identifier = user_record["Email"] if user_record else str(user_id)
+    logger.info("Token refreshed for user %s", refreshed_user_identifier)
 
     return {"message": "Token refreshed", "token": new_token}

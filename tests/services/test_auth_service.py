@@ -34,31 +34,11 @@ def test_login_user_missing_data():
     assert excinfo.value.detail == {"error": "Missing email or password"}
 
 
-def test_login_user_user_not_found(monkeypatch):
-    monkeypatch.setattr(auth_service, "get_user_by_email", lambda email: None)
-
-    with pytest.raises(HTTPException) as excinfo:
-        asyncio.run(
-            auth_service.login_user({"email": "a@example.com", "password": "x"}, Response())
-        )
-
-    assert excinfo.value.status_code == 404
-    assert excinfo.value.detail == {"error": "User not found"}
-
-
-def test_login_user_wrong_password(monkeypatch):
+def test_login_user_not_authorized_when_no_sac_groups(monkeypatch):
     monkeypatch.setattr(
         auth_service,
-        "get_user_by_email",
-        lambda email: {
-            "ID": 1,
-            "FirstName": "A",
-            "LastName": "B",
-            "Email": email,
-            "Role": "User",
-            "BranchName": "HQ",
-            "Password": "hashed",
-        },
+        "_get_user_groups_from_graph",
+        lambda email: [{"id": "x", "displayName": "SomeOtherGroup"}],
     )
 
     with pytest.raises(HTTPException) as excinfo:
@@ -67,84 +47,72 @@ def test_login_user_wrong_password(monkeypatch):
         )
 
     assert excinfo.value.status_code == 401
-    assert excinfo.value.detail == {"error": "Wrong password"}
+    assert excinfo.value.detail == {"error": "User is not authorized"}
 
 
-def test_login_user_plain_password_match(monkeypatch):
+def test_login_user_graph_error(monkeypatch):
+    def fake_get_groups(email):
+        raise HTTPException(status_code=404, detail={"error": "User not found in Entra ID"})
+
+    monkeypatch.setattr(auth_service, "_get_user_groups_from_graph", fake_get_groups)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            auth_service.login_user({"email": "a@example.com", "password": "x"}, Response())
+        )
+
+    assert excinfo.value.status_code == 404
+
+
+def test_login_user_role_priority_and_cookie_flow(monkeypatch):
     captured = {"session_cookie": None, "refresh_cookie": None}
 
     monkeypatch.setattr(
         auth_service,
-        "get_user_by_email",
-        lambda email: {
-            "ID": 2,
-            "FirstName": "A",
-            "LastName": "B",
-            "Email": email,
-            "Role": "User",
-            "BranchName": "HQ",
-            "Password": "legacy",
-        },
+        "_get_user_groups_from_graph",
+        lambda email: [
+            {"id": "1", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"},
+            {"id": "2", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN"},
+            {"id": "3", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS"},
+        ],
     )
-
-    def fake_create_access_token(user_id, role):
-        return "token"
-
-    def fake_create_refresh_token(user_id):
-        return "refresh-token"
-
-    def fake_set_session_cookie(response, token):
-        captured["session_cookie"] = token
-
-    def fake_set_refresh_cookie(response, token):
-        captured["refresh_cookie"] = token
-
-    monkeypatch.setattr(auth_service, "create_access_token", fake_create_access_token)
-    monkeypatch.setattr(auth_service, "create_refresh_token", fake_create_refresh_token)
-    monkeypatch.setattr(auth_service, "_set_session_cookie", fake_set_session_cookie)
-    monkeypatch.setattr(auth_service, "_set_refresh_cookie", fake_set_refresh_cookie)
+    monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
+    monkeypatch.setattr(
+        auth_service,
+        "create_refresh_token",
+        lambda user_id, role=None: "refresh-token",
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "_set_session_cookie",
+        lambda response, token: captured.__setitem__("session_cookie", token),
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "_set_refresh_cookie",
+        lambda response, token: captured.__setitem__("refresh_cookie", token),
+    )
 
     response = Response()
     result = asyncio.run(
-        auth_service.login_user({"email": "a@example.com", "password": "legacy"}, response)
+        auth_service.login_user({"email": "a@example.com", "password": "x"}, response)
     )
 
     assert result["message"] == "Sign in successful"
     assert result["token"] == "token"
+    assert result["user"]["email"] == "a@example.com"
+    assert result["user"]["role"] == "admin"
+    assert result["user"]["matched_ad_groups"] == [
+        "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN",
+        "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS",
+        "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS",
+    ]
     assert captured["session_cookie"] == "token"
     assert captured["refresh_cookie"] == "refresh-token"
 
 
-def test_login_user_valid_password(monkeypatch):
-    monkeypatch.setattr(
-        auth_service,
-        "get_user_by_email",
-        lambda email: {
-            "ID": 1,
-            "FirstName": "A",
-            "LastName": "B",
-            "Email": email,
-            "Role": "User",
-            "BranchName": "HQ",
-            "Password": "x",
-        },
-    )
-    monkeypatch.setattr(auth_service, "create_access_token", lambda uid, role: "token")
-    monkeypatch.setattr(auth_service, "create_refresh_token", lambda uid: "refresh-token")
-    monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
-    monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
-
-    result = asyncio.run(
-        auth_service.login_user({"email": "a@example.com", "password": "x"}, Response())
-    )
-
-    assert result["message"] == "Sign in successful"
-    assert result["user"]["email"] == "a@example.com"
-    assert result["token"] == "token"
-
-
-def test_get_current_user_from_token_success(monkeypatch):
-    monkeypatch.setattr(auth_service, "decode_access_token", lambda token: {"sub": 1})
+def test_get_current_user_from_token_success_db_path(monkeypatch):
+    monkeypatch.setattr(auth_service, "decode_access_token", lambda token: {"sub": "1"})
     monkeypatch.setattr(
         auth_service,
         "get_user_by_id",
@@ -163,6 +131,27 @@ def test_get_current_user_from_token_success(monkeypatch):
 
     result = asyncio.run(auth_service.get_current_user_from_token(request))
     assert result["user"]["email"] == "a@example.com"
+    assert result["user"]["role"] == "User"
+
+
+def test_get_current_user_from_token_success_graph_path(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "decode_access_token",
+        lambda token: {"sub": "a@example.com", "role": "director"},
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "get_user_by_id",
+        lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
+    )
+
+    request = Request({"type": "http", "headers": [], "query_string": b""})
+    request._cookies = {auth_service.SESSION_COOKIE_NAME: "token"}
+
+    result = asyncio.run(auth_service.get_current_user_from_token(request))
+    assert result["user"]["email"] == "a@example.com"
+    assert result["user"]["role"] == "director"
 
 
 def test_get_current_user_from_token_invalid(monkeypatch):
@@ -189,8 +178,8 @@ def test_refresh_user_token_no_token():
     assert excinfo.value.detail == {"error": "No refresh token found"}
 
 
-def test_refresh_user_token_success(monkeypatch):
-    monkeypatch.setattr(auth_service, "decode_refresh_token", lambda token: {"sub": 1})
+def test_refresh_user_token_success_db_path(monkeypatch):
+    monkeypatch.setattr(auth_service, "decode_refresh_token", lambda token: {"sub": "1"})
     monkeypatch.setattr(
         auth_service,
         "get_user_by_id",
@@ -208,6 +197,28 @@ def test_refresh_user_token_success(monkeypatch):
         "_set_refresh_cookie",
         lambda response, token: pytest.fail("refresh cookie must not be reset during refresh"),
     )
+
+    request = Request({"type": "http", "headers": [], "query_string": b""})
+    request._cookies = {auth_service.REFRESH_COOKIE_NAME: "refresh-token"}
+    response = Response()
+
+    result = asyncio.run(auth_service.refresh_user_token(request, response, token=None))
+    assert result == {"message": "Token refreshed", "token": "newtoken"}
+
+
+def test_refresh_user_token_success_graph_path(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "decode_refresh_token",
+        lambda token: {"sub": "a@example.com", "role": "admin"},
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "get_user_by_id",
+        lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
+    )
+    monkeypatch.setattr(auth_service, "create_access_token", lambda uid, role: "newtoken")
+    monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
 
     request = Request({"type": "http", "headers": [], "query_string": b""})
     request._cookies = {auth_service.REFRESH_COOKIE_NAME: "refresh-token"}
