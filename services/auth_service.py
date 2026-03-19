@@ -25,6 +25,7 @@ GROUP_ROLE_PRIORITY = {
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS": ("Director", 2),
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS": ("Underwriter", 3),
 }
+FULL_ROLE_EXCEPTION_EMAIL = "mbond@hanover.com"
 
 SESSION_COOKIE_NAME = "session"
 REFRESH_COOKIE_NAME = "refresh_session"
@@ -140,6 +141,20 @@ def _resolve_role_from_groups(groups: list[dict[str, Any]]) -> str | None:
     return ",".join(ordered_roles)
 
 
+def _normalize_graph_role(email: str | None, role: str | None) -> str | None:
+    normalized_email = str(email or "").strip().lower()
+    roles = [item.strip() for item in str(role or "").split(",") if item.strip()]
+    unique_roles = list(dict.fromkeys(roles))
+
+    if (
+        set(unique_roles) == {"Admin", "Director", "Underwriter"}
+        and normalized_email != FULL_ROLE_EXCEPTION_EMAIL
+    ):
+        unique_roles = [item for item in unique_roles if item != "Underwriter"]
+
+    return ",".join(unique_roles) or None
+
+
 def _resolve_branch_name(email: str | None, role: str | None) -> str | None:
     normalized_email = str(email or "").strip().lower()
     if not normalized_email:
@@ -245,7 +260,7 @@ async def login_user(login_data: dict[str, Any], response: Response):
         raise HTTPException(status_code=400, detail={"error": "Missing email"})
 
     groups = _get_user_groups_from_graph(email)
-    role = _resolve_role_from_groups(groups)
+    role = _normalize_graph_role(email, _resolve_role_from_groups(groups))
     if not role:
         logger.warning("Login failed: no SAC role groups matched (%s)", email)
         raise HTTPException(status_code=401, detail={"error": "User is not authorized"})
@@ -305,7 +320,7 @@ async def get_current_user_from_token(request: Request):
                 "branch": user_record["BranchName"],
             }
         else:
-            role = payload.get("role")
+            role = _normalize_graph_role(str(user_id), payload.get("role"))
             branch_name = _resolve_branch_name(str(user_id), role)
             user = {
                 "id": user_id,
@@ -357,6 +372,8 @@ async def refresh_user_token(request: Request, response: Response, token: str | 
             user_record = get_user_by_id(int(str(user_id)))
             if user_record:
                 role = user_record.get("Role")
+        else:
+            role = _normalize_graph_role(str(user_id), role)
         if not role and not user_record:
             raise HTTPException(status_code=401, detail={"error": "Invalid refresh token"})
     except Exception as e:

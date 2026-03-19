@@ -99,9 +99,42 @@ def test_login_user_role_priority_and_cookie_flow(monkeypatch):
     assert result["message"] == "Sign in successful"
     assert result["token"] == "token"
     assert result["user"]["email"] == "a@example.com"
-    assert result["user"]["role"] == "Admin,Director,Underwriter"
+    assert result["user"]["role"] == "Admin,Director"
     assert captured["session_cookie"] == "token"
     assert captured["refresh_cookie"] == "refresh-token"
+
+
+def test_login_user_keeps_underwriter_for_mbond_with_all_three_groups(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "_get_user_groups_from_graph",
+        lambda email: [
+            {"id": "1", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"},
+            {"id": "2", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN"},
+            {"id": "3", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS"},
+        ],
+    )
+    monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
+    monkeypatch.setattr(
+        auth_service,
+        "create_refresh_token",
+        lambda user_id, role=None: "refresh-token",
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "_set_session_cookie",
+        lambda response, token: None,
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "_set_refresh_cookie",
+        lambda response, token: None,
+    )
+
+    response = Response()
+    result = asyncio.run(auth_service.login_user({"email": "mbond@hanover.com"}, response))
+
+    assert result["user"]["role"] == "Admin,Director,Underwriter"
 
 
 def test_login_user_sets_director_branch_from_mapping(monkeypatch):
@@ -189,7 +222,7 @@ def test_get_current_user_from_token_success_graph_path(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "decode_access_token",
-        lambda token: {"sub": "a@example.com", "role": "Director"},
+        lambda token: {"sub": "a@example.com", "role": "Admin,Director,Underwriter"},
     )
     monkeypatch.setattr(
         auth_service,
@@ -202,8 +235,28 @@ def test_get_current_user_from_token_success_graph_path(monkeypatch):
 
     result = asyncio.run(auth_service.get_current_user_from_token(request))
     assert result["user"]["email"] == "a@example.com"
-    assert result["user"]["role"] == "Director"
+    assert result["user"]["role"] == "Admin,Director"
     assert result["user"]["branch"] is None
+
+
+def test_get_current_user_from_token_keeps_underwriter_for_mbond(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "decode_access_token",
+        lambda token: {"sub": "mbond@hanover.com", "role": "Admin,Director,Underwriter"},
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "get_user_by_id",
+        lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
+    )
+
+    request = Request({"type": "http", "headers": [], "query_string": b""})
+    request._cookies = {auth_service.SESSION_COOKIE_NAME: "token"}
+
+    result = asyncio.run(auth_service.get_current_user_from_token(request))
+    assert result["user"]["email"] == "mbond@hanover.com"
+    assert result["user"]["role"] == "Admin,Director,Underwriter"
 
 
 def test_get_current_user_from_token_success_graph_path_branch_mapping(monkeypatch):
@@ -294,17 +347,23 @@ def test_refresh_user_token_success_db_path(monkeypatch):
 
 
 def test_refresh_user_token_success_graph_path(monkeypatch):
+    captured = {}
+
     monkeypatch.setattr(
         auth_service,
         "decode_refresh_token",
-        lambda token: {"sub": "a@example.com", "role": "admin"},
+        lambda token: {"sub": "a@example.com", "role": "Admin,Director,Underwriter"},
     )
     monkeypatch.setattr(
         auth_service,
         "get_user_by_id",
         lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
     )
-    monkeypatch.setattr(auth_service, "create_access_token", lambda uid, role: "newtoken")
+    monkeypatch.setattr(
+        auth_service,
+        "create_access_token",
+        lambda uid, role: captured.__setitem__("role", role) or "newtoken",
+    )
     monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
 
     request = Request({"type": "http", "headers": [], "query_string": b""})
@@ -313,6 +372,36 @@ def test_refresh_user_token_success_graph_path(monkeypatch):
 
     result = asyncio.run(auth_service.refresh_user_token(request, response, token=None))
     assert result == {"message": "Token refreshed", "token": "newtoken"}
+    assert captured["role"] == "Admin,Director"
+
+
+def test_refresh_user_token_keeps_underwriter_for_mbond(monkeypatch):
+    captured = {}
+
+    monkeypatch.setattr(
+        auth_service,
+        "decode_refresh_token",
+        lambda token: {"sub": "mbond@hanover.com", "role": "Admin,Director,Underwriter"},
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "get_user_by_id",
+        lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "create_access_token",
+        lambda uid, role: captured.__setitem__("role", role) or "newtoken",
+    )
+    monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
+
+    request = Request({"type": "http", "headers": [], "query_string": b""})
+    request._cookies = {auth_service.REFRESH_COOKIE_NAME: "refresh-token"}
+    response = Response()
+
+    result = asyncio.run(auth_service.refresh_user_token(request, response, token=None))
+    assert result == {"message": "Token refreshed", "token": "newtoken"}
+    assert captured["role"] == "Admin,Director,Underwriter"
 
 
 def test_refresh_user_token_invalid_clears_cookies(monkeypatch):
