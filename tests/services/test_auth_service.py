@@ -101,7 +101,7 @@ def test_login_user_role_priority_and_cookie_flow(monkeypatch):
     assert result["message"] == "Sign in successful"
     assert result["token"] == "token"
     assert result["user"]["email"] == "a@example.com"
-    assert result["user"]["role"] == "admin"
+    assert result["user"]["role"] == "Admin,Director,Underwriter"
     assert result["user"]["matched_ad_groups"] == [
         "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN",
         "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS",
@@ -151,7 +151,7 @@ def test_get_current_user_from_token_success_graph_path(monkeypatch):
 
     result = asyncio.run(auth_service.get_current_user_from_token(request))
     assert result["user"]["email"] == "a@example.com"
-    assert result["user"]["role"] == "director"
+    assert result["user"]["role"] == "Director"
 
 
 def test_get_current_user_from_token_invalid(monkeypatch):

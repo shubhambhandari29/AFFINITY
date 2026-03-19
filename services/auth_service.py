@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 GRAPH_SCOPE = "https://graph.microsoft.com/.default"
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 GROUP_ROLE_PRIORITY = {
-    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN": ("admin", 1),
-    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS": ("director", 2),
-    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS": ("underwriter", 3),
+    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN": ("Admin", 1),
+    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS": ("Director", 2),
+    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS": ("Underwriter", 3),
 }
 
 SESSION_COOKIE_NAME = "session"
@@ -136,7 +136,8 @@ def _resolve_role_from_groups(groups: list[dict[str, Any]]) -> tuple[str | None,
         return None, []
 
     matched.sort(key=lambda item: item[0])
-    role = matched[0][2]
+    ordered_roles = list(dict.fromkeys(role for _, _, role in matched))
+    role = ",".join(ordered_roles)
     matched_group_names = [group_name for _, group_name, _ in matched]
     return role, matched_group_names
 
