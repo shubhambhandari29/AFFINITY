@@ -1,24 +1,13 @@
-import requests
-from azure.identity import ManagedIdentityCredential
+CREATE TABLE BranchMapping (
+    Email VARCHAR(255),
+    BranchName VARCHAR(255)
+);
 
-GRAPH_SCOPE = "https://graph.microsoft.com/.default"
-GRAPH_BASE = "https://graph.microsoft.com/v1.0"
-
-# UPN or Entra object ID
-USER_ID = "shubhambhandari@hanover.com"
-
-token = ManagedIdentityCredential().get_token(GRAPH_SCOPE).token
-headers = {"Authorization": f"Bearer {token}"}
-
-url = f"{GRAPH_BASE}/users/{USER_ID}/transitiveMemberOf/microsoft.graph.group?$select=id,displayName"
-
-groups = []
-while url:
-    r = requests.get(url, headers=headers, timeout=30)
-    r.raise_for_status()
-    data = r.json()
-    groups.extend(data.get("value", []))
-    url = data.get("@odata.nextLink")
-
-for g in groups:
-    print(f"{g.get('displayName')}  |  {g.get('id')}")
+INSERT INTO BranchMapping (Email, BranchName)
+VALUES
+('mdeluca@hanover.com', 'NorthEast'),
+('jhoul@hanover.com', 'All'),
+('sh1bhandari@hanover.com', 'All'),
+('stscott@hanover.com', 'All'),
+('scarruth@hanover.com', 'All'),
+('mbond@hanover.com', 'All');
