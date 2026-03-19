@@ -25,6 +25,14 @@ GROUP_ROLE_PRIORITY = {
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS": ("Director", 2),
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS": ("Underwriter", 3),
 }
+DIRECTOR_BRANCH_OVERRIDES = {
+    "mdeluca@hanover.com": "Northeast",
+    "jhoule@hanover.com": "All",
+    "mbond@hanover.com": "All",
+    "sh1bhandari@hanover.com": "All",
+    "stscott@hanover.com": "All",
+    "scarruth@hanover.com": "All",
+}
 
 SESSION_COOKIE_NAME = "session"
 REFRESH_COOKIE_NAME = "refresh_session"
@@ -142,6 +150,18 @@ def _resolve_role_from_groups(groups: list[dict[str, Any]]) -> tuple[str | None,
     return role, matched_group_names
 
 
+def _resolve_branch_name(email: str | None, role: str | None) -> str | None:
+    normalized_email = str(email or "").strip().lower()
+    if not normalized_email:
+        return None
+
+    roles = {item.strip() for item in str(role or "").split(",") if item.strip()}
+    if "Director" in roles:
+        return DIRECTOR_BRANCH_OVERRIDES.get(normalized_email)
+
+    return None
+
+
 # -------------------------
 # DB HELPERS FOR AUTH USER
 # -------------------------
@@ -217,6 +237,7 @@ async def login_user(login_data: dict[str, Any], response: Response):
     if not role:
         logger.warning("Login failed: no SAC role groups matched (%s)", email)
         raise HTTPException(status_code=401, detail={"error": "User is not authorized"})
+    branch_name = _resolve_branch_name(email, role)
 
     # Prepare user payload.
     user = {
@@ -225,7 +246,7 @@ async def login_user(login_data: dict[str, Any], response: Response):
         "last_name": "",
         "email": email,
         "role": role,
-        "branch": None,
+        "branch": branch_name,
         "matched_ad_groups": matched_group_names,
     }
 
@@ -274,13 +295,14 @@ async def get_current_user_from_token(request: Request):
             }
         else:
             role = payload.get("role")
+            branch_name = _resolve_branch_name(str(user_id), role)
             user = {
                 "id": user_id,
                 "first_name": "",
                 "last_name": "",
                 "email": user_id if "@" in str(user_id) else "",
                 "role": role,
-                "branch": None,
+                "branch": branch_name,
             }
     except Exception as e:
         logger.error(f"Token decode failed: {e}")
