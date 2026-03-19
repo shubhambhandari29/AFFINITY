@@ -123,7 +123,7 @@ def _get_user_groups_from_graph(email: str) -> list[dict[str, Any]]:
     return groups
 
 
-def _resolve_role_from_groups(groups: list[dict[str, Any]]) -> tuple[str | None, list[str]]:
+def _resolve_role_from_groups(groups: list[dict[str, Any]]) -> str | None:
     matched: list[tuple[int, str, str]] = []
     for group in groups:
         group_name = str(group.get("displayName", "")).strip()
@@ -133,13 +133,11 @@ def _resolve_role_from_groups(groups: list[dict[str, Any]]) -> tuple[str | None,
             matched.append((priority, group_name, role))
 
     if not matched:
-        return None, []
+        return None
 
     matched.sort(key=lambda item: item[0])
     ordered_roles = list(dict.fromkeys(role for _, _, role in matched))
-    role = ",".join(ordered_roles)
-    matched_group_names = [group_name for _, group_name, _ in matched]
-    return role, matched_group_names
+    return ",".join(ordered_roles)
 
 
 def _resolve_branch_name(email: str | None, role: str | None) -> str | None:
@@ -242,13 +240,12 @@ async def login_user(login_data: dict[str, Any], response: Response):
     """
 
     email = login_data.get("email")
-    password = login_data.get("password")
-    if not email or not password:
-        logger.warning("Login attempt with missing data")
-        raise HTTPException(status_code=400, detail={"error": "Missing email or password"})
+    if not email:
+        logger.warning("Login attempt with missing email")
+        raise HTTPException(status_code=400, detail={"error": "Missing email"})
 
     groups = _get_user_groups_from_graph(email)
-    role, matched_group_names = _resolve_role_from_groups(groups)
+    role = _resolve_role_from_groups(groups)
     if not role:
         logger.warning("Login failed: no SAC role groups matched (%s)", email)
         raise HTTPException(status_code=401, detail={"error": "User is not authorized"})
@@ -262,7 +259,6 @@ async def login_user(login_data: dict[str, Any], response: Response):
         "email": email,
         "role": role,
         "branch": branch_name,
-        "matched_ad_groups": matched_group_names,
     }
 
     # Create JWT pair

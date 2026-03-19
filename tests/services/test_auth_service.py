@@ -26,12 +26,12 @@ def test_set_and_clear_session_cookie():
     assert auth_service.REFRESH_COOKIE_NAME in headers
 
 
-def test_login_user_missing_data():
+def test_login_user_missing_email():
     with pytest.raises(HTTPException) as excinfo:
-        asyncio.run(auth_service.login_user({"email": "a"}, Response()))
+        asyncio.run(auth_service.login_user({}, Response()))
 
     assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == {"error": "Missing email or password"}
+    assert excinfo.value.detail == {"error": "Missing email"}
 
 
 def test_login_user_not_authorized_when_no_sac_groups(monkeypatch):
@@ -43,7 +43,7 @@ def test_login_user_not_authorized_when_no_sac_groups(monkeypatch):
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
-            auth_service.login_user({"email": "a@example.com", "password": "x"}, Response())
+            auth_service.login_user({"email": "a@example.com"}, Response())
         )
 
     assert excinfo.value.status_code == 401
@@ -58,7 +58,7 @@ def test_login_user_graph_error(monkeypatch):
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
-            auth_service.login_user({"email": "a@example.com", "password": "x"}, Response())
+            auth_service.login_user({"email": "a@example.com"}, Response())
         )
 
     assert excinfo.value.status_code == 404
@@ -94,19 +94,12 @@ def test_login_user_role_priority_and_cookie_flow(monkeypatch):
     )
 
     response = Response()
-    result = asyncio.run(
-        auth_service.login_user({"email": "a@example.com", "password": "x"}, response)
-    )
+    result = asyncio.run(auth_service.login_user({"email": "a@example.com"}, response))
 
     assert result["message"] == "Sign in successful"
     assert result["token"] == "token"
     assert result["user"]["email"] == "a@example.com"
     assert result["user"]["role"] == "Admin,Director,Underwriter"
-    assert result["user"]["matched_ad_groups"] == [
-        "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN",
-        "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS",
-        "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS",
-    ]
     assert captured["session_cookie"] == "token"
     assert captured["refresh_cookie"] == "refresh-token"
 
@@ -134,9 +127,7 @@ def test_login_user_sets_director_branch_from_mapping(monkeypatch):
     monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
 
     response = Response()
-    result = asyncio.run(
-        auth_service.login_user({"email": "mdeluca@hanover.com", "password": "x"}, response)
-    )
+    result = asyncio.run(auth_service.login_user({"email": "mdeluca@hanover.com"}, response))
 
     assert result["user"]["role"] == "Director"
     assert result["user"]["branch"] == "Northeast"
@@ -165,9 +156,7 @@ def test_login_user_sets_all_branch_from_mapping(monkeypatch):
     monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
 
     response = Response()
-    result = asyncio.run(
-        auth_service.login_user({"email": "mbond@hanover.com", "password": "x"}, response)
-    )
+    result = asyncio.run(auth_service.login_user({"email": "mbond@hanover.com"}, response))
 
     assert result["user"]["role"] == "Director"
     assert result["user"]["branch"] == "All"
