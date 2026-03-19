@@ -25,14 +25,6 @@ GROUP_ROLE_PRIORITY = {
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS": ("Director", 2),
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS": ("Underwriter", 3),
 }
-DIRECTOR_BRANCH_OVERRIDES = {
-    "mdeluca@hanover.com": "Northeast",
-    "jhoule@hanover.com": "All",
-    "mbond@hanover.com": "All",
-    "sh1bhandari@hanover.com": "All",
-    "stscott@hanover.com": "All",
-    "scarruth@hanover.com": "All",
-}
 
 SESSION_COOKIE_NAME = "session"
 REFRESH_COOKIE_NAME = "refresh_session"
@@ -221,15 +213,15 @@ def get_branch_name_by_email(email: str) -> str | None:
 
     query = """
         SELECT TOP 1 BranchName
-        FROM BranchMapping
+        FROM tblBranchMapping
         WHERE LOWER(Email) = ?
     """
 
     try:
         results = run_raw_query(query, [normalized_email])
     except Exception as exc:
-        logger.warning("BranchMapping lookup failed for %s: %s", normalized_email, exc)
-        return DIRECTOR_BRANCH_OVERRIDES.get(normalized_email)
+        logger.warning("tblBranchMapping lookup failed for %s: %s", normalized_email, exc)
+        return None
 
     if not results:
         return None

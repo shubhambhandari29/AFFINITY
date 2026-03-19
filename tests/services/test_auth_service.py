@@ -111,7 +111,7 @@ def test_login_user_role_priority_and_cookie_flow(monkeypatch):
     assert captured["refresh_cookie"] == "refresh-token"
 
 
-def test_login_user_sets_director_branch_override(monkeypatch):
+def test_login_user_sets_director_branch_from_mapping(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "_get_user_groups_from_graph",
@@ -142,7 +142,7 @@ def test_login_user_sets_director_branch_override(monkeypatch):
     assert result["user"]["branch"] == "Northeast"
 
 
-def test_login_user_sets_all_branch_override(monkeypatch):
+def test_login_user_sets_all_branch_from_mapping(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "_get_user_groups_from_graph",
@@ -217,7 +217,7 @@ def test_get_current_user_from_token_success_graph_path(monkeypatch):
     assert result["user"]["branch"] is None
 
 
-def test_get_current_user_from_token_success_graph_path_branch_override(monkeypatch):
+def test_get_current_user_from_token_success_graph_path_branch_mapping(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "decode_access_token",
@@ -242,14 +242,14 @@ def test_get_current_user_from_token_success_graph_path_branch_override(monkeypa
     assert result["user"]["branch"] == "All"
 
 
-def test_get_branch_name_by_email_falls_back_to_legacy_override(monkeypatch):
+def test_get_branch_name_by_email_returns_none_when_lookup_fails(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "run_raw_query",
         lambda query, params: (_ for _ in ()).throw(RuntimeError("db unavailable")),
     )
 
-    assert auth_service.get_branch_name_by_email("mbond@hanover.com") == "All"
+    assert auth_service.get_branch_name_by_email("mbond@hanover.com") is None
 
 
 def test_get_current_user_from_token_invalid(monkeypatch):
