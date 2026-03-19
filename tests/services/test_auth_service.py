@@ -125,6 +125,11 @@ def test_login_user_sets_director_branch_override(monkeypatch):
         "create_refresh_token",
         lambda user_id, role=None: "refresh-token",
     )
+    monkeypatch.setattr(
+        auth_service,
+        "get_branch_name_by_email",
+        lambda email: "Northeast",
+    )
     monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
     monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
 
@@ -150,6 +155,11 @@ def test_login_user_sets_all_branch_override(monkeypatch):
         auth_service,
         "create_refresh_token",
         lambda user_id, role=None: "refresh-token",
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "get_branch_name_by_email",
+        lambda email: "All",
     )
     monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
     monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
@@ -218,6 +228,11 @@ def test_get_current_user_from_token_success_graph_path_branch_override(monkeypa
         "get_user_by_id",
         lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
     )
+    monkeypatch.setattr(
+        auth_service,
+        "get_branch_name_by_email",
+        lambda email: "All",
+    )
 
     request = Request({"type": "http", "headers": [], "query_string": b""})
     request._cookies = {auth_service.SESSION_COOKIE_NAME: "token"}
@@ -225,6 +240,16 @@ def test_get_current_user_from_token_success_graph_path_branch_override(monkeypa
     result = asyncio.run(auth_service.get_current_user_from_token(request))
     assert result["user"]["email"] == "jhoule@hanover.com"
     assert result["user"]["branch"] == "All"
+
+
+def test_get_branch_name_by_email_falls_back_to_legacy_override(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "run_raw_query",
+        lambda query, params: (_ for _ in ()).throw(RuntimeError("db unavailable")),
+    )
+
+    assert auth_service.get_branch_name_by_email("mbond@hanover.com") == "All"
 
 
 def test_get_current_user_from_token_invalid(monkeypatch):

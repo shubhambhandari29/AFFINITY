@@ -157,7 +157,7 @@ def _resolve_branch_name(email: str | None, role: str | None) -> str | None:
 
     roles = {item.strip() for item in str(role or "").split(",") if item.strip()}
     if "Director" in roles:
-        return DIRECTOR_BRANCH_OVERRIDES.get(normalized_email)
+        return get_branch_name_by_email(normalized_email)
 
     return None
 
@@ -212,6 +212,29 @@ def get_user_by_id(user_id: int) -> dict[str, Any] | None:
         return results[0]
 
     return None
+
+
+def get_branch_name_by_email(email: str) -> str | None:
+    normalized_email = str(email or "").strip().lower()
+    if not normalized_email:
+        return None
+
+    query = """
+        SELECT TOP 1 BranchName
+        FROM BranchMapping
+        WHERE LOWER(Email) = ?
+    """
+
+    try:
+        results = run_raw_query(query, [normalized_email])
+    except Exception as exc:
+        logger.warning("BranchMapping lookup failed for %s: %s", normalized_email, exc)
+        return DIRECTOR_BRANCH_OVERRIDES.get(normalized_email)
+
+    if not results:
+        return None
+
+    return results[0].get("BranchName")
 
 
 # -------------------------
