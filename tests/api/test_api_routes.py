@@ -195,11 +195,15 @@ def test_dropdown_endpoints(monkeypatch):
 
 def test_auth_endpoints(monkeypatch, request_factory):
     module = importlib.import_module("api.auth")
-    captured = {"login": None, "me": None, "logout": None, "refresh": None}
+    captured = {"login": None, "f5_login": None, "me": None, "logout": None, "refresh": None}
 
     async def fake_login(payload, response):
         captured["login"] = (payload, response)
         return {"ok": "login"}
+
+    async def fake_f5_login(payload, response):
+        captured["f5_login"] = (payload, response)
+        return {"ok": "f5_login"}
 
     async def fake_me(request):
         captured["me"] = request
@@ -214,6 +218,7 @@ def test_auth_endpoints(monkeypatch, request_factory):
         return {"ok": "refresh"}
 
     monkeypatch.setattr(module, "login_user", fake_login)
+    monkeypatch.setattr(module, "f5_login_user", fake_f5_login)
     monkeypatch.setattr(module, "get_current_user_from_token", fake_me)
     monkeypatch.setattr(module, "logout_user", fake_logout)
     monkeypatch.setattr(module, "refresh_user_token", fake_refresh)
@@ -222,11 +227,13 @@ def test_auth_endpoints(monkeypatch, request_factory):
     request = request_factory()
 
     assert asyncio.run(module.login(DummyModel({"user": "u"}), response)) == {"ok": "login"}
+    assert asyncio.run(module.f5_login(DummyModel({"user_id": "u"}), response)) == {"ok": "f5_login"}
     assert asyncio.run(module.get_current_user(request)) == {"ok": "me"}
     assert asyncio.run(module.logout(response)) == {"ok": "logout"}
     assert asyncio.run(module.refresh_token(request, response, token="abc")) == {"ok": "refresh"}
 
     assert captured["login"][0] == {"user": "u"}
+    assert captured["f5_login"][0] == {"user_id": "u"}
     assert captured["logout"] is response
     assert captured["refresh"][2] == "abc"
 

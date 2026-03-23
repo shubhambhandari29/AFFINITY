@@ -26,6 +26,10 @@ GROUP_ROLE_PRIORITY = {
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS": ("Underwriter", 3),
 }
 FULL_ROLE_EXCEPTION_EMAIL = "mbond@hanover.com"
+USER_NOT_IN_APP_ERROR = {
+    "error": "User is not part of this application",
+    "code": "USER_NOT_IN_APP",
+}
 
 SESSION_COOKIE_NAME = "session"
 REFRESH_COOKIE_NAME = "refresh_session"
@@ -76,6 +80,45 @@ def _clear_auth_cookies(response: Response) -> None:
     _clear_refresh_cookie(response)
 
 
+def _build_db_user_payload(user_record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": user_record["ID"],
+        "first_name": user_record["FirstName"],
+        "last_name": user_record["LastName"],
+        "email": user_record["Email"],
+        "role": user_record["Role"],
+        "branch": user_record["BranchName"],
+    }
+
+
+def _build_f5_user_payload(user_id: str, role: str | None) -> dict[str, Any]:
+    normalized_user_id = str(user_id).strip()
+    return {
+        "id": normalized_user_id,
+        "first_name": "",
+        "last_name": "",
+        "email": normalized_user_id if "@" in normalized_user_id else "",
+        "role": role,
+        "branch": _resolve_branch_name(normalized_user_id, role),
+    }
+
+
+def _create_login_response(
+    response: Response,
+    *,
+    token_subject: str | int,
+    user: dict[str, Any],
+    refresh_role: str | None = None,
+) -> dict[str, Any]:
+    token = create_access_token(token_subject, user.get("role"))
+    refresh_token = create_refresh_token(token_subject, refresh_role)
+
+    _set_session_cookie(response, token)
+    _set_refresh_cookie(response, refresh_token)
+
+    return {"message": "Sign in successful", "user": user, "token": token}
+
+
 def _get_graph_access_token() -> str:
     try:
         from azure.identity import ManagedIdentityCredential
@@ -93,7 +136,7 @@ def _get_graph_access_token() -> str:
         ) from exc
 
 
-def _get_user_groups_from_graph(email: str) -> list[dict[str, Any]]:
+def _get_user_groups_from_graph(user_id: str) -> list[dict[str, Any]]:
     try:
         import requests
     except ImportError as exc:  # pragma: no cover - runtime dependency guard
@@ -102,7 +145,7 @@ def _get_user_groups_from_graph(email: str) -> list[dict[str, Any]]:
     token = _get_graph_access_token()
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     url = (
-        f"{GRAPH_BASE_URL}/users/{quote(email, safe='')}"
+        f"{GRAPH_BASE_URL}/users/{quote(user_id, safe='')}"
         "/transitiveMemberOf/microsoft.graph.group?$select=id,displayName"
     )
 
@@ -249,44 +292,62 @@ def get_branch_name_by_email(email: str) -> str | None:
 
 async def login_user(login_data: dict[str, Any], response: Response):
     """
-    Validates user by Entra AD group membership via Graph API.
+    Validates user email/password.
     Sets HTTP-only cookie.
     Returns user profile + token.
     """
 
     email = login_data.get("email")
-    if not email:
-        logger.warning("Login attempt with missing email")
-        raise HTTPException(status_code=400, detail={"error": "Missing email"})
+    password = login_data.get("password")
+    if not email or not password:
+        logger.warning("Login attempt with missing data")
+        raise HTTPException(status_code=400, detail={"error": "Missing email or password"})
 
-    groups = _get_user_groups_from_graph(email)
-    role = _normalize_graph_role(email, _resolve_role_from_groups(groups))
-    if not role:
-        logger.warning("Login failed: no SAC role groups matched (%s)", email)
-        raise HTTPException(status_code=401, detail={"error": "User is not authorized"})
-    branch_name = _resolve_branch_name(email, role)
+    user_record = get_user_by_email(email)
+    if not user_record:
+        logger.warning(f"Login failed: user not found ({email})")
+        raise HTTPException(status_code=404, detail={"error": "User not found"})
 
-    # Prepare user payload.
-    user = {
-        "id": email,
-        "first_name": "",
-        "last_name": "",
-        "email": email,
-        "role": role,
-        "branch": branch_name,
-    }
+    stored_password = user_record.get("Password")
+    if stored_password is None or password != str(stored_password):
+        logger.warning(f"Login failed: wrong password ({email})")
+        raise HTTPException(status_code=401, detail={"error": "Wrong password"})
 
-    # Create JWT pair
-    token = create_access_token(user["id"], user.get("role"))
-    refresh_token = create_refresh_token(user["id"], user.get("role"))
-
-    # Set cookies
-    _set_session_cookie(response, token)
-    _set_refresh_cookie(response, refresh_token)
+    user = _build_db_user_payload(user_record)
+    result = _create_login_response(response, token_subject=user["id"], user=user)
 
     logger.info(f"User {email} logged in successfully")
+    return result
 
-    return {"message": "Sign in successful", "user": user, "token": token}
+
+async def f5_login_user(login_data: dict[str, Any], response: Response):
+    """
+    Validates user by Entra AD group membership via Graph API.
+    Sets HTTP-only cookie.
+    Returns user profile + token.
+    """
+
+    user_id = str(login_data.get("user_id") or "").strip()
+    if not user_id:
+        logger.warning("F5 login attempt with missing user_id")
+        raise HTTPException(status_code=400, detail={"error": "Missing user_id"})
+
+    groups = _get_user_groups_from_graph(user_id)
+    role = _normalize_graph_role(user_id, _resolve_role_from_groups(groups))
+    if not role:
+        logger.warning("F5 login failed: no SAC role groups matched (%s)", user_id)
+        raise HTTPException(status_code=403, detail=USER_NOT_IN_APP_ERROR)
+
+    user = _build_f5_user_payload(user_id, role)
+    result = _create_login_response(
+        response,
+        token_subject=user_id,
+        user=user,
+        refresh_role=role,
+    )
+
+    logger.info("User %s logged in successfully via F5", user_id)
+    return result
 
 
 async def get_current_user_from_token(request: Request):
@@ -311,25 +372,10 @@ async def get_current_user_from_token(request: Request):
             user_record = get_user_by_id(int(str(user_id)))
 
         if user_record:
-            user = {
-                "id": user_record["ID"],
-                "first_name": user_record["FirstName"],
-                "last_name": user_record["LastName"],
-                "email": user_record["Email"],
-                "role": user_record["Role"],
-                "branch": user_record["BranchName"],
-            }
+            user = _build_db_user_payload(user_record)
         else:
             role = _normalize_graph_role(str(user_id), payload.get("role"))
-            branch_name = _resolve_branch_name(str(user_id), role)
-            user = {
-                "id": user_id,
-                "first_name": "",
-                "last_name": "",
-                "email": user_id if "@" in str(user_id) else "",
-                "role": role,
-                "branch": branch_name,
-            }
+            user = _build_f5_user_payload(str(user_id), role)
     except Exception as e:
         logger.error(f"Token decode failed: {e}")
         raise HTTPException(status_code=401, detail={"error": "Invalid token"}) from e
