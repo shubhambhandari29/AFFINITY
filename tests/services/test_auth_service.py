@@ -137,7 +137,12 @@ def test_f5_login_user_not_authorized_when_no_sac_groups(monkeypatch):
         )
 
     assert excinfo.value.status_code == 403
-    assert excinfo.value.detail == {"authorized_user": False}
+    assert excinfo.value.detail == {
+        "error": (
+            "You are not an authorized user. For getting access, "
+            "share an email to mbond@hanover.com for next steps."
+        )
+    }
 
 
 def test_f5_login_user_graph_error(monkeypatch):

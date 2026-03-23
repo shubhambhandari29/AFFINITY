@@ -332,7 +332,15 @@ async def f5_login_user(login_data: dict[str, Any], response: Response):
     role = _normalize_graph_role(user_id, _resolve_role_from_groups(groups))
     if not role:
         logger.warning("F5 login failed: no SAC role groups matched (%s)", user_id)
-        raise HTTPException(status_code=403, detail={"authorized_user": False})
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": (
+                    "You are not an authorized user. For getting access, "
+                    "share an email to mbond@hanover.com for next steps."
+                )
+            },
+        )
 
     user = _build_f5_user_payload(user_id, role)
     result = _create_login_response(
