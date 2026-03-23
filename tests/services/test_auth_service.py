@@ -137,10 +137,7 @@ def test_f5_login_user_not_authorized_when_no_sac_groups(monkeypatch):
         )
 
     assert excinfo.value.status_code == 403
-    assert excinfo.value.detail == {
-        "error": "User is not part of this application",
-        "code": "USER_NOT_IN_APP",
-    }
+    assert excinfo.value.detail == {"authorized_user": False}
 
 
 def test_f5_login_user_graph_error(monkeypatch):

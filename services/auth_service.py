@@ -26,10 +26,6 @@ GROUP_ROLE_PRIORITY = {
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS": ("Underwriter", 3),
 }
 FULL_ROLE_EXCEPTION_EMAIL = "mbond@hanover.com"
-USER_NOT_IN_APP_ERROR = {
-    "error": "User is not part of this application",
-    "code": "USER_NOT_IN_APP",
-}
 
 SESSION_COOKIE_NAME = "session"
 REFRESH_COOKIE_NAME = "refresh_session"
@@ -336,7 +332,7 @@ async def f5_login_user(login_data: dict[str, Any], response: Response):
     role = _normalize_graph_role(user_id, _resolve_role_from_groups(groups))
     if not role:
         logger.warning("F5 login failed: no SAC role groups matched (%s)", user_id)
-        raise HTTPException(status_code=403, detail=USER_NOT_IN_APP_ERROR)
+        raise HTTPException(status_code=403, detail={"authorized_user": False})
 
     user = _build_f5_user_payload(user_id, role)
     result = _create_login_response(
