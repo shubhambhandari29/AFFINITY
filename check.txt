@@ -8,6 +8,11 @@ from azure.identity import ManagedIdentityCredential
 
 GRAPH_SCOPE = "https://graph.microsoft.com/.default"
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
+TARGET_GROUPS = {
+    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN",
+    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS",
+    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS",
+}
 
 
 def get_graph_access_token() -> str:
@@ -34,7 +39,7 @@ def get_user_groups(user_id: str, access_token: str) -> list[dict]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fetch all AD groups for a user.")
+    parser = argparse.ArgumentParser(description="Fetch SAC AD groups for a user.")
     parser.add_argument("--user-id", required=True, help="UPN or Entra object ID")
     args = parser.parse_args()
 
@@ -42,7 +47,9 @@ def main() -> None:
     groups = get_user_groups(args.user_id, token)
 
     for g in groups:
-        print(f"{g.get('displayName')}")
+        group_name = str(g.get("displayName") or "").strip()
+        if group_name in TARGET_GROUPS:
+            print(group_name)
 
 
 if __name__ == "__main__":
