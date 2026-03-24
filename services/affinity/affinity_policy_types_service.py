@@ -21,8 +21,9 @@ logger = logging.getLogger(__name__)
 TABLE_NAME = "tblAffinityPolicyType"
 AGENTS_TABLE = "tblAffinityAgents"
 NOT_RETIRED_CONDITION = (
-    f"({TABLE_NAME}.Stage IS NULL OR LOWER(LTRIM(RTRIM({TABLE_NAME}.Stage))) <> 'retired')"
+    f"({TABLE_NAME}.Stage IS NULL OR LOWER(LTRIM(RTRIM({TABLE_NAME}.Stage))) <> 'Retired')"
 )
+
 
 async def _lookup_pk_number(record: dict[str, Any]) -> int | None:
     """
@@ -54,7 +55,7 @@ async def get_affinity_policy_types(query_params: dict[str, Any]):
     try:
         filters: list[str] = []
         params: list[Any] = []
-        for key,value in query_params.items():
+        for key, value in query_params.items():
             _ensure_safe_identifier(key)
             filters.append(f"{TABLE_NAME}.{key} = ?")
             params.append(value)
@@ -188,4 +189,3 @@ async def upsert_affinity_policy_types(data: dict[str, Any]):
     except Exception as e:
         logger.warning(f"Insert/Update failed - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
-    

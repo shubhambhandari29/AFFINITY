@@ -22,9 +22,7 @@ KEY_COLUMNS = ["ProgramName"]
 
 def _exclude_retired_stage(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
-        record
-        for record in records
-        if str(record.get("Stage", "")).strip().lower() != "retired"
+        record for record in records if str(record.get("Stage", "")).strip().lower() != "retired"
     ]
 
 
