@@ -141,7 +141,9 @@ def _get_graph_access_token() -> str:
     try:
         from azure.identity import ManagedIdentityCredential
     except ImportError as exc:  # pragma: no cover - runtime dependency guard
-        raise HTTPException(status_code=500, detail={"error": "Missing dependency: azure-identity"}) from exc
+        raise HTTPException(
+            status_code=500, detail={"error": "Missing dependency: azure-identity"}
+        ) from exc
 
     try:
         credential = ManagedIdentityCredential()
@@ -158,7 +160,9 @@ def _get_user_groups_from_graph(user_id: str) -> list[dict[str, Any]]:
     try:
         import requests
     except ImportError as exc:  # pragma: no cover - runtime dependency guard
-        raise HTTPException(status_code=500, detail={"error": "Missing dependency: requests"}) from exc
+        raise HTTPException(
+            status_code=500, detail={"error": "Missing dependency: requests"}
+        ) from exc
 
     token = _get_graph_access_token()
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
@@ -207,10 +211,9 @@ def _normalize_graph_role(email: str | None, role: str | None) -> str | None:
     roles = [item.strip() for item in str(role or "").split(",") if item.strip()]
     unique_roles = list(dict.fromkeys(roles))
 
-    if (
-        {"Admin", "Director", "Underwriter"}.issubset(set(unique_roles))
-        and normalized_email != FULL_ROLE_EXCEPTION_EMAIL
-    ):
+    if {"Admin", "Director", "Underwriter"}.issubset(
+        set(unique_roles)
+    ) and normalized_email != FULL_ROLE_EXCEPTION_EMAIL:
         unique_roles = [item for item in unique_roles if item != "Underwriter"]
 
     return ",".join(unique_roles) or None

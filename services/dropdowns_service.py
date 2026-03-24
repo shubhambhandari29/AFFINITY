@@ -1,4 +1,3 @@
-
 import logging
 import re
 from functools import partial
@@ -71,8 +70,8 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
     """,
     "LossCtl": """
 SELECT tblLossCtrl.PK_Number, tblLossCtrl.RepName, tblLossCtrl.LCEmail
- FROM tblLossCtrl 
- WHERE (((tblLossCtrl.Active)='Yes')) 
+ FROM tblLossCtrl
+ WHERE (((tblLossCtrl.Active)='Yes'))
  ORDER BY tblLossCtrl.RepName
 """,
     "users": """
@@ -406,9 +405,7 @@ def _delete_dropdown_records(
                 if key_column not in data:
                     raise ValueError(f"{key_column} is required for deletion")
 
-                delete_query = (
-                    f"DELETE FROM {_quote_identifier(table)} WHERE {_quote_identifier(key_column)} = ?"
-                )
+                delete_query = f"DELETE FROM {_quote_identifier(table)} WHERE {_quote_identifier(key_column)} = ?"
                 cursor.execute(delete_query, [data[key_column]])
 
             conn.commit()
@@ -449,9 +446,7 @@ async def _insert_dropdown_records_async(
     table: str,
     records: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    return await run_in_threadpool(
-        partial(_insert_dropdown_records, table=table, records=records)
-    )
+    return await run_in_threadpool(partial(_insert_dropdown_records, table=table, records=records))
 
 
 async def _delete_dropdown_records_async(
@@ -554,7 +549,6 @@ async def upsert_dropdown_values(name: str, rows: list[dict[str, Any]]) -> dict[
                     isinstance(password_value, str) and not password_value.strip()
                 ):
                     row["Password"] = _DEFAULT_USER_PASSWORD
-
         total_count = 0
         if rows_with_pk:
             result = await _merge_upsert_dropdown_records_async(
