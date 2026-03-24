@@ -14,7 +14,6 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerName AS [Customer Name],
             tblAcctSpecial.CustomerNum AS [Customer Number],
             tblAcctSpecial.OnBoardDate AS [On Board Date],
-            tblAcctSpecial.ServLevel AS [Service Level],
             tblAcctSpecial.AcctStatus AS [Account Status]
         FROM tblAcctSpecial
         WHERE tblAcctSpecial.Stage = 'Admin' AND tblAcctSpecial.IsSubmitted = 1
@@ -22,7 +21,6 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerName,
             tblAcctSpecial.CustomerNum,
             tblAcctSpecial.OnBoardDate,
-            tblAcctSpecial.ServLevel,
             tblAcctSpecial.AcctStatus
         ORDER BY tblAcctSpecial.CustomerName;
     """,
@@ -31,7 +29,6 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerNum AS [Customer Number],
             tblAcctSpecial.CustomerName AS [Customer Name],
             tblAcctSpecial.OnBoardDate AS [On Board Date],
-            tblAcctSpecial.ServLevel AS [Service Level],
             tblAcctSpecial.AcctStatus AS [Account Status]
         FROM tblAcctSpecial
         WHERE tblAcctSpecial.Stage = 'Admin' AND tblAcctSpecial.IsSubmitted = 1
@@ -39,7 +36,6 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerNum,
             tblAcctSpecial.CustomerName,
             tblAcctSpecial.OnBoardDate,
-            tblAcctSpecial.ServLevel,
             tblAcctSpecial.AcctStatus
         ORDER BY tblAcctSpecial.CustomerNum;
     """,
@@ -49,7 +45,6 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerNum AS [Customer Number],
             tblAcctSpecial.CustomerName AS [Customer Name],
             tblAcctSpecial.OnBoardDate AS [On Board Date],
-            tblAcctSpecial.ServLevel AS [Service Level],
             tblAcctSpecial.AcctStatus AS [Account Status]
         FROM tblPOLICIES
         INNER JOIN tblAcctSpecial
@@ -60,7 +55,6 @@ SEARCH_QUERIES = {
             tblAcctSpecial.CustomerNum,
             tblAcctSpecial.CustomerName,
             tblAcctSpecial.OnBoardDate,
-            tblAcctSpecial.ServLevel,
             tblAcctSpecial.AcctStatus
         HAVING tblPOLICIES.PolicyNum IS NOT NULL
         ORDER BY tblPOLICIES.PolicyNum;
@@ -111,14 +105,13 @@ SEARCH_QUERIES = {
     "AffiliateName": """
     SELECT tblAffiliates.AffiliateName AS [Affiliate Name],
       tblAcctSpecial.CustomerName AS [Customer Name],
-        tblAcctSpecial.CustomerNum AS [Cust Number],
+        tblAcctSpecial.CustomerNum AS [Customer Number],
           tblAcctSpecial.OnBoardDate,
-            tblAcctSpecial.ServLevel AS [Service Level],
             tblAcctSpecial.AcctStatus AS [Account Status]
               FROM
                 tblAffiliates INNER JOIN tblAcctSpecial
                   ON tblAffiliates.CustomerNum=tblAcctSpecial.CustomerNum
-                    GROUP BY 
+                    GROUP BY
                     tblAffiliates.AffiliateName, tblAcctSpecial.CustomerName, tblAcctSpecial.CustomerNum, tblAcctSpecial.OnBoardDate, tblAcctSpecial.ServLevel, tblAcctSpecial.AcctStatus
                       ORDER BY tblAffiliates.AffiliateName;""",
 }
@@ -135,4 +128,3 @@ async def search_sac_account_records(search_by: str):
     except Exception as e:
         logger.warning(f"Search failed - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
-    

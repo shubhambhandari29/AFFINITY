@@ -1,4 +1,3 @@
-
 import logging
 from typing import Any
 
@@ -39,20 +38,14 @@ async def add_associations(payload: dict[str, Any]):
         parent_account = payload.get("parent_account")
         parent_account = str(parent_account).strip() if parent_account is not None else ""
         if not parent_account:
-            raise HTTPException(
-                status_code=400, detail={"error": "parent_account is required"}
-            )
+            raise HTTPException(status_code=400, detail={"error": "parent_account is required"})
 
         child_accounts = payload.get("child_account")
         if not isinstance(child_accounts, list):
-            raise HTTPException(
-                status_code=400, detail={"error": "child_account must be a list"}
-            )
+            raise HTTPException(status_code=400, detail={"error": "child_account must be a list"})
 
         normalized_children = [
-            child
-            for child in _normalize_children(child_accounts)
-            if child != parent_account
+            child for child in _normalize_children(child_accounts) if child != parent_account
         ]
         if not normalized_children:
             return {"message": "No new associations to add", "count": 0}
@@ -96,20 +89,14 @@ async def delete_associations(payload: dict[str, Any]):
         parent_account = payload.get("parent_account")
         parent_account = str(parent_account).strip() if parent_account is not None else ""
         if not parent_account:
-            raise HTTPException(
-                status_code=400, detail={"error": "parent_account is required"}
-            )
+            raise HTTPException(status_code=400, detail={"error": "parent_account is required"})
 
         child_accounts = payload.get("child_account")
         if not isinstance(child_accounts, list):
-            raise HTTPException(
-                status_code=400, detail={"error": "child_account must be a list"}
-            )
+            raise HTTPException(status_code=400, detail={"error": "child_account must be a list"})
 
         normalized_children = [
-            child
-            for child in _normalize_children(child_accounts)
-            if child != parent_account
+            child for child in _normalize_children(child_accounts) if child != parent_account
         ]
         if not normalized_children:
             return {"message": "No data provided for deletion", "count": 0}
