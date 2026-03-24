@@ -9,3 +9,6 @@ class DeductBillFrequencyEntry(BaseModel):
     CustomerNum: str = Field(..., min_length=1)
     MthNum: int = Field(..., ge=1, le=12)
     RptMth: int | None = None
+
+    class Config:
+        extra = "allow"
