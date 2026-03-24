@@ -21,7 +21,6 @@ class SacAffinityMixedLoadUser(HttpUser):
     wait_time = between(1, 3)
 
     email = os.getenv("SAC_TEST_EMAIL", "mbond@hanover.com")
-    password = os.getenv("SAC_TEST_PASSWORD", "12345678")
     sac_customer_num = os.getenv("SAC_TEST_CUSTOMER_NUM", "LT_CUST_001")
     affinity_program_name = os.getenv("AFF_TEST_PROGRAM_NAME", "LT_PROGRAM_001")
     no_claims_default = 0
@@ -43,7 +42,7 @@ class SacAffinityMixedLoadUser(HttpUser):
     affinity_search_modes = ["ProgramName", "ProducerCode"]
 
     def _login(self) -> None:
-        payload = {"email": self.email, "password": self.password}
+        payload = {"email": self.email}
         headers = {"accept": "application/json", "Content-Type": "application/json"}
         with self.client.post(
             "/auth/login",
