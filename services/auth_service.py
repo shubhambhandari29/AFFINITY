@@ -24,6 +24,7 @@ GROUP_ROLE_PRIORITY = {
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN": ("Admin", 1),
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS": ("Director", 2),
     "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS": ("Underwriter", 3),
+    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_CCT": ("CCT_User", 4),
 }
 FULL_ROLE_EXCEPTION_EMAIL = "mbond@hanover.com"
 
@@ -207,7 +208,7 @@ def _normalize_graph_role(email: str | None, role: str | None) -> str | None:
     unique_roles = list(dict.fromkeys(roles))
 
     if (
-        set(unique_roles) == {"Admin", "Director", "Underwriter"}
+        {"Admin", "Director", "Underwriter"}.issubset(set(unique_roles))
         and normalized_email != FULL_ROLE_EXCEPTION_EMAIL
     ):
         unique_roles = [item for item in unique_roles if item != "Underwriter"]

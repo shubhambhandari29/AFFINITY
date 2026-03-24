@@ -253,6 +253,47 @@ def test_f5_login_user_keeps_underwriter_for_mbond_with_all_three_groups(monkeyp
     assert result["user"]["role"] == "Admin,Director,Underwriter"
 
 
+def test_f5_login_user_returns_cct_role(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "_get_user_groups_from_graph",
+        lambda user_id: [
+            {"id": "4", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_CCT"},
+        ],
+    )
+    monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
+    monkeypatch.setattr(
+        auth_service,
+        "create_refresh_token",
+        lambda user_id, role=None: "refresh-token",
+    )
+    monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
+    monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
+
+    response = Response()
+    result = asyncio.run(auth_service.f5_login_user({"user_id": "a@example.com"}, response))
+
+    assert result["user"]["role"] == "CCT_User"
+
+
+def test_normalize_graph_role_drops_underwriter_when_cct_is_also_present():
+    result = auth_service._normalize_graph_role(
+        "a@example.com",
+        "Admin,Director,Underwriter,CCT_User",
+    )
+
+    assert result == "Admin,Director,CCT_User"
+
+
+def test_normalize_graph_role_keeps_underwriter_for_mbond_when_cct_is_also_present():
+    result = auth_service._normalize_graph_role(
+        "mbond@hanover.com",
+        "Admin,Director,Underwriter,CCT_User",
+    )
+
+    assert result == "Admin,Director,Underwriter,CCT_User"
+
+
 def test_f5_login_user_sets_director_branch_from_mapping(monkeypatch):
     monkeypatch.setattr(
         auth_service,
