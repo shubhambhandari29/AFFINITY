@@ -29,18 +29,24 @@ FULL_ROLE_EXCEPTION_EMAIL = "mbond@hanover.com"
 
 SESSION_COOKIE_NAME = "session"
 REFRESH_COOKIE_NAME = "refresh_session"
-ACCESS_COOKIE_OPTIONS = {
+COOKIE_BASE_OPTIONS = {
     "httponly": True,
     "secure": settings.SECURE_COOKIE,
     "samesite": settings.SAME_SITE,
+}
+ACCESS_COOKIE_OPTIONS = {
+    **COOKIE_BASE_OPTIONS,
     "path": "/",
 }
 REFRESH_COOKIE_OPTIONS = {
-    "httponly": True,
-    "secure": settings.SECURE_COOKIE,
-    "samesite": settings.SAME_SITE,
+    **COOKIE_BASE_OPTIONS,
     "path": "/auth/refresh",
 }
+LEGACY_REFRESH_COOKIE_PATHS = (
+    "/auth/refresh_token",
+    "/auth",
+    "/",
+)
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -64,11 +70,26 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
 
 
 def _clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=SESSION_COOKIE_NAME, path=ACCESS_COOKIE_OPTIONS["path"])
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path=ACCESS_COOKIE_OPTIONS["path"],
+        **COOKIE_BASE_OPTIONS,
+    )
 
 
 def _clear_refresh_cookie(response: Response) -> None:
-    response.delete_cookie(key=REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_OPTIONS["path"])
+    refresh_paths = dict.fromkeys(
+        (
+            REFRESH_COOKIE_OPTIONS["path"],
+            *LEGACY_REFRESH_COOKIE_PATHS,
+        )
+    )
+    for path in refresh_paths:
+        response.delete_cookie(
+            key=REFRESH_COOKIE_NAME,
+            path=path,
+            **COOKIE_BASE_OPTIONS,
+        )
 
 
 def _clear_auth_cookies(response: Response) -> None:

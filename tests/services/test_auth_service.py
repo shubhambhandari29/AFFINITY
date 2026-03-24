@@ -26,6 +26,29 @@ def test_set_and_clear_session_cookie():
     assert auth_service.REFRESH_COOKIE_NAME in headers
 
 
+def test_clear_auth_cookies_clears_refresh_cookie_on_legacy_paths():
+    response = Response()
+
+    auth_service._clear_auth_cookies(response)
+
+    refresh_headers = [
+        value.decode()
+        for key, value in response.raw_headers
+        if key == b"set-cookie" and value.decode().startswith(f"{auth_service.REFRESH_COOKIE_NAME}=")
+    ]
+    refresh_paths = {
+        segment.split("=", 1)[1]
+        for header in refresh_headers
+        for segment in header.split("; ")
+        if segment.startswith("Path=")
+    }
+
+    assert refresh_paths == {
+        auth_service.REFRESH_COOKIE_OPTIONS["path"],
+        *auth_service.LEGACY_REFRESH_COOKIE_PATHS,
+    }
+
+
 def test_login_user_missing_data():
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(auth_service.login_user({"email": "a"}, Response()))
