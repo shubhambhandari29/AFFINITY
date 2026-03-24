@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 # Load .env values
 load_dotenv()
 
+
 def _as_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default

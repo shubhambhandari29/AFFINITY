@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -14,7 +13,6 @@ _DEFAULT_INPUT_FORMATS: tuple[str, ...] = (
     "%d/%m/%Y",
     "%d-%m-%Y",
 )
-
 
 
 def _is_sentinel_date(value: date | datetime) -> bool:
