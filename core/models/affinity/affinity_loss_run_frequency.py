@@ -10,7 +10,7 @@ class AffinityLossRunFrequencyEntry(BaseModel):
     CompDate: Any | None = None
     RptType: Any | None = None
     DelivMeth: Any | None = None
-    NoClaims: Any | None =None
+    NoClaims: Any | None = None
     AdHocReport: Any | None = None
 
     class Config:
