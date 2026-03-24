@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends
 
 from services.auth_service import get_current_user_from_token
 from services.dropdowns_service import (
@@ -8,6 +8,8 @@ from services.dropdowns_service import (
 )
 from services.dropdowns_service import (
     get_dropdown_values as get_dropdown_values_service,
+)
+from services.dropdowns_service import (
     upsert_dropdown_values as upsert_dropdown_values_service,
 )
 
