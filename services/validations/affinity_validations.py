@@ -140,9 +140,7 @@ def validate_affinity_program_payload(payload: dict[str, Any]) -> list[dict[str,
     if _has_value(num_pol):
         parsed = _coerce_number(num_pol)
         if parsed is None or parsed >= 99999:
-            errors.append(
-                _number_error("NumPol", "Invalid Value for Number of Policies")
-            )
+            errors.append(_number_error("NumPol", "Invalid Value for Number of Policies"))
 
     for field in DATE_FIELDS_PROGRAM:
         if _has_value(payload.get(field)) and not _is_valid_date(payload.get(field)):
@@ -188,9 +186,7 @@ def validate_affinity_agent_payload(payload: dict[str, Any]) -> list[dict[str, s
     errors: list[dict[str, str]] = []
 
     if not _has_value(payload.get("ProgramName")):
-        errors.append(
-            _error("ProgramName", "Program Name is required before Agent Details")
-        )
+        errors.append(_error("ProgramName", "Program Name is required before Agent Details"))
 
     for field in PHONE_FIELDS_AGENT:
         if _has_value(payload.get(field)) and not _is_valid_phone(payload.get(field)):
