@@ -52,9 +52,7 @@ class SacAffinityMixedLoadUser(HttpUser):
             catch_response=True,
         ) as response:
             if response.status_code != 200:
-                response.failure(
-                    f"Login failed status={response.status_code} body={response.text}"
-                )
+                response.failure(f"Login failed status={response.status_code} body={response.text}")
                 raise StopUser("Stopping user because login failed.")
             response.success()
 
