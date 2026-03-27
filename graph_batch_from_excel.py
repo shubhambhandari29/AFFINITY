@@ -6,16 +6,15 @@ import pandas as pd
 
 from graph import TARGET_GROUPS, get_graph_access_token, get_user_groups
 
-EXCEL_FILE_NAME = "UW Details.xlsx"
-SHEET_NAME = "sheet1"
+CSV_FILE_NAME = "UW Details.csv"
 EMAIL_COLUMN_NAME = "UW Email"
 
 
-def load_emails_from_excel(file_path: Path) -> list[str]:
-    df = pd.read_excel(file_path, sheet_name=SHEET_NAME)
+def load_emails_from_csv(file_path: Path) -> list[str]:
+    df = pd.read_csv(file_path)
     if EMAIL_COLUMN_NAME not in df.columns:
         raise ValueError(
-            f"Column '{EMAIL_COLUMN_NAME}' not found in sheet '{SHEET_NAME}'. "
+            f"Column '{EMAIL_COLUMN_NAME}' not found in CSV file. "
             f"Available columns: {list(df.columns)}"
         )
 
@@ -29,8 +28,8 @@ def load_emails_from_excel(file_path: Path) -> list[str]:
 
 
 def main() -> None:
-    excel_path = Path(__file__).with_name(EXCEL_FILE_NAME)
-    emails = load_emails_from_excel(excel_path)
+    csv_path = Path(__file__).with_name(CSV_FILE_NAME)
+    emails = load_emails_from_csv(csv_path)
     access_token = get_graph_access_token()
 
     matched_users: list[tuple[str, list[str]]] = []
