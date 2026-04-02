@@ -1,1 +1,61 @@
-ss
+We investigated the `403 Ip Forbidden` issue for:
+
+https://sacplatformpreprd.allmerica.com/
+
+### What we observed:
+
+1. Browser shows:
+
+   * `403 Forbidden`
+   * Response includes F5 indicators (`BigIP`, `MRHSession`, redirect to `/my.policy`)
+     → Request is getting blocked at **F5 (APM)** before reaching the app.
+
+---
+
+### Network findings:
+
+**VDI IP (ipconfig):**
+→ `10.199.1.239`
+
+**DNS:**
+→ Host resolves to `10.207.15.163` (F5 VIP)
+
+**Traceroute:**
+
+```text
+10.199.0.1        (VDI gateway)
+10.207.11.10      (internal network)
+10.207.11.9
+10.207.15.163     (F5)
+```
+
+👉 This shows path:
+VDI (10.199.x.x) → internal network (10.207.x.x) → F5
+
+---
+
+### Note on IP translation:
+
+Traffic from VDI passes through internal network boundaries (gateway/firewall), where source IP gets translated or routed.
+So although the VDI IP is `10.199.x.x`, F5 actually sees the request coming from **10.207.x.x**.
+
+---
+
+### What this suggests:
+
+F5 is likely evaluating access based on the **10.207.x.x network**, but that subnet does not seem to be allowlisted / included in the APM policy or ACL for this application.
+
+---
+
+### What to check:
+
+1. Which client IP F5 is evaluating (original vs translated)
+2. Whether **10.207.x.x subnet** is included in allowlist / datagroup
+3. APM session logs → exact deny reason (IP restriction / ACL / policy branch)
+4. Correct policy/resource mapping for `sacplatformpreprd` hostname
+
+---
+
+### Summary:
+
+Request is not reaching Azure/app layer — it is being denied at F5 level due to likely network/IP allowlist mismatch (10.199 vs 10.207 path).
