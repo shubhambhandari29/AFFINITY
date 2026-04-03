@@ -207,14 +207,18 @@ def _resolve_role_from_groups(groups: list[dict[str, Any]]) -> str | None:
 
 
 def _normalize_graph_role(email: str | None, role: str | None) -> str | None:
-    normalized_email = str(email or "").strip().lower()
     roles = [item.strip() for item in str(role or "").split(",") if item.strip()]
     unique_roles = list(dict.fromkeys(roles))
 
-    if {"Admin", "Director", "Underwriter"}.issubset(
-        set(unique_roles)
-    ) and normalized_email != FULL_ROLE_EXCEPTION_EMAIL:
-        unique_roles = [item for item in unique_roles if item != "Underwriter"]
+    # Keep the full role set returned by Graph.
+    # Previous logic intentionally removed "Underwriter" for non-mbond users
+    # when Admin, Director, and Underwriter were all present.
+    #
+    # normalized_email = str(email or "").strip().lower()
+    # if {"Admin", "Director", "Underwriter"}.issubset(
+    #     set(unique_roles)
+    # ) and normalized_email != FULL_ROLE_EXCEPTION_EMAIL:
+    #     unique_roles = [item for item in unique_roles if item != "Underwriter"]
 
     return ",".join(unique_roles) or None
 

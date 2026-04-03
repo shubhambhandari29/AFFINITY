@@ -257,7 +257,7 @@ def test_f5_login_user_role_priority_and_cookie_flow(monkeypatch):
     assert result["message"] == "Sign in successful"
     assert result["token"] == "token"
     assert result["user"]["email"] == "a@example.com"
-    assert result["user"]["role"] == "Admin,Director"
+    assert result["user"]["role"] == "Admin,Director,Underwriter"
 
 
 def test_f5_login_user_keeps_underwriter_for_mbond_with_all_three_groups(monkeypatch):
@@ -328,13 +328,13 @@ def test_f5_login_user_returns_cct_role(monkeypatch):
     assert result["user"]["role"] == "CCT_User"
 
 
-def test_normalize_graph_role_drops_underwriter_when_cct_is_also_present():
+def test_normalize_graph_role_keeps_underwriter_when_cct_is_also_present():
     result = auth_service._normalize_graph_role(
         "a@example.com",
         "Admin,Director,Underwriter,CCT_User",
     )
 
-    assert result == "Admin,Director,CCT_User"
+    assert result == "Admin,Director,Underwriter,CCT_User"
 
 
 def test_normalize_graph_role_keeps_underwriter_for_mbond_when_cct_is_also_present():
@@ -458,7 +458,7 @@ def test_get_current_user_from_token_success_graph_path(monkeypatch):
 
     result = asyncio.run(auth_service.get_current_user_from_token(request))
     assert result["user"]["email"] == "a@example.com"
-    assert result["user"]["role"] == "Admin,Director"
+    assert result["user"]["role"] == "Admin,Director,Underwriter"
     assert result["user"]["branch"] is None
 
 
@@ -595,7 +595,7 @@ def test_refresh_user_token_success_graph_path(monkeypatch):
 
     result = asyncio.run(auth_service.refresh_user_token(request, response, token=None))
     assert result == {"message": "Token refreshed", "token": "newtoken"}
-    assert captured["role"] == "Admin,Director"
+    assert captured["role"] == "Admin,Director,Underwriter"
 
 
 def test_refresh_user_token_keeps_underwriter_for_mbond(monkeypatch):
