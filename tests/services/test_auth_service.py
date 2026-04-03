@@ -139,15 +139,47 @@ def test_login_user_valid_password(monkeypatch):
     assert captured["refresh_cookie"] == "refresh-token"
 
 
-def test_f5_login_user_missing_user_id():
+def test_f5_login_user_missing_user():
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(auth_service.f5_login_user({}, Response()))
 
     assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == {"error": "Missing user_id"}
+    assert excinfo.value.detail == {"error": "Missing user"}
+
+
+def test_get_email_by_user_identifier_returns_email(monkeypatch):
+    captured = {}
+
+    def fake_run_raw_query(query, params):
+        captured["query"] = query
+        captured["params"] = params
+        return [{"Email": "a@example.com"}]
+
+    monkeypatch.setattr(auth_service, "run_raw_query", fake_run_raw_query)
+
+    result = auth_service.get_email_by_user_identifier("MRM468")
+
+    assert result == "a@example.com"
+    assert "LOWER(UserID) = ?" in captured["query"]
+    assert captured["params"] == ["mrm468"]
+
+
+def test_f5_login_user_returns_404_when_email_not_found(monkeypatch):
+    monkeypatch.setattr(auth_service, "get_email_by_user_identifier", lambda user_id: None)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(auth_service.f5_login_user({"user": "MRM468", "groups": []}, Response()))
+
+    assert excinfo.value.status_code == 404
+    assert excinfo.value.detail == {"error": "User email not found for provided user id"}
 
 
 def test_f5_login_user_not_authorized_when_no_sac_groups(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "get_email_by_user_identifier",
+        lambda user_id: "a@example.com",
+    )
     monkeypatch.setattr(
         auth_service,
         "_get_user_groups_from_graph",
@@ -156,7 +188,7 @@ def test_f5_login_user_not_authorized_when_no_sac_groups(monkeypatch):
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
-            auth_service.f5_login_user({"user_id": "a@example.com"}, Response())
+            auth_service.f5_login_user({"user": "MRM468", "groups": []}, Response())
         )
 
     assert excinfo.value.status_code == 403
@@ -172,17 +204,27 @@ def test_f5_login_user_graph_error(monkeypatch):
     def fake_get_groups(user_id):
         raise HTTPException(status_code=404, detail={"error": "User not found in Entra ID"})
 
+    monkeypatch.setattr(
+        auth_service,
+        "get_email_by_user_identifier",
+        lambda user_id: "a@example.com",
+    )
     monkeypatch.setattr(auth_service, "_get_user_groups_from_graph", fake_get_groups)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
-            auth_service.f5_login_user({"user_id": "a@example.com"}, Response())
+            auth_service.f5_login_user({"user": "MRM468", "groups": []}, Response())
         )
 
     assert excinfo.value.status_code == 404
 
 
 def test_f5_login_user_role_priority_and_cookie_flow(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "get_email_by_user_identifier",
+        lambda user_id: "a@example.com",
+    )
     monkeypatch.setattr(
         auth_service,
         "_get_user_groups_from_graph",
@@ -210,7 +252,7 @@ def test_f5_login_user_role_priority_and_cookie_flow(monkeypatch):
     )
 
     response = Response()
-    result = asyncio.run(auth_service.f5_login_user({"user_id": "a@example.com"}, response))
+    result = asyncio.run(auth_service.f5_login_user({"user": "MRM468", "groups": []}, response))
 
     assert result["message"] == "Sign in successful"
     assert result["token"] == "token"
@@ -219,6 +261,11 @@ def test_f5_login_user_role_priority_and_cookie_flow(monkeypatch):
 
 
 def test_f5_login_user_keeps_underwriter_for_mbond_with_all_three_groups(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "get_email_by_user_identifier",
+        lambda user_id: "mbond@hanover.com",
+    )
     monkeypatch.setattr(
         auth_service,
         "_get_user_groups_from_graph",
@@ -247,13 +294,18 @@ def test_f5_login_user_keeps_underwriter_for_mbond_with_all_three_groups(monkeyp
 
     response = Response()
     result = asyncio.run(
-        auth_service.f5_login_user({"user_id": "mbond@hanover.com"}, response)
+        auth_service.f5_login_user({"user": "MBOND", "groups": []}, response)
     )
 
     assert result["user"]["role"] == "Admin,Director,Underwriter"
 
 
 def test_f5_login_user_returns_cct_role(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "get_email_by_user_identifier",
+        lambda user_id: "a@example.com",
+    )
     monkeypatch.setattr(
         auth_service,
         "_get_user_groups_from_graph",
@@ -271,7 +323,7 @@ def test_f5_login_user_returns_cct_role(monkeypatch):
     monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
 
     response = Response()
-    result = asyncio.run(auth_service.f5_login_user({"user_id": "a@example.com"}, response))
+    result = asyncio.run(auth_service.f5_login_user({"user": "MRM468", "groups": []}, response))
 
     assert result["user"]["role"] == "CCT_User"
 
@@ -297,6 +349,11 @@ def test_normalize_graph_role_keeps_underwriter_for_mbond_when_cct_is_also_prese
 def test_f5_login_user_sets_director_branch_from_mapping(monkeypatch):
     monkeypatch.setattr(
         auth_service,
+        "get_email_by_user_identifier",
+        lambda user_id: "mdeluca@hanover.com",
+    )
+    monkeypatch.setattr(
+        auth_service,
         "_get_user_groups_from_graph",
         lambda user_id: [
             {"id": "2", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"},
@@ -318,7 +375,7 @@ def test_f5_login_user_sets_director_branch_from_mapping(monkeypatch):
 
     response = Response()
     result = asyncio.run(
-        auth_service.f5_login_user({"user_id": "mdeluca@hanover.com"}, response)
+        auth_service.f5_login_user({"user": "MDELUCA", "groups": []}, response)
     )
 
     assert result["user"]["role"] == "Director"
@@ -326,6 +383,11 @@ def test_f5_login_user_sets_director_branch_from_mapping(monkeypatch):
 
 
 def test_f5_login_user_sets_all_branch_from_mapping(monkeypatch):
+    monkeypatch.setattr(
+        auth_service,
+        "get_email_by_user_identifier",
+        lambda user_id: "mbond@hanover.com",
+    )
     monkeypatch.setattr(
         auth_service,
         "_get_user_groups_from_graph",
@@ -349,7 +411,7 @@ def test_f5_login_user_sets_all_branch_from_mapping(monkeypatch):
 
     response = Response()
     result = asyncio.run(
-        auth_service.f5_login_user({"user_id": "mbond@hanover.com"}, response)
+        auth_service.f5_login_user({"user": "MBOND", "groups": []}, response)
     )
 
     assert result["user"]["role"] == "Director"

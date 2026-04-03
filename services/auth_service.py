@@ -283,6 +283,33 @@ def get_user_by_id(user_id: int) -> dict[str, Any] | None:
     return None
 
 
+def get_email_by_user_identifier(user_identifier: str) -> str | None:
+    normalized_user_identifier = str(user_identifier or "").strip().lower()
+    if not normalized_user_identifier:
+        return None
+
+    query = """
+        SELECT TOP 1 Email
+        FROM tblUsers
+        WHERE active = 1 AND LOWER(UserID) = ?
+    """
+
+    try:
+        results = run_raw_query(query, [normalized_user_identifier])
+    except Exception as exc:
+        logger.error("DB error fetching email by UserID %s: %s", user_identifier, exc)
+        raise
+
+    if not results:
+        return None
+
+    email = results[0].get("Email")
+    if not email:
+        return None
+
+    return str(email).strip()
+
+
 def get_branch_name_by_email(email: str) -> str | None:
     normalized_email = str(email or "").strip().lower()
     if not normalized_email:
@@ -348,15 +375,23 @@ async def f5_login_user(login_data: dict[str, Any], response: Response):
     Returns user profile + token.
     """
 
-    user_id = str(login_data.get("user_id") or "").strip()
-    if not user_id:
-        logger.warning("F5 login attempt with missing user_id")
-        raise HTTPException(status_code=400, detail={"error": "Missing user_id"})
+    user_identifier = str(login_data.get("user") or "").strip()
+    if not user_identifier:
+        logger.warning("F5 login attempt with missing user")
+        raise HTTPException(status_code=400, detail={"error": "Missing user"})
 
-    groups = _get_user_groups_from_graph(user_id)
-    role = _normalize_graph_role(user_id, _resolve_role_from_groups(groups))
+    email = get_email_by_user_identifier(user_identifier)
+    if not email:
+        logger.warning("F5 login failed: no email found for UserID %s", user_identifier)
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "User email not found for provided user id"},
+        )
+
+    groups = _get_user_groups_from_graph(email)
+    role = _normalize_graph_role(email, _resolve_role_from_groups(groups))
     if not role:
-        logger.warning("F5 login failed: no SAC role groups matched (%s)", user_id)
+        logger.warning("F5 login failed: no SAC role groups matched (%s)", email)
         raise HTTPException(
             status_code=403,
             detail={
@@ -367,15 +402,15 @@ async def f5_login_user(login_data: dict[str, Any], response: Response):
             },
         )
 
-    user = _build_f5_user_payload(user_id, role)
+    user = _build_f5_user_payload(email, role)
     result = _create_login_response(
         response,
-        token_subject=user_id,
+        token_subject=email,
         user=user,
         refresh_role=role,
     )
 
-    logger.info("User %s logged in successfully via F5", user_id)
+    logger.info("User %s resolved to %s and logged in successfully via F5", user_identifier, email)
     return result
 
 

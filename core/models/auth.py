@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict, EmailStr
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class LoginRequest(BaseModel):
@@ -7,5 +9,6 @@ class LoginRequest(BaseModel):
 
 
 class F5LoginRequest(BaseModel):
-    user_id: str
+    user: str
+    groups: list[Any] = Field(default_factory=list)
     model_config = ConfigDict(extra="allow")
