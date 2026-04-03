@@ -10,5 +10,5 @@ class LoginRequest(BaseModel):
 
 class F5LoginRequest(BaseModel):
     user: str
-    groups: list[Any] = Field(default_factory=list)
+    groups: Any = None
     model_config = ConfigDict(extra="allow")
