@@ -1,30 +1,47 @@
-{
-  "email_candidates": [
-    "SH1BHANDARI@HANOVER.COM",
-    "SXB640@HANOVER2.onmicrosoft.com",
-    "SXB640@hanover.com"
-  ],
-  "lookup_input": "sh1bhandari@hanover.com",
-  "resolved_email": "SH1BHANDARI@HANOVER.COM",
-  "user": {
-    "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users(id,displayName,givenName,surname,mail,userPrincipalName,otherMails,proxyAddresses,accountEnabled,jobTitle,department,officeLocation,mobilePhone,businessPhones)/$entity",
-    "accountEnabled": true,
-    "businessPhones": [],
-    "department": "Claims Analytics",
-    "displayName": "BHANDARI, SHUBHAM",
-    "givenName": "SHUBHAM",
-    "id": "ae5c5535-0605-4ed4-88a6-06c0c12bd16e",
-    "jobTitle": "EXL CONSULTANTS",
-    "mail": "SH1BHANDARI@HANOVER.COM",
-    "mobilePhone": null,
-    "officeLocation": null,
-    "otherMails": [],
-    "proxyAddresses": [
-      "smtp:SXB640@HANOVER2.onmicrosoft.com",
-      "smtp:SXB640@hanover.com",
-      "SMTP:SH1BHANDARI@HANOVER.COM"
-    ],
-    "surname": "BHANDARI",
-    "userPrincipalName": "SH1BHANDARI@HANOVER.COM"
-  }
-}
+BEGIN TRAN;
+
+-- 1) Add UserID column if it does not already exist
+IF COL_LENGTH('dbo.tblUsers', 'UserID') IS NULL
+BEGIN
+    ALTER TABLE dbo.tblUsers
+    ADD UserID VARCHAR(20) NULL;
+END;
+
+-- 2) Remove duplicate/wrong rows
+DELETE FROM dbo.tblUsers
+WHERE ID IN (109, 110);
+
+-- 3) Update remaining rows with correct Email + UserID
+;WITH Src AS
+(
+    SELECT *
+    FROM (VALUES
+        (102, 'mdeluca@hanover.com',  'MAD039'),  -- Marc De Luca
+        (103, 'scarruth@hanover.com', 'SAZ'),     -- Sharon Carruth
+        (104, 'rleal@hanover.com',    'RDL344'),  -- Rob Leal
+        (105, 'STSCOTT@HANOVER.COM',  'SFS972'),  -- Stuart Scott
+        (106, 'mbond@hanover.com',    'MRM468'),  -- Michelle Bond
+        (107, 'wdepaolo@hanover.com', 'WJD742'),  -- Walter DePaolo
+        (108, 'jhoule@hanover.com',   'JLH675'),  -- Jenna Houle
+        (111, 'CSEITZ@HANOVER.COM',   'COS'),     -- Carol Seitz
+        (113, 'BPAINTER@hanover.com', 'BXP701')   -- Brenda Painter
+    ) AS v(ID, NewEmail, NewUserID)
+)
+UPDATE u
+SET
+    u.Email = s.NewEmail,
+    u.UserID = s.NewUserID
+FROM dbo.tblUsers u
+JOIN Src s
+    ON u.ID = s.ID
+WHERE
+       ISNULL(u.Email, '') <> s.NewEmail
+    OR ISNULL(u.UserID, '') <> s.NewUserID;
+
+-- 4) Verify
+SELECT ID, FirstName, LastName, Email, UserID
+FROM dbo.tblUsers
+WHERE ID IN (102,103,104,105,106,107,108,111,113)
+ORDER BY ID;
+
+COMMIT;
