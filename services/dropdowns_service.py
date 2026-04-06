@@ -75,7 +75,7 @@ SELECT tblLossCtrl.PK_Number, tblLossCtrl.RepName, tblLossCtrl.LCEmail
  ORDER BY tblLossCtrl.RepName
 """,
     "users": """
-        SELECT ID, FirstName, LastName, Email, Role, BranchName, Active
+        SELECT ID, FirstName, LastName, Email, Role, Active
         FROM tblUsers
         ORDER BY FirstName, LastName, Email
     """,
@@ -140,7 +140,7 @@ _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
     "users": {
         "table": "tblUsers",
         "primary_key": "ID",
-        "columns": ["FirstName", "LastName", "Email", "Password", "Role", "BranchName", "Active"],
+        "columns": ["FirstName", "LastName", "Email", "Password", "Role", "Active"],
     },
 }
 

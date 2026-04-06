@@ -99,13 +99,14 @@ def _clear_auth_cookies(response: Response) -> None:
 
 
 def _build_db_user_payload(user_record: dict[str, Any]) -> dict[str, Any]:
+    email = str(user_record.get("Email") or "").strip()
     return {
         "id": user_record["ID"],
         "first_name": user_record["FirstName"],
         "last_name": user_record["LastName"],
-        "email": user_record["Email"],
+        "email": email,
         "role": user_record["Role"],
-        "branch": user_record["BranchName"],
+        "branch": get_branch_name_by_email(email),
     }
 
 

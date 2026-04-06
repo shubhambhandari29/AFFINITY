@@ -104,7 +104,7 @@ def test_get_dropdown_values_all_and_query_and_dynamic(monkeypatch):
 
     result = asyncio.run(dropdowns_service.get_dropdown_values("users"))
     assert "FROM tblUsers" in result[0]["query"]
-    assert "SELECT ID, FirstName, LastName, Email, Role, BranchName, Active" in result[0]["query"]
+    assert "SELECT ID, FirstName, LastName, Email, Role, Active" in result[0]["query"]
 
     result = asyncio.run(dropdowns_service.get_dropdown_values("Unknown"))
     assert result == [{"dynamic": "Unknown"}]
@@ -201,7 +201,6 @@ def test_upsert_dropdown_values_users_default_password_on_insert(monkeypatch):
                 "Email": "Email",
                 "Password": "Password",
                 "Role": "Role",
-                "BranchName": "BranchName",
                 "Active": "Active",
             },
         ),

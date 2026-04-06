@@ -79,7 +79,6 @@ def test_login_user_wrong_password(monkeypatch):
             "LastName": "B",
             "Email": email,
             "Role": "User",
-            "BranchName": "HQ",
             "Password": "stored-password",
         },
     )
@@ -105,10 +104,10 @@ def test_login_user_valid_password(monkeypatch):
             "LastName": "B",
             "Email": email,
             "Role": "User",
-            "BranchName": "HQ",
             "Password": "legacy",
         },
     )
+    monkeypatch.setattr(auth_service, "get_branch_name_by_email", lambda email: "HQ")
     monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
     monkeypatch.setattr(
         auth_service,
@@ -135,6 +134,7 @@ def test_login_user_valid_password(monkeypatch):
     assert result["token"] == "token"
     assert result["user"]["email"] == "a@example.com"
     assert result["user"]["role"] == "User"
+    assert result["user"]["branch"] == "HQ"
     assert captured["session_cookie"] == "token"
     assert captured["refresh_cookie"] == "refresh-token"
 
@@ -429,9 +429,9 @@ def test_get_current_user_from_token_success_db_path(monkeypatch):
             "LastName": "B",
             "Email": "a@example.com",
             "Role": "User",
-            "BranchName": "HQ",
         },
     )
+    monkeypatch.setattr(auth_service, "get_branch_name_by_email", lambda email: "HQ")
 
     request = Request({"type": "http", "headers": [], "query_string": b""})
     request._cookies = {auth_service.SESSION_COOKIE_NAME: "token"}
@@ -439,6 +439,7 @@ def test_get_current_user_from_token_success_db_path(monkeypatch):
     result = asyncio.run(auth_service.get_current_user_from_token(request))
     assert result["user"]["email"] == "a@example.com"
     assert result["user"]["role"] == "User"
+    assert result["user"]["branch"] == "HQ"
 
 
 def test_get_current_user_from_token_success_graph_path(monkeypatch):
