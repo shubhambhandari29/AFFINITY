@@ -129,3 +129,53 @@ const authSlice = createSlice({
 
 export const { setAccessToken, logout, updateUser } = authSlice.actions;
 export default authSlice.reducer;
+
+
+
+------------------server.js---------------
+
+
+
+
+
+
+const express = require("express");
+const path = require("path");
+const app = express();
+
+/**
+ * 1. THE ECHO API ENDPOINT
+ * This is the "Intercom" React will call to ask for the F5 headers.
+ */
+app.get("/api/user_info", (req, res) => {
+  // Return the data as a clean JSON object
+  res.json({
+    user: req.header("username") || "",
+    groups: req.header("groups") || "",
+  });
+});
+
+/**
+ * 2. SERVE STATIC FILES
+ */
+const buildPath = path.join(__dirname, "build");
+app.use(express.static(buildPath));
+
+/**
+ * 3. SPA ROUTING SUPPORT
+ * If a user refreshes the page on a route like /profile,
+ * this ensures they get index.html instead of a 404.
+ */
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(buildPath, "index.html"));
+});
+
+/**
+ * 4. START THE SERVER
+ * Azure App Service automatically assigns a PORT via environment variables.
+ */
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
