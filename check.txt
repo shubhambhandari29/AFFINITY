@@ -1,47 +1,131 @@
-BEGIN TRAN;
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import api from "../api/api";
+export const ENV = process.env.REACT_APP_ENV;
 
--- 1) Add UserID column if it does not already exist
-IF COL_LENGTH('dbo.tblUsers', 'UserID') IS NULL
-BEGIN
-    ALTER TABLE dbo.tblUsers
-    ADD UserID VARCHAR(20) NULL;
-END;
+export const loginThunk = createAsyncThunk(
+  "auth/login",
+  async (credentials, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(
+        `/auth/${ENV === "local" ? "login" : "F5_login"}`,
+        credentials,
+      );
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.detail || "Login failed");
+    }
+  },
+);
 
--- 2) Remove duplicate/wrong rows
-DELETE FROM dbo.tblUsers
-WHERE ID IN (109, 110);
+export const fetchCurrentUser = createAsyncThunk(
+  "auth/me",
+  async (_, { rejectWithValue }) => {
+    try {
+      // call the backend to validate cookie & return user info
+      const { data } = await api.get("/auth/me", { withCredentials: true });
+      return data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.detail || "Failed to fetch user",
+      );
+    }
+  },
+);
 
--- 3) Update remaining rows with correct Email + UserID
-;WITH Src AS
-(
-    SELECT *
-    FROM (VALUES
-        (102, 'mdeluca@hanover.com',  'MAD039'),  -- Marc De Luca
-        (103, 'scarruth@hanover.com', 'SAZ'),     -- Sharon Carruth
-        (104, 'rleal@hanover.com',    'RDL344'),  -- Rob Leal
-        (105, 'STSCOTT@HANOVER.COM',  'SFS972'),  -- Stuart Scott
-        (106, 'mbond@hanover.com',    'MRM468'),  -- Michelle Bond
-        (107, 'wdepaolo@hanover.com', 'WJD742'),  -- Walter DePaolo
-        (108, 'jhoule@hanover.com',   'JLH675'),  -- Jenna Houle
-        (111, 'CSEITZ@HANOVER.COM',   'COS'),     -- Carol Seitz
-        (113, 'BPAINTER@hanover.com', 'BXP701')   -- Brenda Painter
-    ) AS v(ID, NewEmail, NewUserID)
-)
-UPDATE u
-SET
-    u.Email = s.NewEmail,
-    u.UserID = s.NewUserID
-FROM dbo.tblUsers u
-JOIN Src s
-    ON u.ID = s.ID
-WHERE
-       ISNULL(u.Email, '') <> s.NewEmail
-    OR ISNULL(u.UserID, '') <> s.NewUserID;
+export const refreshTokenThunk = createAsyncThunk(
+  "auth/refresh",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/auth/refresh");
+      return data.token;
+    } catch (err) {
+      return rejectWithValue("Refresh failed");
+    }
+  },
+);
 
--- 4) Verify
-SELECT ID, FirstName, LastName, Email, UserID
-FROM dbo.tblUsers
-WHERE ID IN (102,103,104,105,106,107,108,111,113)
-ORDER BY ID;
+export const logoutThunk = createAsyncThunk("auth/logout", async () => {
+  try {
+    await api.post("/auth/logout");
+  } catch {}
+});
 
-COMMIT;
+const authSlice = createSlice({
+  name: "auth",
+  initialState: {
+    user: null,
+    accessToken: null,
+    status: "idle",
+    error: null,
+  },
+  reducers: {
+    setAccessToken: (state, action) => {
+      state.accessToken = action.payload;
+    },
+    logout: (state) => {
+      state.user = null;
+      state.accessToken = null;
+      state.status = "idle";
+    },
+    updateUser: (state, action) => {
+      state.user = action.payload;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(loginThunk.pending, (state) => {
+        state.status = "loggingin";
+      })
+      .addCase(loginThunk.fulfilled, (state, action) => {
+        state.user = {
+          ...action.payload.user,
+          currentRole: action.payload.user.role.split(",")[0],
+        };
+        state.accessToken = action.payload.token;
+        state.error = null;
+        state.status = "idle";
+      })
+      .addCase(loginThunk.rejected, (state, action) => {
+        state.error = action.payload;
+        state.status = "idle";
+      })
+      .addCase(fetchCurrentUser.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(fetchCurrentUser.fulfilled, (state, action) => {
+        state.user = {
+          ...action.payload.user,
+          currentRole: action.payload.user.role.split(",")[0],
+        };
+        state.accessToken = action.payload.token;
+        state.error = null;
+        state.status = "idle";
+      })
+      .addCase(fetchCurrentUser.rejected, (state, action) => {
+        state.status = "idle";
+      })
+      .addCase(refreshTokenThunk.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(refreshTokenThunk.fulfilled, (state, action) => {
+        state.accessToken = action.payload;
+        state.status = "idle";
+      })
+      .addCase(refreshTokenThunk.rejected, (state) => {
+        state.status = "idle";
+        state.accessToken = null;
+        state.user = null;
+      })
+      .addCase(logoutThunk.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(logoutThunk.fulfilled, (state) => {
+        state.user = null;
+        state.accessToken = null;
+        state.status = "idle";
+      });
+  },
+});
+
+export const { setAccessToken, logout, updateUser } = authSlice.actions;
+export default authSlice.reducer;
