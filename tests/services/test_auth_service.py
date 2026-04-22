@@ -26,7 +26,7 @@ def test_set_and_clear_session_cookie():
     assert auth_service.REFRESH_COOKIE_NAME in headers
 
 
-def test_clear_auth_cookies_clears_refresh_cookie_on_legacy_paths():
+def test_clear_auth_cookies_clears_refresh_cookie_on_refresh_path():
     response = Response()
 
     auth_service._clear_auth_cookies(response)
@@ -34,7 +34,8 @@ def test_clear_auth_cookies_clears_refresh_cookie_on_legacy_paths():
     refresh_headers = [
         value.decode()
         for key, value in response.raw_headers
-        if key == b"set-cookie" and value.decode().startswith(f"{auth_service.REFRESH_COOKIE_NAME}=")
+        if key == b"set-cookie"
+        and value.decode().startswith(f"{auth_service.REFRESH_COOKIE_NAME}=")
     ]
     refresh_paths = {
         segment.split("=", 1)[1]
@@ -43,10 +44,7 @@ def test_clear_auth_cookies_clears_refresh_cookie_on_legacy_paths():
         if segment.startswith("Path=")
     }
 
-    assert refresh_paths == {
-        auth_service.REFRESH_COOKIE_OPTIONS["path"],
-        *auth_service.LEGACY_REFRESH_COOKIE_PATHS,
-    }
+    assert refresh_paths == {auth_service.REFRESH_COOKIE_OPTIONS["path"]}
 
 
 def test_login_user_missing_data():
@@ -147,48 +145,21 @@ def test_f5_login_user_missing_user():
     assert excinfo.value.detail == {"error": "Missing user"}
 
 
-def test_get_email_by_user_identifier_returns_email(monkeypatch):
-    captured = {}
-
-    def fake_run_raw_query(query, params):
-        captured["query"] = query
-        captured["params"] = params
-        return [{"Email": "a@example.com"}]
-
-    monkeypatch.setattr(auth_service, "run_raw_query", fake_run_raw_query)
-
-    result = auth_service.get_email_by_user_identifier("MRM468")
-
-    assert result == "a@example.com"
-    assert "LOWER(UserID) = ?" in captured["query"]
-    assert captured["params"] == ["mrm468"]
-
-
-def test_f5_login_user_returns_404_when_email_not_found(monkeypatch):
-    monkeypatch.setattr(auth_service, "get_email_by_user_identifier", lambda user_id: None)
-
+def test_f5_login_user_invalid_groups_payload():
     with pytest.raises(HTTPException) as excinfo:
-        asyncio.run(auth_service.f5_login_user({"user": "MRM468", "groups": []}, Response()))
+        asyncio.run(auth_service.f5_login_user({"user": "MRM468", "groups": "bad"}, Response()))
 
-    assert excinfo.value.status_code == 404
-    assert excinfo.value.detail == {"error": "User email not found for provided user id"}
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == {"error": "Invalid groups"}
 
 
-def test_f5_login_user_not_authorized_when_no_sac_groups(monkeypatch):
-    monkeypatch.setattr(
-        auth_service,
-        "get_email_by_user_identifier",
-        lambda user_id: "a@example.com",
-    )
-    monkeypatch.setattr(
-        auth_service,
-        "_get_user_groups_from_graph",
-        lambda user_id: [{"id": "x", "displayName": "SomeOtherGroup"}],
-    )
-
+def test_f5_login_user_not_authorized_when_no_sac_groups():
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
-            auth_service.f5_login_user({"user": "MRM468", "groups": []}, Response())
+            auth_service.f5_login_user(
+                {"user": "MRM468", "groups": ["SomeOtherGroup"]},
+                Response(),
+            )
         )
 
     assert excinfo.value.status_code == 403
@@ -200,45 +171,19 @@ def test_f5_login_user_not_authorized_when_no_sac_groups(monkeypatch):
     }
 
 
-def test_f5_login_user_graph_error(monkeypatch):
-    def fake_get_groups(user_id):
-        raise HTTPException(status_code=404, detail={"error": "User not found in Entra ID"})
-
-    monkeypatch.setattr(
-        auth_service,
-        "get_email_by_user_identifier",
-        lambda user_id: "a@example.com",
-    )
-    monkeypatch.setattr(auth_service, "_get_user_groups_from_graph", fake_get_groups)
-
-    with pytest.raises(HTTPException) as excinfo:
-        asyncio.run(
-            auth_service.f5_login_user({"user": "MRM468", "groups": []}, Response())
-        )
-
-    assert excinfo.value.status_code == 404
-
-
 def test_f5_login_user_role_priority_and_cookie_flow(monkeypatch):
+    captured = {"access": None, "refresh": None}
+
     monkeypatch.setattr(
         auth_service,
-        "get_email_by_user_identifier",
-        lambda user_id: "a@example.com",
+        "create_access_token",
+        lambda user_id, role: captured.__setitem__("access", (user_id, role)) or "token",
     )
-    monkeypatch.setattr(
-        auth_service,
-        "_get_user_groups_from_graph",
-        lambda user_id: [
-            {"id": "1", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"},
-            {"id": "2", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN"},
-            {"id": "3", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS"},
-        ],
-    )
-    monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
     monkeypatch.setattr(
         auth_service,
         "create_refresh_token",
-        lambda user_id, role=None: "refresh-token",
+        lambda user_id, role=None: captured.__setitem__("refresh", (user_id, role))
+        or "refresh-token",
     )
     monkeypatch.setattr(
         auth_service,
@@ -252,29 +197,30 @@ def test_f5_login_user_role_priority_and_cookie_flow(monkeypatch):
     )
 
     response = Response()
-    result = asyncio.run(auth_service.f5_login_user({"user": "MRM468", "groups": []}, response))
+    result = asyncio.run(
+        auth_service.f5_login_user(
+            {
+                "user": "MRM468",
+                "groups": [
+                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS",
+                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN",
+                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS",
+                ],
+            },
+            response,
+        )
+    )
 
     assert result["message"] == "Sign in successful"
     assert result["token"] == "token"
-    assert result["user"]["email"] == "a@example.com"
+    assert result["user"]["id"] == "MRM468"
+    assert result["user"]["email"] == ""
     assert result["user"]["role"] == "Admin,Director,Underwriter"
+    assert captured["access"] == ("MRM468", "Admin,Director,Underwriter")
+    assert captured["refresh"] == ("MRM468", "Admin,Director,Underwriter")
 
 
 def test_f5_login_user_keeps_underwriter_for_mbond_with_all_three_groups(monkeypatch):
-    monkeypatch.setattr(
-        auth_service,
-        "get_email_by_user_identifier",
-        lambda user_id: "mbond@hanover.com",
-    )
-    monkeypatch.setattr(
-        auth_service,
-        "_get_user_groups_from_graph",
-        lambda user_id: [
-            {"id": "1", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"},
-            {"id": "2", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN"},
-            {"id": "3", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS"},
-        ],
-    )
     monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
     monkeypatch.setattr(
         auth_service,
@@ -294,107 +240,68 @@ def test_f5_login_user_keeps_underwriter_for_mbond_with_all_three_groups(monkeyp
 
     response = Response()
     result = asyncio.run(
-        auth_service.f5_login_user({"user": "MBOND", "groups": []}, response)
+        auth_service.f5_login_user(
+            {
+                "user": "MBOND",
+                "groups": [
+                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS",
+                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN",
+                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS",
+                ],
+            },
+            response,
+        )
     )
 
+    assert result["user"]["id"] == "MBOND"
+    assert result["user"]["email"] == ""
     assert result["user"]["role"] == "Admin,Director,Underwriter"
 
 
 def test_f5_login_user_returns_cct_role(monkeypatch):
-    monkeypatch.setattr(
-        auth_service,
-        "get_email_by_user_identifier",
-        lambda user_id: "a@example.com",
-    )
-    monkeypatch.setattr(
-        auth_service,
-        "_get_user_groups_from_graph",
-        lambda user_id: [
-            {"id": "4", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_CCT"},
-        ],
-    )
     monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
     monkeypatch.setattr(
         auth_service,
         "create_refresh_token",
         lambda user_id, role=None: "refresh-token",
-    )
-    monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
-    monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
-
-    response = Response()
-    result = asyncio.run(auth_service.f5_login_user({"user": "MRM468", "groups": []}, response))
-
-    assert result["user"]["role"] == "CCT_User"
-
-
-def test_normalize_graph_role_keeps_underwriter_when_cct_is_also_present():
-    result = auth_service._normalize_graph_role(
-        "a@example.com",
-        "Admin,Director,Underwriter,CCT_User",
-    )
-
-    assert result == "Admin,Director,Underwriter,CCT_User"
-
-
-def test_normalize_graph_role_keeps_underwriter_for_mbond_when_cct_is_also_present():
-    result = auth_service._normalize_graph_role(
-        "mbond@hanover.com",
-        "Admin,Director,Underwriter,CCT_User",
-    )
-
-    assert result == "Admin,Director,Underwriter,CCT_User"
-
-
-def test_f5_login_user_sets_director_branch_from_mapping(monkeypatch):
-    monkeypatch.setattr(
-        auth_service,
-        "get_email_by_user_identifier",
-        lambda user_id: "mdeluca@hanover.com",
-    )
-    monkeypatch.setattr(
-        auth_service,
-        "_get_user_groups_from_graph",
-        lambda user_id: [
-            {"id": "2", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"},
-        ],
-    )
-    monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
-    monkeypatch.setattr(
-        auth_service,
-        "create_refresh_token",
-        lambda user_id, role=None: "refresh-token",
-    )
-    monkeypatch.setattr(
-        auth_service,
-        "get_branch_name_by_email",
-        lambda email: "Northeast",
     )
     monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
     monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
 
     response = Response()
     result = asyncio.run(
-        auth_service.f5_login_user({"user": "MDELUCA", "groups": []}, response)
+        auth_service.f5_login_user(
+            {
+                "user": "MRM468",
+                "groups": ["AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_CCT"],
+            },
+            response,
+        )
     )
 
-    assert result["user"]["role"] == "Director"
-    assert result["user"]["branch"] == "Northeast"
+    assert result["user"]["role"] == "CCT_User"
 
 
-def test_f5_login_user_sets_all_branch_from_mapping(monkeypatch):
-    monkeypatch.setattr(
-        auth_service,
-        "get_email_by_user_identifier",
-        lambda user_id: "mbond@hanover.com",
+def test_normalize_role_keeps_order_and_dedupes():
+    result = auth_service._normalize_role("Admin,Director,Admin,Underwriter,CCT_User")
+
+    assert result == "Admin,Director,Underwriter,CCT_User"
+
+
+def test_resolve_role_from_groups_uses_plain_group_names():
+    result = auth_service._resolve_role_from_groups(
+        [
+            "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_CCT",
+            "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN",
+        ]
     )
-    monkeypatch.setattr(
-        auth_service,
-        "_get_user_groups_from_graph",
-        lambda user_id: [
-            {"id": "3", "displayName": "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"},
-        ],
-    )
+
+    assert result == "Admin,CCT_User"
+
+
+def test_f5_login_user_sets_director_branch_from_mapping(monkeypatch):
+    captured = {}
+
     monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
     monkeypatch.setattr(
         auth_service,
@@ -403,7 +310,38 @@ def test_f5_login_user_sets_all_branch_from_mapping(monkeypatch):
     )
     monkeypatch.setattr(
         auth_service,
-        "get_branch_name_by_email",
+        "get_branch_name_by_user_identifier",
+        lambda user_id: captured.__setitem__("user_id", user_id) or "Northeast",
+    )
+    monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
+    monkeypatch.setattr(auth_service, "_set_refresh_cookie", lambda response, token: None)
+
+    response = Response()
+    result = asyncio.run(
+        auth_service.f5_login_user(
+            {
+                "user": "MDELUCA",
+                "groups": ["AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"],
+            },
+            response,
+        )
+    )
+
+    assert result["user"]["role"] == "Director"
+    assert result["user"]["branch"] == "Northeast"
+    assert captured["user_id"] == "mdeluca"
+
+
+def test_f5_login_user_sets_all_branch_from_mapping(monkeypatch):
+    monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
+    monkeypatch.setattr(
+        auth_service,
+        "create_refresh_token",
+        lambda user_id, role=None: "refresh-token",
+    )
+    monkeypatch.setattr(
+        auth_service,
+        "get_branch_name_by_user_identifier",
         lambda email: "All",
     )
     monkeypatch.setattr(auth_service, "_set_session_cookie", lambda response, token: None)
@@ -411,7 +349,13 @@ def test_f5_login_user_sets_all_branch_from_mapping(monkeypatch):
 
     response = Response()
     result = asyncio.run(
-        auth_service.f5_login_user({"user": "MBOND", "groups": []}, response)
+        auth_service.f5_login_user(
+            {
+                "user": "MBOND",
+                "groups": ["AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"],
+            },
+            response,
+        )
     )
 
     assert result["user"]["role"] == "Director"
@@ -442,23 +386,24 @@ def test_get_current_user_from_token_success_db_path(monkeypatch):
     assert result["user"]["branch"] == "HQ"
 
 
-def test_get_current_user_from_token_success_graph_path(monkeypatch):
+def test_get_current_user_from_token_success_f5_path(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "decode_access_token",
-        lambda token: {"sub": "a@example.com", "role": "Admin,Director,Underwriter"},
+        lambda token: {"sub": "MRM468", "role": "Admin,Director,Underwriter"},
     )
     monkeypatch.setattr(
         auth_service,
         "get_user_by_id",
-        lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
+        lambda user_id: pytest.fail("DB lookup should not happen for F5 user id"),
     )
 
     request = Request({"type": "http", "headers": [], "query_string": b""})
     request._cookies = {auth_service.SESSION_COOKIE_NAME: "token"}
 
     result = asyncio.run(auth_service.get_current_user_from_token(request))
-    assert result["user"]["email"] == "a@example.com"
+    assert result["user"]["id"] == "MRM468"
+    assert result["user"]["email"] == ""
     assert result["user"]["role"] == "Admin,Director,Underwriter"
     assert result["user"]["branch"] is None
 
@@ -467,44 +412,46 @@ def test_get_current_user_from_token_keeps_underwriter_for_mbond(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "decode_access_token",
-        lambda token: {"sub": "mbond@hanover.com", "role": "Admin,Director,Underwriter"},
+        lambda token: {"sub": "MBOND", "role": "Admin,Director,Underwriter"},
     )
     monkeypatch.setattr(
         auth_service,
         "get_user_by_id",
-        lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
+        lambda user_id: pytest.fail("DB lookup should not happen for F5 user id"),
     )
 
     request = Request({"type": "http", "headers": [], "query_string": b""})
     request._cookies = {auth_service.SESSION_COOKIE_NAME: "token"}
 
     result = asyncio.run(auth_service.get_current_user_from_token(request))
-    assert result["user"]["email"] == "mbond@hanover.com"
+    assert result["user"]["id"] == "MBOND"
+    assert result["user"]["email"] == ""
     assert result["user"]["role"] == "Admin,Director,Underwriter"
 
 
-def test_get_current_user_from_token_success_graph_path_branch_mapping(monkeypatch):
+def test_get_current_user_from_token_success_f5_path_branch_mapping(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "decode_access_token",
-        lambda token: {"sub": "jhoule@hanover.com", "role": "Director"},
+        lambda token: {"sub": "JHOULE", "role": "Director"},
     )
     monkeypatch.setattr(
         auth_service,
         "get_user_by_id",
-        lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
+        lambda user_id: pytest.fail("DB lookup should not happen for F5 user id"),
     )
     monkeypatch.setattr(
         auth_service,
-        "get_branch_name_by_email",
-        lambda email: "All",
+        "get_branch_name_by_user_identifier",
+        lambda user_id: "All",
     )
 
     request = Request({"type": "http", "headers": [], "query_string": b""})
     request._cookies = {auth_service.SESSION_COOKIE_NAME: "token"}
 
     result = asyncio.run(auth_service.get_current_user_from_token(request))
-    assert result["user"]["email"] == "jhoule@hanover.com"
+    assert result["user"]["id"] == "JHOULE"
+    assert result["user"]["email"] == ""
     assert result["user"]["branch"] == "All"
 
 
@@ -516,6 +463,23 @@ def test_get_branch_name_by_email_returns_none_when_lookup_fails(monkeypatch):
     )
 
     assert auth_service.get_branch_name_by_email("mbond@hanover.com") is None
+
+
+def test_get_branch_name_by_user_identifier_uses_user_id(monkeypatch):
+    captured = {}
+
+    def fake_run_raw_query(query, params):
+        captured["query"] = query
+        captured["params"] = params
+        return [{"BranchName": "Northeast"}]
+
+    monkeypatch.setattr(auth_service, "run_raw_query", fake_run_raw_query)
+
+    result = auth_service.get_branch_name_by_user_identifier("MRM468")
+
+    assert result == "Northeast"
+    assert "LOWER(UserID) = ?" in captured["query"]
+    assert captured["params"] == ["mrm468"]
 
 
 def test_get_current_user_from_token_invalid(monkeypatch):
@@ -570,18 +534,18 @@ def test_refresh_user_token_success_db_path(monkeypatch):
     assert result == {"message": "Token refreshed", "token": "newtoken"}
 
 
-def test_refresh_user_token_success_graph_path(monkeypatch):
+def test_refresh_user_token_success_f5_path(monkeypatch):
     captured = {}
 
     monkeypatch.setattr(
         auth_service,
         "decode_refresh_token",
-        lambda token: {"sub": "a@example.com", "role": "Admin,Director,Underwriter"},
+        lambda token: {"sub": "MRM468", "role": "Admin,Director,Underwriter"},
     )
     monkeypatch.setattr(
         auth_service,
         "get_user_by_id",
-        lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
+        lambda user_id: pytest.fail("DB lookup should not happen for F5 user id"),
     )
     monkeypatch.setattr(
         auth_service,
@@ -605,12 +569,12 @@ def test_refresh_user_token_keeps_underwriter_for_mbond(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "decode_refresh_token",
-        lambda token: {"sub": "mbond@hanover.com", "role": "Admin,Director,Underwriter"},
+        lambda token: {"sub": "MBOND", "role": "Admin,Director,Underwriter"},
     )
     monkeypatch.setattr(
         auth_service,
         "get_user_by_id",
-        lambda user_id: pytest.fail("DB lookup should not happen for email-based id"),
+        lambda user_id: pytest.fail("DB lookup should not happen for F5 user id"),
     )
     monkeypatch.setattr(
         auth_service,
