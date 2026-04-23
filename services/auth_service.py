@@ -18,10 +18,10 @@ from core.jwt_handler import (
 logger = logging.getLogger(__name__)
 
 GROUP_ROLE_PRIORITY = {
-    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN": ("Admin", 1),
-    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS": ("Director", 2),
-    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS": ("Underwriter", 3),
-    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_CCT": ("CCT_User", 4),
+    "ADMIN": ("Admin", 1),
+    "DIRECTORS": ("Director", 2),
+    "UNDERWRITERS": ("Underwriter", 3),
+    "CCT": ("CCT_User", 4),
 }
 
 SESSION_COOKIE_NAME = "session"
@@ -125,7 +125,7 @@ def _create_login_response(
 def _resolve_role_from_groups(groups: list[str]) -> str | None:
     matched: list[tuple[int, str, str]] = []
     for group in groups:
-        group_name = str(group or "").strip()
+        group_name = str(group or "").strip().upper()
         role_priority = GROUP_ROLE_PRIORITY.get(group_name)
         if role_priority:
             role, priority = role_priority

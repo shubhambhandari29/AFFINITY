@@ -202,9 +202,9 @@ def test_f5_login_user_role_priority_and_cookie_flow(monkeypatch):
             {
                 "user": "MRM468",
                 "groups": [
-                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS",
-                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN",
-                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS",
+                    "DIRECTORS",
+                    "ADMIN",
+                    "UNDERWRITERS",
                 ],
             },
             response,
@@ -244,9 +244,9 @@ def test_f5_login_user_keeps_underwriter_for_mbond_with_all_three_groups(monkeyp
             {
                 "user": "MBOND",
                 "groups": [
-                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS",
-                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN",
-                    "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_UNDERWRITERS",
+                    "DIRECTORS",
+                    "ADMIN",
+                    "UNDERWRITERS",
                 ],
             },
             response,
@@ -273,7 +273,7 @@ def test_f5_login_user_returns_cct_role(monkeypatch):
         auth_service.f5_login_user(
             {
                 "user": "MRM468",
-                "groups": ["AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_CCT"],
+                "groups": ["CCT"],
             },
             response,
         )
@@ -291,8 +291,8 @@ def test_normalize_role_keeps_order_and_dedupes():
 def test_resolve_role_from_groups_uses_plain_group_names():
     result = auth_service._resolve_role_from_groups(
         [
-            "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_CCT",
-            "AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_ADMIN",
+            "CCT",
+            "ADMIN",
         ]
     )
 
@@ -321,7 +321,7 @@ def test_f5_login_user_sets_director_branch_from_mapping(monkeypatch):
         auth_service.f5_login_user(
             {
                 "user": "MDELUCA",
-                "groups": ["AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"],
+                "groups": ["DIRECTORS"],
             },
             response,
         )
@@ -352,7 +352,7 @@ def test_f5_login_user_sets_all_branch_from_mapping(monkeypatch):
         auth_service.f5_login_user(
             {
                 "user": "MBOND",
-                "groups": ["AZURE_SECURE_ROLE_CLAIMS_PROD_SACAPP_DIRECTORS"],
+                "groups": ["DIRECTORS"],
             },
             response,
         )
