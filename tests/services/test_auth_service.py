@@ -482,6 +482,14 @@ def test_get_branch_name_by_user_identifier_uses_user_id(monkeypatch):
     assert captured["params"] == ["mrm468"]
 
 
+def test_get_branch_name_by_user_identifier_defaults_to_all_when_missing(monkeypatch):
+    monkeypatch.setattr(auth_service, "run_raw_query", lambda query, params: [])
+
+    result = auth_service.get_branch_name_by_user_identifier("UNKNOWN_USER")
+
+    assert result == "All"
+
+
 def test_get_current_user_from_token_invalid(monkeypatch):
     monkeypatch.setattr(auth_service, "decode_access_token", lambda token: {})
 

@@ -254,7 +254,7 @@ def get_branch_name_by_user_identifier(user_identifier: str) -> str | None:
         return None
 
     if not results:
-        return None
+        return "All"
 
     return results[0].get("BranchName")
 
