@@ -119,6 +119,17 @@ CREATE TABLE [dbo].[tblBranchMapping](
 	[UserID] [varchar](255) NULL
 ) ON [PRIMARY];
 
+INSERT INTO [dbo].[tblBranchMapping] ([Email], [BranchName], [UserID])
+VALUES
+    ('mdeluca@hanover.com', 'Northeast', 'MAD039'),
+    ('jhoule@hanover.com', 'All', 'JLH675'),
+    ('sh1bhandari@hanover.com', 'All', 'SXB640'),
+    ('stscott@hanover.com', 'Pacific & West', 'SFS972'),
+    ('scarruth@hanover.com', 'Midwest', 'SAZ'),
+    ('mbond@hanover.com', 'All', 'MRM468'),
+    ('nleal@hanover.com', 'Southeast', 'RDL344'),
+    ('BLUTTGE@HANOVER.COM', 'All', 'BXL547');
+
 8. tblClaimRevFreq_AFFIN, tblClaimReviewFrequency , tblDist_ClaimRev_AFFIN, tblDist_LossRun_AFFIN, tblDIST_PolicyTypeScheduler_AFFIN, tblDistribute_ClaimReview, tblDistribute_DeductBill, tblDistribute_LossRun, : new column: InsertDateTime, UpdateDateTime
 9. tblDeductBillFrequency: InsertDateTime, UpdateDateTime, CompDate, DueDate, ReceivedDate, TotalAmtDue
 CompDate, DueDate, ReceivedDate, TotalAmtDue
@@ -168,6 +179,25 @@ CREATE TABLE [dbo].[tblSACAccountAssociations] (
     [AssociatedAccount] [varchar](100) NULL
 );
 
-Pre prod DB Script for above changes :
+INSERT INTO [dbo].[tblSACAccountAssociations] ([ParentAccount], [AssociatedAccount])
+VALUES
+    ('6872682456', '1506380704'),
+    ('1506380704', '6872682456'),
+    ('6872682456', '1512319542'),
+    ('1512319542', '6872682456'),
+    ('6872682456', '1501973530'),
+    ('1501973530', '6872682456');
 
-script.sql
+
+
+INSERT INTO [dbo].[tblBranchMapping] ([Email], [BranchName], [UserID])
+VALUES
+    ('mdeluca@hanover.com', 'Northeast', 'MAD039'),
+    ('jhoule@hanover.com', 'All', 'JLH675'),
+    ('sh1bhandari@hanover.com', 'All', 'SXB640'),
+    ('stscott@hanover.com', 'Pacific & West', 'SFS972'),
+    ('scarruth@hanover.com', 'Midwest', 'SAZ'),
+    ('mbond@hanover.com', 'All', 'MRM468'),
+    ('nleal@hanover.com', 'Southeast', 'RDL344'),
+    ('BLUTTGE@HANOVER.COM', 'All', 'BXL547');
+
