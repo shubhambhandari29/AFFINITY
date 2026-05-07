@@ -3,10 +3,19 @@ import csv
 import re
 from typing import Iterable
 
-from db import get_raw_connection
+import pyodbc
 
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+CONN_STR = (
+    "Driver={ODBC Driver 17 for SQL Server};"
+    "Server=clms-preprd-sqlmanagedinstance.3b98dc354c37.database.windows.net;"
+    "Database=CLMAA_SpecialAccounts;"
+    "Authentication=ActiveDirectoryIntegrated;"
+    "Encrypt=yes;"
+    "TrustServerCertificate=no;"
+)
 
 
 def _sanitize_value(value: str) -> str:
@@ -47,7 +56,7 @@ def load_agents(
     batch: list[tuple[str, str]] = []
     errors: list[str] = []
 
-    conn = get_raw_connection()
+    conn = pyodbc.connect(CONN_STR)
     try:
         cursor = conn.cursor()
         cursor.fast_executemany = True
