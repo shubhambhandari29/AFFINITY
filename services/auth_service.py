@@ -125,7 +125,7 @@ def _create_login_response(
 def _resolve_role_from_groups(groups: list[str]) -> str | None:
     matched: list[tuple[int, str, str]] = []
     for group in groups:
-        group_name = str(group or "").strip().upper()
+        group_name = str(group or "").strip().capitalize()
         role_priority = GROUP_ROLE_PRIORITY.get(group_name)
         if role_priority:
             role, priority = role_priority

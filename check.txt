@@ -1,26 +1,169 @@
 DB changes:
 
 1. TblUsers : new table (needed till AD groups are sent by F5)
+CREATE TABLE [dbo].[tblUsers](
+	[ID] [int] NOT NULL,
+	[FirstName] [varchar](50) NOT NULL,
+	[LastName] [varchar](50) NOT NULL,
+	[Email] [varchar](50) NOT NULL,
+	[Password] [varchar](255) NULL,
+	[Role] [varchar](50) NOT NULL,
+	[Active] [int] NOT NULL,
+	[UserID] [varchar](20) NULL
+) ON [PRIMARY];
+
 2. tblAcctSpecial: columns are added
-Stage, IsSubmitted, MarketSegmentation, EffectiveDate, AcctSpecialKey, InsertDateTime, UpdateDateTime, AddCommentLossRun, AddCommentClaimReview, RetiredBy
+Stage, IsSubmitted, MarketSegmentation, EffectiveDate, AcctSpecialKey, AddCommentLossRun, AddCommentClaimReview, RetiredBy
+
+ALTER TABLE [dbo].[tblAcctSpecial]
+ADD
+	[Stage] [varchar](50) NULL,
+	[IsSubmitted] [int] NULL,
+	[MarketSegmentation] [varchar](100) NULL,
+	[EffectiveDate] [date] NULL,
+	[AddCommentLossRun] [bit] NULL,
+	[AddCommentClaimReview] [bit] NULL,
+	[RetiredBy] [varchar](200) NULL;
+
+ALTER TABLE [dbo].[tblAcctSpecial]
+ADD [AcctSpecialKey] [int] IDENTITY(1,1) NOT NULL;
+
+UPDATE [dbo].[tblAcctSpecial]
+SET
+	[Stage] = COALESCE([Stage], 'Admin'),
+	[IsSubmitted] = COALESCE([IsSubmitted], 1)
+WHERE [Stage] IS NULL
+   OR [IsSubmitted] IS NULL;
+
 3.  tblAcctAffinityProgram: columns are added:
-AcctAffinityProgramKey, InsertDateTime, UpdateDateTime, Stage, IsSubmitted, AddCommentLossRun, AddCommentClaimReview, RetiredBy
+AcctAffinityProgramKey, Stage, IsSubmitted, AddCommentLossRun, AddCommentClaimReview, RetiredBy
+
+ALTER TABLE [dbo].[tblAcctAffinityProgram]
+ADD
+	[Stage] [varchar](50) NULL,
+	[IsSubmitted] [int] NULL,
+	[AddCommentLossRun] [bit] NULL,
+	[AddCommentClaimReview] [bit] NULL,
+	[RetiredBy] [varchar](200) NULL;
+
+ALTER TABLE [dbo].[tblAcctAffinityProgram]
+ADD [AcctAffinityProgramKey] [int] IDENTITY(1,1) NOT NULL;
+
+UPDATE [dbo].[tblAcctAffinityProgram]
+SET
+	[Stage] = COALESCE([Stage], 'Admin'),
+	[IsSubmitted] = COALESCE([IsSubmitted], 1)
+WHERE [Stage] IS NULL
+   OR [IsSubmitted] IS NULL;
+
 4. tblAffiliates: columns added: InsertDateTime, UpdateDateTime
 5. tblPolicies: columns added:
-AdjusterContact1, AdjusterTitle1, AdjusterPhone1, AdjusterCell1, AdjusterEMail1, AdjusterContact2, AdjusterTitle2, AdjusterPhone2, AdjusterCell2, AdjusterEMail2, FirmName, FirmAddress, FirmCityStateZip , FirmWebsite, CounselName, CounselPhone, CounselEmail , HourlyRatesPartner, HourlyRatesAssociate, HourlyRatesParalegal, canceledDate, stage, retiredBy, : InsertDateTime, UpdateDateTime
+AdjusterContact1, AdjusterTitle1, AdjusterPhone1, AdjusterCell1, AdjusterEMail1, AdjusterContact2, AdjusterTitle2, AdjusterPhone2, AdjusterCell2, AdjusterEMail2, FirmName, FirmAddress, FirmCityStateZip, FirmWebsite, CounselName, CounselPhone, CounselEmail, HourlyRatesPartner, HourlyRatesAssociate, HourlyRatesParalegal, CanceledDate, Stage, RetiredBy
+
+ALTER TABLE [dbo].[tblPolicies]
+ADD
+	[FirmName] [varchar](255) NULL,
+	[FirmAddress] [varchar](500) NULL,
+	[FirmCityStateZip] [varchar](255) NULL,
+	[FirmWebsite] [varchar](255) NULL,
+	[CounselName] [varchar](255) NULL,
+	[CounselPhone] [varchar](50) NULL,
+	[CounselEmail] [varchar](255) NULL,
+	[HourlyRatesPartner] [varchar](70) NULL,
+	[HourlyRatesAssociate] [varchar](100) NULL,
+	[HourlyRatesParalegal] [varchar](255) NULL,
+	[AdjusterContact1] [varchar](255) NULL,
+	[AdjusterTitle1] [varchar](500) NULL,
+	[AdjusterPhone1] [varchar](255) NULL,
+	[AdjusterCell1] [varchar](255) NULL,
+	[AdjusterEMail1] [varchar](255) NULL,
+	[AdjusterContact2] [varchar](250) NULL,
+	[AdjusterTitle2] [varchar](255) NULL,
+	[AdjusterPhone2] [varchar](70) NULL,
+	[AdjusterCell2] [varchar](100) NULL,
+	[AdjusterEMail2] [varchar](255) NULL,
+	[CanceledDate] [datetime] NULL,
+	[Stage] [varchar](200) NULL,
+	[RetiredBy] [varchar](200) NULL;
 
 6. tblAffinityPolicyType: columns added:
-"AdjusterContact1","AdjusterTitle1","AdjusterPhone1","AdjusterCell1","AdjusterEMail1","AdjusterContact2","AdjusterTitle2","AdjusterPhone2","AdjusterCell2","AdjusterEMail2", "FirmName", "FirmAddress", "FirmCityStateZip", "FirmWebsite", "CounselName", "CounselPhone", "CounselEmail", "HourlyRatesPartner", "HourlyRatesAssociate", "HourlyRatesParalegal",  InsertDateTime, UpdateDateTime
+AdjusterContact1, AdjusterTitle1, AdjusterPhone1, AdjusterCell1, AdjusterEMail1, AdjusterContact2, AdjusterTitle2, AdjusterPhone2, AdjusterCell2, AdjusterEMail2, FirmName, FirmAddress, FirmCityStateZip, FirmWebsite, CounselName, CounselPhone, CounselEmail, HourlyRatesPartner, HourlyRatesAssociate, HourlyRatesParalegal
+
+ALTER TABLE [dbo].[tblAffinityPolicyType]
+ADD
+	[AdjusterContact1] [varchar](200) NULL,
+	[AdjusterTitle1] [varchar](200) NULL,
+	[AdjusterPhone1] [varchar](50) NULL,
+	[AdjusterCell1] [varchar](50) NULL,
+	[AdjusterEMail1] [varchar](255) NULL,
+	[AdjusterContact2] [varchar](200) NULL,
+	[AdjusterTitle2] [varchar](200) NULL,
+	[AdjusterPhone2] [varchar](50) NULL,
+	[AdjusterCell2] [varchar](50) NULL,
+	[AdjusterEMail2] [varchar](255) NULL,
+	[FirmName] [varchar](255) NULL,
+	[FirmAddress] [varchar](255) NULL,
+	[FirmCityStateZip] [varchar](255) NULL,
+	[FirmWebsite] [varchar](255) NULL,
+	[CounselName] [varchar](255) NULL,
+	[CounselPhone] [varchar](50) NULL,
+	[CounselEmail] [varchar](255) NULL,
+	[HourlyRatesPartner] [varchar](50) NULL,
+	[HourlyRatesAssociate] [varchar](50) NULL,
+	[HourlyRatesParalegal] [varchar](50) NULL;
 
 7. tblBranchMapping: new table to be added. 
+CREATE TABLE [dbo].[tblBranchMapping](
+	[Email] [varchar](255) NULL,
+	[BranchName] [varchar](255) NULL,
+	[UserID] [varchar](255) NULL
+) ON [PRIMARY];
+
 8. tblClaimRevFreq_AFFIN, tblClaimReviewFrequency , tblDist_ClaimRev_AFFIN, tblDist_LossRun_AFFIN, tblDIST_PolicyTypeScheduler_AFFIN, tblDistribute_ClaimReview, tblDistribute_DeductBill, tblDistribute_LossRun, : new column: InsertDateTime, UpdateDateTime
 9. tblDeductBillFrequency: InsertDateTime, UpdateDateTime, CompDate, DueDate, ReceivedDate, TotalAmtDue
+CompDate, DueDate, ReceivedDate, TotalAmtDue
+
+ALTER TABLE [dbo].[tblDeductBillFrequency]
+ADD
+	[CompDate] [datetime] NULL,
+	[DueDate] [date] NULL,
+	[ReceivedDate] [date] NULL,
+	[TotalAmtDue] [varchar](50) NULL;
+
 10. TblDropDowns: new table added
-11. TblEDW_Agent_List: new table, to be added
+11. tblEDW_AGENT_LIST: new table, to be added
+CREATE TABLE [dbo].[tblEDW_AGENT_LIST](
+	[Agent_Code] [varchar](50) NOT NULL,
+	[Agent_name] [varchar](255) NOT NULL,
+	[PK_Number] [int] IDENTITY(1,1) NOT NULL,
+ CONSTRAINT [PK_tblEDW_AGENT_LIST_PK_Number] PRIMARY KEY CLUSTERED 
+(
+	[PK_Number] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY];
+
 12. TblHCMUsers: columns added: DateDeleted, DateAdded, ChangeDate
+ALTER TABLE [dbo].[tblHCMUsers]
+ADD
+	[DateDeleted] [date] NULL,
+	[DateAdded] [date] NULL,
+	[ChangeDate] [date] NULL;
+
 13. tblLossRunFreq_AFFIN , tblLossRunFrequency : columns added :  InsertDateTime, UpdateDateTime, NoClaims, AdHocReport
+tblLossRunFreq_AFFIN: NoClaims, AdHocReport
+
+ALTER TABLE [dbo].[tblLossRunFreq_AFFIN]
+ADD
+	[NoClaims] [bit] NULL,
+	[AdHocReport] [bit] NULL;
+
+tblLossRunFrequency: NoClaims, AdHocReport
+
+ALTER TABLE [dbo].[tblLossRunFrequency]
+ADD
+	[AdHocReport] [bit] NULL,
+	[NoClaims] [bit] NULL;
 
 Pre prod DB Script for above changes :
 
 script.sql
-
