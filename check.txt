@@ -1,5 +1,26 @@
-UPDATE bm
-SET bm.UserID = u.UserID
-FROM [CLMAA_SpecialAccounts].[dbo].[tblBranchMapping] bm
-INNER JOIN [CLMAA_SpecialAccounts].[dbo].[tblUsers] u
-    ON LOWER(bm.Email) = LOWER(u.Email);
+DB changes:
+
+1. TblUsers : new table (needed till AD groups are sent by F5)
+2. tblAcctSpecial: columns are added
+Stage, IsSubmitted, MarketSegmentation, EffectiveDate, AcctSpecialKey, InsertDateTime, UpdateDateTime, AddCommentLossRun, AddCommentClaimReview, RetiredBy
+3.  tblAcctAffinityProgram: columns are added:
+AcctAffinityProgramKey, InsertDateTime, UpdateDateTime, Stage, IsSubmitted, AddCommentLossRun, AddCommentClaimReview, RetiredBy
+4. tblAffiliates: columns added: InsertDateTime, UpdateDateTime
+5. tblPolicies: columns added:
+AdjusterContact1, AdjusterTitle1, AdjusterPhone1, AdjusterCell1, AdjusterEMail1, AdjusterContact2, AdjusterTitle2, AdjusterPhone2, AdjusterCell2, AdjusterEMail2, FirmName, FirmAddress, FirmCityStateZip , FirmWebsite, CounselName, CounselPhone, CounselEmail , HourlyRatesPartner, HourlyRatesAssociate, HourlyRatesParalegal, canceledDate, stage, retiredBy, : InsertDateTime, UpdateDateTime
+
+6. tblAffinityPolicyType: columns added:
+"AdjusterContact1","AdjusterTitle1","AdjusterPhone1","AdjusterCell1","AdjusterEMail1","AdjusterContact2","AdjusterTitle2","AdjusterPhone2","AdjusterCell2","AdjusterEMail2", "FirmName", "FirmAddress", "FirmCityStateZip", "FirmWebsite", "CounselName", "CounselPhone", "CounselEmail", "HourlyRatesPartner", "HourlyRatesAssociate", "HourlyRatesParalegal",  InsertDateTime, UpdateDateTime
+
+7. tblBranchMapping: new table to be added. 
+8. tblClaimRevFreq_AFFIN, tblClaimReviewFrequency , tblDist_ClaimRev_AFFIN, tblDist_LossRun_AFFIN, tblDIST_PolicyTypeScheduler_AFFIN, tblDistribute_ClaimReview, tblDistribute_DeductBill, tblDistribute_LossRun, : new column: InsertDateTime, UpdateDateTime
+9. tblDeductBillFrequency: InsertDateTime, UpdateDateTime, CompDate, DueDate, ReceivedDate, TotalAmtDue
+10. TblDropDowns: new table added
+11. TblEDW_Agent_List: new table, to be added
+12. TblHCMUsers: columns added: DateDeleted, DateAdded, ChangeDate
+13. tblLossRunFreq_AFFIN , tblLossRunFrequency : columns added :  InsertDateTime, UpdateDateTime, NoClaims, AdHocReport
+
+Pre prod DB Script for above changes :
+
+script.sql
+
