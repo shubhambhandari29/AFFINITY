@@ -132,15 +132,12 @@ ADD
 
 10. TblDropDowns: new table added
 11. tblEDW_AGENT_LIST: new table, to be added
-CREATE TABLE [dbo].[tblEDW_AGENT_LIST](
-	[Agent_Code] [varchar](50) NOT NULL,
-	[Agent_name] [varchar](255) NOT NULL,
-	[PK_Number] [int] IDENTITY(1,1) NOT NULL,
- CONSTRAINT [PK_tblEDW_AGENT_LIST_PK_Number] PRIMARY KEY CLUSTERED 
-(
-	[PK_Number] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY];
+CREATE TABLE [dbo].[tblEDW_AGENT_LIST] (
+    [PK_Number] [int] IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    [Agent_Code] [varchar](50) NOT NULL,
+    [Agent_name] [varchar](255) NOT NULL
+);
+
 
 12. TblHCMUsers: columns added: DateDeleted, DateAdded, ChangeDate
 ALTER TABLE [dbo].[tblHCMUsers]
@@ -163,6 +160,13 @@ ALTER TABLE [dbo].[tblLossRunFrequency]
 ADD
 	[AdHocReport] [bit] NULL,
 	[NoClaims] [bit] NULL;
+
+14. tblSACAccountAssociations: new table to be added
+CREATE TABLE [dbo].[tblSACAccountAssociations] (
+    [PK_Number] [int] IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    [ParentAccount] [varchar](100) NULL,
+    [AssociatedAccount] [varchar](100) NULL
+);
 
 Pre prod DB Script for above changes :
 
