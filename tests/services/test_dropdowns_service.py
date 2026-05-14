@@ -24,14 +24,6 @@ def test_get_dropdown_definition_default():
     assert column_map == {"DD_Value": "DD_Value", "DD_SortOrder": "DD_SortOrder"}
 
 
-def test_get_dropdown_definition_users():
-    table, primary_key, column_map = dropdowns_service._get_dropdown_definition("users")
-    assert table == "tblUsers"
-    assert primary_key == "ID"
-    assert column_map["Active"] == "Active"
-    assert column_map["Password"] == "Password"
-
-
 def test_normalize_dropdown_rows_valid_and_invalid():
     rows = [{"LANID": "x", "SACName": "A"}]
     normalized = dropdowns_service._normalize_dropdown_rows(
@@ -102,27 +94,21 @@ def test_get_dropdown_values_all_and_query_and_dynamic(monkeypatch):
     result = asyncio.run(dropdowns_service.get_dropdown_values("LossCtlRep2"))
     assert result[0]["params"] == ["Yes"]
 
-    result = asyncio.run(dropdowns_service.get_dropdown_values("users"))
-    assert "FROM tblUsers" in result[0]["query"]
-    assert "SELECT ID, FirstName, LastName, Email, Role, Active" in result[0]["query"]
-
     result = asyncio.run(dropdowns_service.get_dropdown_values("Unknown"))
     assert result == [{"dynamic": "Unknown"}]
-
-
-def test_normalize_dropdown_rows_users_columns():
-    _, primary_key, column_map = dropdowns_service._get_dropdown_definition("users")
-    normalized = dropdowns_service._normalize_dropdown_rows(
-        [{"ID": 5, "Active": 1}],
-        primary_key=primary_key,
-        column_map=column_map,
-    )
-    assert normalized == [{"ID": 5, "Active": 1}]
 
 
 def test_get_dropdown_values_requires_name():
     with pytest.raises(HTTPException):
         asyncio.run(dropdowns_service.get_dropdown_values("  "))
+
+
+def test_get_dropdown_values_rejects_users():
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(dropdowns_service.get_dropdown_values(" users "))
+
+    assert excinfo.value.status_code == 404
+    assert excinfo.value.detail == {"error": "Dropdown type 'users' is not supported"}
 
 
 def test_fetch_dynamic_dropdown_error(monkeypatch):
@@ -186,68 +172,20 @@ def test_upsert_dropdown_values_splits_rows(monkeypatch):
     assert captured["insert"][1][0]["DD_Type"] == "TestType"
 
 
-def test_upsert_dropdown_values_users_default_password_on_insert(monkeypatch):
-    captured = {"merge": None, "insert": None}
-
-    monkeypatch.setattr(
-        dropdowns_service,
-        "_get_dropdown_definition",
-        lambda name: (
-            "tblUsers",
-            "ID",
-            {
-                "FirstName": "FirstName",
-                "LastName": "LastName",
-                "Email": "Email",
-                "Password": "Password",
-                "Role": "Role",
-                "Active": "Active",
-            },
-        ),
-    )
-    monkeypatch.setattr(
-        dropdowns_service,
-        "_normalize_dropdown_rows",
-        lambda rows, pk, cmap: [
-            {"ID": 1, "FirstName": "Existing"},
-            {"FirstName": "New1"},
-            {"FirstName": "New2", "Password": ""},
-            {"FirstName": "New3", "Password": "Custom@123"},
-        ],
-    )
-
-    async def fake_merge(*, table, data_list, key_columns, exclude_key_columns_from_insert):
-        captured["merge"] = (table, data_list, key_columns, exclude_key_columns_from_insert)
-        return {"count": len(data_list)}
-
-    async def fake_insert(*, table, records):
-        captured["insert"] = (table, records)
-        return {"count": len(records)}
-
-    monkeypatch.setattr(dropdowns_service, "_merge_upsert_dropdown_records_async", fake_merge)
-    monkeypatch.setattr(dropdowns_service, "_insert_dropdown_records_async", fake_insert)
-
-    result = asyncio.run(dropdowns_service.upsert_dropdown_values("users", [{"FirstName": "x"}]))
-
-    assert result == {"message": "Upsert successful", "count": 4}
-    assert captured["merge"][0] == "tblUsers"
-    assert captured["merge"][1] == [{"ID": 1, "FirstName": "Existing"}]
-    assert captured["merge"][2] == ["ID"]
-    assert captured["merge"][3] is True
-    assert captured["insert"][0] == "tblUsers"
-    assert captured["insert"][1] == [
-        {"FirstName": "New1", "Password": "12345678"},
-        {"FirstName": "New2", "Password": "12345678"},
-        {"FirstName": "New3", "Password": "Custom@123"},
-    ]
-
-
 def test_upsert_dropdown_values_requires_name():
     with pytest.raises(HTTPException):
         asyncio.run(dropdowns_service.upsert_dropdown_values("  ", []))
 
     with pytest.raises(HTTPException):
         asyncio.run(dropdowns_service.upsert_dropdown_values("all", []))
+
+
+def test_upsert_dropdown_values_rejects_users():
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(dropdowns_service.upsert_dropdown_values("Users", [{"DD_Value": "x"}]))
+
+    assert excinfo.value.status_code == 404
+    assert excinfo.value.detail == {"error": "Dropdown type 'Users' is not supported"}
 
 
 def test_delete_dropdown_values_success(monkeypatch):
@@ -277,6 +215,14 @@ def test_delete_dropdown_values_requires_name():
 
     with pytest.raises(HTTPException):
         asyncio.run(dropdowns_service.delete_dropdown_values("all", []))
+
+
+def test_delete_dropdown_values_rejects_users():
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(dropdowns_service.delete_dropdown_values("users", [{"DD_Key": 1}]))
+
+    assert excinfo.value.status_code == 404
+    assert excinfo.value.detail == {"error": "Dropdown type 'users' is not supported"}
 
 
 def test_merge_upsert_dropdown_records_executes_queries(monkeypatch):
