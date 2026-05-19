@@ -1,203 +1,70 @@
-DB changes:
-
-1. TblUsers : new table (needed till AD groups are sent by F5)
-CREATE TABLE [dbo].[tblUsers](
-	[ID] [int] NOT NULL,
-	[FirstName] [varchar](50) NOT NULL,
-	[LastName] [varchar](50) NOT NULL,
-	[Email] [varchar](50) NOT NULL,
-	[Password] [varchar](255) NULL,
-	[Role] [varchar](50) NOT NULL,
-	[Active] [int] NOT NULL,
-	[UserID] [varchar](20) NULL
-) ON [PRIMARY];
-
-2. tblAcctSpecial: columns are added
-Stage, IsSubmitted, MarketSegmentation, EffectiveDate, AcctSpecialKey, AddCommentLossRun, AddCommentClaimReview, RetiredBy
-
-ALTER TABLE [dbo].[tblAcctSpecial]
-ADD
-	[Stage] [varchar](50) NULL,
-	[IsSubmitted] [int] NULL,
-	[MarketSegmentation] [varchar](100) NULL,
-	[EffectiveDate] [date] NULL,
-	[AddCommentLossRun] [bit] NULL,
-	[AddCommentClaimReview] [bit] NULL,
-	[RetiredBy] [varchar](200) NULL;
-
-ALTER TABLE [dbo].[tblAcctSpecial]
-ADD [AcctSpecialKey] [int] IDENTITY(1,1) NOT NULL;
-
-UPDATE [dbo].[tblAcctSpecial]
-SET
-	[Stage] = COALESCE([Stage], 'Admin'),
-	[IsSubmitted] = COALESCE([IsSubmitted], 1)
-WHERE [Stage] IS NULL
-   OR [IsSubmitted] IS NULL;
-
-3.  tblAcctAffinityProgram: columns are added:
-AcctAffinityProgramKey, Stage, IsSubmitted, AddCommentLossRun, AddCommentClaimReview, RetiredBy
-
-ALTER TABLE [dbo].[tblAcctAffinityProgram]
-ADD
-	[Stage] [varchar](50) NULL,
-	[IsSubmitted] [int] NULL,
-	[AddCommentLossRun] [bit] NULL,
-	[AddCommentClaimReview] [bit] NULL,
-	[RetiredBy] [varchar](200) NULL;
-
-ALTER TABLE [dbo].[tblAcctAffinityProgram]
-ADD [AcctAffinityProgramKey] [int] IDENTITY(1,1) NOT NULL;
-
-UPDATE [dbo].[tblAcctAffinityProgram]
-SET
-	[Stage] = COALESCE([Stage], 'Admin'),
-	[IsSubmitted] = COALESCE([IsSubmitted], 1)
-WHERE [Stage] IS NULL
-   OR [IsSubmitted] IS NULL;
-
-4. tblAffiliates: columns added: InsertDateTime, UpdateDateTime
-5. tblPolicies: columns added:
-AdjusterContact1, AdjusterTitle1, AdjusterPhone1, AdjusterCell1, AdjusterEMail1, AdjusterContact2, AdjusterTitle2, AdjusterPhone2, AdjusterCell2, AdjusterEMail2, FirmName, FirmAddress, FirmCityStateZip, FirmWebsite, CounselName, CounselPhone, CounselEmail, HourlyRatesPartner, HourlyRatesAssociate, HourlyRatesParalegal, CanceledDate, Stage, RetiredBy
-
-ALTER TABLE [dbo].[tblPolicies]
-ADD
-	[FirmName] [varchar](255) NULL,
-	[FirmAddress] [varchar](500) NULL,
-	[FirmCityStateZip] [varchar](255) NULL,
-	[FirmWebsite] [varchar](255) NULL,
-	[CounselName] [varchar](255) NULL,
-	[CounselPhone] [varchar](50) NULL,
-	[CounselEmail] [varchar](255) NULL,
-	[HourlyRatesPartner] [varchar](70) NULL,
-	[HourlyRatesAssociate] [varchar](100) NULL,
-	[HourlyRatesParalegal] [varchar](255) NULL,
-	[AdjusterContact1] [varchar](255) NULL,
-	[AdjusterTitle1] [varchar](500) NULL,
-	[AdjusterPhone1] [varchar](255) NULL,
-	[AdjusterCell1] [varchar](255) NULL,
-	[AdjusterEMail1] [varchar](255) NULL,
-	[AdjusterContact2] [varchar](250) NULL,
-	[AdjusterTitle2] [varchar](255) NULL,
-	[AdjusterPhone2] [varchar](70) NULL,
-	[AdjusterCell2] [varchar](100) NULL,
-	[AdjusterEMail2] [varchar](255) NULL,
-	[CanceledDate] [datetime] NULL,
-	[Stage] [varchar](200) NULL,
-	[RetiredBy] [varchar](200) NULL;
-
-6. tblAffinityPolicyType: columns added:
-AdjusterContact1, AdjusterTitle1, AdjusterPhone1, AdjusterCell1, AdjusterEMail1, AdjusterContact2, AdjusterTitle2, AdjusterPhone2, AdjusterCell2, AdjusterEMail2, FirmName, FirmAddress, FirmCityStateZip, FirmWebsite, CounselName, CounselPhone, CounselEmail, HourlyRatesPartner, HourlyRatesAssociate, HourlyRatesParalegal
-
-ALTER TABLE [dbo].[tblAffinityPolicyType]
-ADD
-	[AdjusterContact1] [varchar](200) NULL,
-	[AdjusterTitle1] [varchar](200) NULL,
-	[AdjusterPhone1] [varchar](50) NULL,
-	[AdjusterCell1] [varchar](50) NULL,
-	[AdjusterEMail1] [varchar](255) NULL,
-	[AdjusterContact2] [varchar](200) NULL,
-	[AdjusterTitle2] [varchar](200) NULL,
-	[AdjusterPhone2] [varchar](50) NULL,
-	[AdjusterCell2] [varchar](50) NULL,
-	[AdjusterEMail2] [varchar](255) NULL,
-	[FirmName] [varchar](255) NULL,
-	[FirmAddress] [varchar](255) NULL,
-	[FirmCityStateZip] [varchar](255) NULL,
-	[FirmWebsite] [varchar](255) NULL,
-	[CounselName] [varchar](255) NULL,
-	[CounselPhone] [varchar](50) NULL,
-	[CounselEmail] [varchar](255) NULL,
-	[HourlyRatesPartner] [varchar](50) NULL,
-	[HourlyRatesAssociate] [varchar](50) NULL,
-	[HourlyRatesParalegal] [varchar](50) NULL;
-
-7. tblBranchMapping: new table to be added. 
-CREATE TABLE [dbo].[tblBranchMapping](
-	[Email] [varchar](255) NULL,
-	[BranchName] [varchar](255) NULL,
-	[UserID] [varchar](255) NULL
-) ON [PRIMARY];
-
-INSERT INTO [dbo].[tblBranchMapping] ([Email], [BranchName], [UserID])
-VALUES
-    ('mdeluca@hanover.com', 'Northeast', 'MAD039'),
-    ('jhoule@hanover.com', 'All', 'JLH675'),
-    ('sh1bhandari@hanover.com', 'All', 'SXB640'),
-    ('stscott@hanover.com', 'Pacific & West', 'SFS972'),
-    ('scarruth@hanover.com', 'Midwest', 'SAZ'),
-    ('mbond@hanover.com', 'All', 'MRM468'),
-    ('nleal@hanover.com', 'Southeast', 'RDL344'),
-    ('BLUTTGE@HANOVER.COM', 'All', 'BXL547');
-
-8. tblClaimRevFreq_AFFIN, tblClaimReviewFrequency , tblDist_ClaimRev_AFFIN, tblDist_LossRun_AFFIN, tblDIST_PolicyTypeScheduler_AFFIN, tblDistribute_ClaimReview, tblDistribute_DeductBill, tblDistribute_LossRun, : new column: InsertDateTime, UpdateDateTime
-9. tblDeductBillFrequency: InsertDateTime, UpdateDateTime, CompDate, DueDate, ReceivedDate, TotalAmtDue
-CompDate, DueDate, ReceivedDate, TotalAmtDue
-
-ALTER TABLE [dbo].[tblDeductBillFrequency]
-ADD
-	[CompDate] [datetime] NULL,
-	[DueDate] [date] NULL,
-	[ReceivedDate] [date] NULL,
-	[TotalAmtDue] [varchar](50) NULL;
-
-10. TblDropDowns: new table added
-11. tblEDW_AGENT_LIST: new table, to be added
-CREATE TABLE [dbo].[tblEDW_AGENT_LIST] (
-    [PK_Number] [int] IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    [Agent_Code] [varchar](50) NOT NULL,
-    [Agent_name] [varchar](255) NOT NULL
-);
-
-
-12. TblHCMUsers: columns added: DateDeleted, DateAdded, ChangeDate
-ALTER TABLE [dbo].[tblHCMUsers]
-ADD
-	[DateDeleted] [date] NULL,
-	[DateAdded] [date] NULL,
-	[ChangeDate] [date] NULL;
-
-13. tblLossRunFreq_AFFIN , tblLossRunFrequency : columns added :  InsertDateTime, UpdateDateTime, NoClaims, AdHocReport
-tblLossRunFreq_AFFIN: NoClaims, AdHocReport
-
-ALTER TABLE [dbo].[tblLossRunFreq_AFFIN]
-ADD
-	[NoClaims] [bit] NULL,
-	[AdHocReport] [bit] NULL;
-
-tblLossRunFrequency: NoClaims, AdHocReport
-
-ALTER TABLE [dbo].[tblLossRunFrequency]
-ADD
-	[AdHocReport] [bit] NULL,
-	[NoClaims] [bit] NULL;
-
-14. tblSACAccountAssociations: new table to be added
-CREATE TABLE [dbo].[tblSACAccountAssociations] (
-    [PK_Number] [int] IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    [ParentAccount] [varchar](100) NULL,
-    [AssociatedAccount] [varchar](100) NULL
-);
-
-INSERT INTO [dbo].[tblSACAccountAssociations] ([ParentAccount], [AssociatedAccount])
-VALUES
-    ('6872682456', '1506380704'),
-    ('1506380704', '6872682456'),
-    ('6872682456', '1512319542'),
-    ('1512319542', '6872682456'),
-    ('6872682456', '1501973530'),
-    ('1501973530', '6872682456');
-
-
-
-INSERT INTO [dbo].[tblBranchMapping] ([Email], [BranchName], [UserID])
-VALUES
-    ('mdeluca@hanover.com', 'Northeast', 'MAD039'),
-    ('jhoule@hanover.com', 'All', 'JLH675'),
-    ('sh1bhandari@hanover.com', 'All', 'SXB640'),
-    ('stscott@hanover.com', 'Pacific & West', 'SFS972'),
-    ('scarruth@hanover.com', 'Midwest', 'SAZ'),
-    ('mbond@hanover.com', 'All', 'MRM468'),
-    ('nleal@hanover.com', 'Southeast', 'RDL344'),
-    ('BLUTTGE@HANOVER.COM', 'All', 'BXL547');
-
+Goal 1: Production Support, Stability & Continuous Improvement
+Objective:
+Ensure stable, secure, and uninterrupted operation of SCC Application post-go-live with structured support and continuous enhancements.
+Activities:
+Provide L1/L2/L3 production support for application incidents and service requests.
+Implement structured defect tracking, prioritization, root cause analysis (RCA), and resolution process.
+Deliver timely bug fixes, hotfix deployments, and minor UI/UX enhancements.
+Perform application health checks and regression validation testing to avoid recurrence of issues.
+Monitor application performance, API response times, and database health.
+Support production release management and controlled deployment activities.
+Maintain logging, error monitoring, and operational dashboards for issue visibility.
+Support configuration updates and environment maintenance across DEV/UAT/PROD.
+Provide periodic knowledge transfer and operational documentation updates.
+Conduct monthly service review meetings and backlog assessment.
+Deliverable:
+Stable, continuously monitored production application with defined SLAs, improved reliability, and controlled enhancement mechanisms.
+Goal 2: Dashboard Integration, Reporting & Data Continuity
+Objective:
+Ensure seamless reporting continuity and trusted business insights post-go-live of SCC Application.
+Activities:
+Switch Power BI (PBI) dashboard connectivity from legacy database to Production Azure SQL.
+Validate end-to-end data reconciliation between Legacy System and Azure SQL database.
+Support semantic model creation and optimization for reporting performance.
+Develop and enhance Power BI dashboards based on evolving business requirements.
+Perform dashboard validation and report certification before release.
+Maintain refresh schedules and monitor report execution failures.
+Implement data quality and consistency validation checks.
+Support new KPI, metric, and analytical report requests.
+Maintain reporting documentation and dashboard governance process.
+Deliverable:
+Fully functional Power BI dashboards connected to Production Azure SQL with validated reporting accuracy and operational continuity.
+Goal 3: Application Enhancement & Feature Expansion
+Objective:
+Support evolving business requirements through controlled application enhancements.
+Activities:
+Deliver approved minor and medium-scale feature enhancements.
+Enhance existing workflows, validations, and user experience improvements.
+Support configuration-driven business rule updates.
+Implement API enhancements and integration updates.
+Improve application scalability and maintainability.
+Conduct impact analysis for all enhancement requests.
+Maintain backward compatibility with existing production functionality.
+Deliverable:
+Enhanced application capabilities delivered through governed change management and controlled releases.
+Goal 4: Data Management, Compliance & Operational Support
+Objective:
+Ensure data integrity, operational continuity, and platform compliance.
+Activities:
+Support production data correction and controlled data maintenance activities.
+Execute data validation and reconciliation during production updates.
+Support archival, retention, and audit requirements.
+Monitor database performance and optimization opportunities.
+Maintain operational runbooks and SOPs.
+Support access requests and role management processes.
+Assist in audit preparation and production evidence gathering.
+Deliverable:
+Reliable and governed production operations with validated data integrity and compliance readiness.
+Goal 5: Performance, Monitoring & Technical Governance
+Objective:
+Maintain application performance, availability, and operational excellence.
+Activities:
+Monitor application availability and incident trends.
+Track API, backend, and database performance metrics.
+Perform periodic performance tuning and optimization.
+Support infrastructure configuration updates and deployment improvements.
+Conduct periodic security and dependency assessments.
+Implement preventive maintenance and technical debt reduction initiatives.
+Maintain technical documentation and architecture updates.
+Deliverable:
+High-performing, observable, and operationally governed production environment.
