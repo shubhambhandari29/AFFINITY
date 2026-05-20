@@ -36,9 +36,6 @@ from api.sac.sac_affiliates import router as sac_affiliates_router
 from api.sac.sac_policies import router as sac_policies_router
 from api.sac.search_sac_account import router as search_sac_account_router
 from core.config import settings
-from core.logging_config import configure_logging
-
-configure_logging()
 
 app = FastAPI()
 
