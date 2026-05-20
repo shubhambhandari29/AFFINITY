@@ -18,11 +18,12 @@ from core.jwt_handler import (
 logger = logging.getLogger(__name__)
 
 GROUP_ROLE_PRIORITY = {
-    "Admin": ("Admin", 1),
-    "Director": ("Director", 2),
-    "Underwriter": ("Underwriter", 3),
-    "CCT_User": ("CCT_User", 4),
+    "Admin": 1,
+    "Director": 2,
+    "Underwriter": 3,
+    "CCT_User": 4,
 }
+GROUP_ROLE_LOOKUP = {role.casefold(): role for role in GROUP_ROLE_PRIORITY}
 
 SESSION_COOKIE_NAME = "session"
 REFRESH_COOKIE_NAME = "refresh_session"
@@ -123,25 +124,17 @@ def _create_login_response(
 
 
 def _resolve_role_from_groups(groups: list[str]) -> str | None:
-    matched: list[tuple[int, str, str]] = []
-    for group in groups:
-        if str(group).strip() == "CCT_User":
-            group_name = str(group).strip()
-        else:
-            group_name = str(group or "").strip().capitalize()
-        print("grp name", group_name)
-        role_priority = GROUP_ROLE_PRIORITY.get(group_name)
-        print("role priority", role_priority)
-        if role_priority:
-            role, priority = role_priority
-            matched.append((priority, group_name, role))
-
-    if not matched:
-        return None
-
-    matched.sort(key=lambda item: item[0])
-    ordered_roles = list(dict.fromkeys(role for _, _, role in matched))
-    return ",".join(ordered_roles)
+    normalized_groups = {
+        GROUP_ROLE_LOOKUP[str(group or "").strip().casefold()]
+        for group in groups
+        if str(group or "").strip().casefold() in GROUP_ROLE_LOOKUP
+    }
+    ordered_roles = [
+        role
+        for role, _priority in sorted(GROUP_ROLE_PRIORITY.items(), key=lambda item: item[1])
+        if role in normalized_groups
+    ]
+    return ",".join(ordered_roles) or None
 
 
 def _normalize_role(role: str | None) -> str | None:
@@ -312,7 +305,6 @@ async def f5_login_user(login_data: dict[str, Any], response: Response):
         raise HTTPException(status_code=400, detail={"error": "Missing user"})
 
     groups = login_data.get("groups") or []
-    print("GROUPS >>>", groups)
     if not isinstance(groups, list):
         logger.warning("F5 login failed: groups payload must be a list (%s)", user_identifier)
         raise HTTPException(
@@ -321,7 +313,6 @@ async def f5_login_user(login_data: dict[str, Any], response: Response):
         )
 
     role = _resolve_role_from_groups(groups)
-    print("ROLES >>", role)
     if not role:
         logger.warning("F5 login failed: no SAC role groups matched (%s)", user_identifier)
         raise HTTPException(

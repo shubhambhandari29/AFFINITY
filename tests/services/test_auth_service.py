@@ -202,9 +202,9 @@ def test_f5_login_user_role_priority_and_cookie_flow(monkeypatch):
             {
                 "user": "MRM468",
                 "groups": [
-                    "DIRECTORS",
+                    "DIRECTOR",
                     "ADMIN",
-                    "UNDERWRITERS",
+                    "UNDERWRITER",
                 ],
             },
             response,
@@ -244,9 +244,9 @@ def test_f5_login_user_keeps_underwriter_for_mbond_with_all_three_groups(monkeyp
             {
                 "user": "MBOND",
                 "groups": [
-                    "DIRECTORS",
+                    "DIRECTOR",
                     "ADMIN",
-                    "UNDERWRITERS",
+                    "UNDERWRITER",
                 ],
             },
             response,
@@ -273,7 +273,7 @@ def test_f5_login_user_returns_cct_role(monkeypatch):
         auth_service.f5_login_user(
             {
                 "user": "MRM468",
-                "groups": ["CCT"],
+                "groups": ["CCT_User"],
             },
             response,
         )
@@ -288,15 +288,21 @@ def test_normalize_role_keeps_order_and_dedupes():
     assert result == "Admin,Director,Underwriter,CCT_User"
 
 
-def test_resolve_role_from_groups_uses_plain_group_names():
+def test_resolve_role_from_groups_orders_direct_role_names_by_priority():
     result = auth_service._resolve_role_from_groups(
         [
-            "CCT",
+            "CCT_User",
             "ADMIN",
         ]
     )
 
     assert result == "Admin,CCT_User"
+
+
+def test_resolve_role_from_groups_does_not_translate_unknown_group_names():
+    result = auth_service._resolve_role_from_groups(["CCT"])
+
+    assert result is None
 
 
 def test_f5_login_user_sets_director_branch_from_mapping(monkeypatch):
@@ -321,7 +327,7 @@ def test_f5_login_user_sets_director_branch_from_mapping(monkeypatch):
         auth_service.f5_login_user(
             {
                 "user": "MDELUCA",
-                "groups": ["DIRECTORS"],
+                "groups": ["DIRECTOR"],
             },
             response,
         )
@@ -352,7 +358,7 @@ def test_f5_login_user_sets_all_branch_from_mapping(monkeypatch):
         auth_service.f5_login_user(
             {
                 "user": "MBOND",
-                "groups": ["DIRECTORS"],
+                "groups": ["DIRECTOR"],
             },
             response,
         )
