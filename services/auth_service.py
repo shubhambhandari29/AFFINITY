@@ -18,10 +18,10 @@ from core.jwt_handler import (
 logger = logging.getLogger(__name__)
 
 GROUP_ROLE_PRIORITY = {
-    "ADMIN": ("Admin", 1),
-    "DIRECTORS": ("Director", 2),
-    "UNDERWRITERS": ("Underwriter", 3),
-    "CCT": ("CCT_User", 4),
+    "Admin": ("Admin", 1),
+    "Director": ("Director", 2),
+    "Underwriter": ("Underwriter", 3),
+    "CCT_User": ("CCT_User", 4),
 }
 
 SESSION_COOKIE_NAME = "session"
@@ -98,7 +98,7 @@ def _build_f5_user_payload(user_id: str, role: str | None) -> dict[str, Any]:
     normalized_user_id = str(user_id).strip()
     return {
         "id": normalized_user_id,
-        "first_name": "",
+        "first_name": normalized_user_id,
         "last_name": "",
         "email": "",
         "role": role,
@@ -125,8 +125,13 @@ def _create_login_response(
 def _resolve_role_from_groups(groups: list[str]) -> str | None:
     matched: list[tuple[int, str, str]] = []
     for group in groups:
-        group_name = str(group or "").strip().capitalize()
+        if str(group).strip() == "CCT_User":
+            group_name = str(group).strip()
+        else:
+            group_name = str(group or "").strip().capitalize()
+        print("grp name", group_name)
         role_priority = GROUP_ROLE_PRIORITY.get(group_name)
+        print("role priority", role_priority)
         if role_priority:
             role, priority = role_priority
             matched.append((priority, group_name, role))
@@ -227,7 +232,7 @@ def get_branch_name_by_email(email: str) -> str | None:
         return None
 
     if not results:
-        return None
+        return "All"
 
     return results[0].get("BranchName")
 
@@ -307,6 +312,7 @@ async def f5_login_user(login_data: dict[str, Any], response: Response):
         raise HTTPException(status_code=400, detail={"error": "Missing user"})
 
     groups = login_data.get("groups") or []
+    print("GROUPS >>>", groups)
     if not isinstance(groups, list):
         logger.warning("F5 login failed: groups payload must be a list (%s)", user_identifier)
         raise HTTPException(
@@ -315,6 +321,7 @@ async def f5_login_user(login_data: dict[str, Any], response: Response):
         )
 
     role = _resolve_role_from_groups(groups)
+    print("ROLES >>", role)
     if not role:
         logger.warning("F5 login failed: no SAC role groups matched (%s)", user_identifier)
         raise HTTPException(
@@ -425,3 +432,4 @@ async def refresh_user_token(request: Request, response: Response, token: str | 
     logger.info("Token refreshed for user %s", refreshed_user_identifier)
 
     return {"message": "Token refreshed", "token": new_token}
+
