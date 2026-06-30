@@ -1,3 +1,37 @@
-{"updateVia":"CustomerNum","updateViaValue":"1513841918","fieldName":"InsuredContact2","fieldValue":"Becca Lindsey"}
-
-{"updateVia":"PolicyNum","updateViaValue":"J443854","fieldName":"InsuredTitle2","fieldValue":"VP-HR"}
+{
+    "detail": [
+        {
+            "type": "model_attributes_type",
+            "loc": [
+                "body"
+            ],
+            "msg": "Input should be a valid dictionary or object to extract fields from",
+            "input": [
+                {
+                    "updateVia": "CustomerNum",
+                    "updateViaValue": "1513841918",
+                    "fieldName": "AgentContact1",
+                    "fieldValue": "Cheryl Smith"
+                },
+                {
+                    "updateVia": "CustomerNum",
+                    "updateViaValue": "1513841918",
+                    "fieldName": "AgentTel1",
+                    "fieldValue": "(972)  813-2165 Ext."
+                },
+                {
+                    "updateVia": "CustomerNum",
+                    "updateViaValue": "1513841918",
+                    "fieldName": "AgentCell1",
+                    "fieldValue": "(318) 614-1777"
+                },
+                {
+                    "updateVia": "CustomerNum",
+                    "updateViaValue": "1513841918",
+                    "fieldName": "AgentEmail1",
+                    "fieldValue": "cheryl_smith@ajg.com"
+                }
+            ]
+        }
+    ]
+}
