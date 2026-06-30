@@ -12,6 +12,9 @@ from services.sac.sac_policies_service import (
 from services.sac.sac_policies_service import (
     upsert_sac_policies as upsert_sac_policies_service,
 )
+from services.sac.sac_policies_service import (
+    get_underwriter_details as get_underwriter_details_service,
+)
 
 router = APIRouter(dependencies=[Depends(get_current_user_from_token)])
 
@@ -34,3 +37,7 @@ async def update_field_for_all_policies(payload: SacPolicyBulkFieldUpdate):
 @router.get("/get_premium")
 async def get_premium(request: Request):
     return await get_premium_service(dict(request.query_params))
+
+@router.get("/underwriter-details")
+async def get_underwriter_details(request: Request):
+    return await get_underwriter_details_service(dict(request.query_params))

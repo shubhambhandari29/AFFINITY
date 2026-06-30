@@ -6,3 +6,17 @@ FROM tblAcctSpecial AS a
 LEFT JOIN tblPolicies AS p 
 ON a.CustomerNum = p.CustomerNum 
 WHERE a.CustomerNum = '1513841918'
+
+
+[
+    {
+        "AcctOwner": "aaa",
+        "UnderwriterName": "ABC",
+        "UWMgr": "Manager A"
+    },
+    {
+        "AcctOwner": "bbb",
+        "UnderwriterName": "XYZ Underwriter",
+        "UWMgr": "Manager B"
+    }
+]

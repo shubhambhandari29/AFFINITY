@@ -200,3 +200,37 @@ async def get_premium(query_params: dict[str, Any]):
     except Exception as e:
         logger.warning(f"Error fetching SAC policy premium - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
+    
+async def get_underwriter_details(query_params: dict[str, Any]):
+    try:
+        filters = sanitize_filters(query_params, ALLOWED_FILTERS)
+
+        customer_num = filters.get("CustomerNum")
+
+        if not customer_num:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "CustomerNum is required."},
+            )
+
+        query = """
+            SELECT DISTINCT
+                CAST(a.AcctOwner AS VARCHAR(MAX)) AS AcctOwner,
+                CAST(p.UnderwriterName AS VARCHAR(MAX)) AS UnderwriterName,
+                CAST(p.UWMgr AS VARCHAR(MAX)) AS UWMgr
+            FROM tblAcctSpecial a
+            LEFT JOIN tblPolicies p
+                ON a.CustomerNum = p.CustomerNum
+            WHERE a.CustomerNum = ?
+            ORDER BY
+                UnderwriterName,
+                UWMgr;
+        """
+
+        return await run_raw_query_async(query, [customer_num])
+
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
+    except Exception as exc:
+        logger.warning(f"Error fetching Underwriter details - {str(exc)}")
+        raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc
