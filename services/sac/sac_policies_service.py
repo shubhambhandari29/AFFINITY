@@ -16,6 +16,7 @@ from core.db_helpers import (
     merge_upsert_records_async,
     run_raw_query_async,
     sanitize_filters,
+    update_records_async,
 )
 from core.models.sac_policies import normalize_money_string
 from db import db_connection
@@ -126,49 +127,71 @@ async def upsert_sac_policies(data: dict[str, Any]):
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
 
 
-async def update_field_for_all_policies(data: dict[str, Any]):
-    field_name = data.get("fieldName")
-    update_via = data.get("updateVia")
+async def update_field_for_all_policies(data: list[dict[str, Any]]):
 
-    if not field_name or not update_via:
+    if not data:
         raise HTTPException(
-            status_code=400, detail={"error": "Field name and update via are required"}
+            status_code=400,
+            detail={"error": "Request payload cannot be empty"},
         )
-    if "fieldValue" not in data or "updateViaValue" not in data:
-        raise HTTPException(status_code=400, detail={"error": "Missing required values"})
+
+    normalized_updates = []
 
     try:
-        _ensure_safe_identifier(field_name)
-        _ensure_safe_identifier(update_via)
+        for item in data:
+
+            field_name = item.get("fieldName")
+            update_via = item.get("updateVia")
+
+            if not field_name or not update_via:
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": "Field name and update via are required"},
+                )
+
+            if "fieldValue" not in item or "updateViaValue" not in item:
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": "Missing required values"},
+                )
+
+            _ensure_safe_identifier(field_name)
+            _ensure_safe_identifier(update_via)
+
+            field_value = item["fieldValue"]
+
+            if isinstance(field_value, str):
+                field_value = parse_date_input(field_value)
+
+            normalized_updates.append(
+                {
+                    "fieldName": field_name,
+                    "fieldValue": field_value,
+                    "updateVia": update_via,
+                    "updateViaValue": item["updateViaValue"],
+                }
+            )
+
+        return await update_records_async(
+            table=TABLE_NAME,
+            updates=normalized_updates,
+        )
+
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
+        raise HTTPException(
+            status_code=400,
+            detail={"error": str(exc)},
+        ) from exc
 
-    field_value = data["fieldValue"]
-    if isinstance(field_value, str):
-        parsed = parse_date_input(field_value)
-        field_value = parsed
+    except HTTPException:
+        raise
 
-    query = f"""
-        UPDATE {TABLE_NAME}
-        SET {field_name} = ?
-        WHERE {update_via} = ?
-    """
-
-    def _execute_update():
-        with db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (field_value, data["updateViaValue"]))
-            conn.commit()
-        count = cursor.rowcount if cursor.rowcount is not None else 0
-        if count < 0:
-            count = 0
-        return {"message": "Update successful", "count": count}
-
-    try:
-        return await run_in_threadpool(_execute_update)
     except Exception as e:
         logger.error(f"Error updating policies field: {str(e)}")
-        raise HTTPException(status_code=500, detail={"error": str(e)}) from e
+        raise HTTPException(
+            status_code=500,
+            detail={"error": str(e)},
+        ) from e
 
 
 async def get_premium(query_params: dict[str, Any]):

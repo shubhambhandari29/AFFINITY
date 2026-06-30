@@ -340,3 +340,84 @@ async def delete_records_async(
     return await run_in_threadpool(
         partial(delete_records, table=table, data_list=data_list, key_columns=key_columns)
     )
+
+
+def update_records(
+    table: str,
+    updates: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Generic bulk update helper.
+
+    Each item should contain:
+    {
+        "fieldName": "...",
+        "fieldValue": "...",
+        "updateVia": "...",
+        "updateViaValue": "..."
+    }
+    """
+    if not updates:
+        return {"message": "No data provided", "count": 0}
+
+    _ensure_safe_identifier(table)
+
+    from db import db_connection as _db_connection
+
+    conn = None
+
+    try:
+        with _db_connection() as conn:
+            cursor = conn.cursor()
+
+            total_count = 0
+
+            for update in updates:
+                field_name = update["fieldName"]
+                update_via = update["updateVia"]
+
+                _ensure_safe_identifier(field_name)
+                _ensure_safe_identifier(update_via)
+
+                query = f"""
+                    UPDATE {table}
+                    SET {field_name} = ?
+                    WHERE {update_via} = ?
+                """
+
+                cursor.execute(
+                    query,
+                    (
+                        update["fieldValue"],
+                        update["updateViaValue"],
+                    ),
+                )
+
+                if cursor.rowcount and cursor.rowcount > 0:
+                    total_count += cursor.rowcount
+
+            conn.commit()
+
+    except Exception as e:
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                logger.error("Rollback failed in update_records", exc_info=True)
+
+        logger.error(f"Error updating records in {table}: {e}", exc_info=True)
+        raise
+
+    return {
+        "message": "Update successful",
+        "count": total_count,
+    }
+
+
+async def update_records_async(
+    table: str,
+    updates: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return await run_in_threadpool(
+        partial(update_records, table=table, updates=updates)
+    )
