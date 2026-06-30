@@ -59,7 +59,7 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
         ORDER BY SortNum
     """,
     "Underwriters": """
-        SELECT PK_Number, [UW Name], [UW Email]
+        SELECT PK_Number, [UW Name], [UW Email], [UW Phone], [Active], [LAN_ID]
         FROM tblUnderwriters
         ORDER BY [UW Name]
     """,
@@ -74,28 +74,23 @@ SELECT tblLossCtrl.PK_Number, tblLossCtrl.RepName, tblLossCtrl.LCEmail
  WHERE (((tblLossCtrl.Active)='Yes'))
  ORDER BY tblLossCtrl.RepName
 """,
-    "users": """
-        SELECT ID, FirstName, LastName, Email, Role, Active
-        FROM tblUsers
-        ORDER BY FirstName, LastName, Email
-    """,
 }
 
 _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
     "SAC_Contact1": {
         "table": "tblMGTUsers",
         "primary_key": "LANID",
-        "columns": ["SACName"],
+        "columns": ["SACName", "EmpTitle", "TelNum", "EMailID", "TelExt", "FaxNum", "CellNum"],
     },
     "SAC_Contact2": {
         "table": "tblMGTUsers",
         "primary_key": "LANID",
-        "columns": ["SACName", "EmpTitle", "TelNum", "EMailID"],
+        "columns": ["SACName", "EmpTitle", "TelNum", "EMailID", "TelExt", "FaxNum", "CellNum"],
     },
     "AcctOwner": {
         "table": "tblMGTUsers",
         "primary_key": "LANID",
-        "columns": ["SACName", "EMailID", "EmpTitle", "TelNum", "TelExt"],
+        "columns": ["SACName", "EmpTitle", "TelNum", "EMailID", "TelExt", "FaxNum", "CellNum"],
     },
     "LossCtlRep1": {
         "table": "tblLossCtrl",
@@ -125,7 +120,7 @@ _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
     "Underwriters": {
         "table": "tblUnderwriters",
         "primary_key": "PK_Number",
-        "columns": ["UW Name", "UW Email"],
+        "columns": ["UW Name", "UW Email", "UW Phone" ,"Active", "LAN_ID"],
     },
     "EDW_AGENT_LIST": {
         "table": "tblEDW_AGENT_LIST",
@@ -137,16 +132,11 @@ _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
         "primary_key": "PK_Number",
         "columns": ["RepName", "LCEmail"],
     },
-    "users": {
-        "table": "tblUsers",
-        "primary_key": "ID",
-        "columns": ["FirstName", "LastName", "Email", "Password", "Role", "Active"],
-    },
 }
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_ ]*$")
 _IDENTITY_PRIMARY_KEYS = {"DD_Key", "PK_Number", "ID"}
-_DEFAULT_USER_PASSWORD = "12345678"
+_UNSUPPORTED_DROPDOWN_NAMES = {"users"}
 
 
 def _ensure_safe_identifier(identifier: str) -> None:
@@ -171,6 +161,14 @@ def _get_dropdown_definition(name: str) -> tuple[str, str, dict[str, str]]:
         column_map = {column: column for column in columns}
 
     return definition["table"], definition["primary_key"], column_map
+
+
+def _ensure_supported_dropdown_name(name: str) -> None:
+    if name.lower() in _UNSUPPORTED_DROPDOWN_NAMES:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": f"Dropdown type '{name}' is not supported"},
+        )
 
 
 def _normalize_dropdown_rows(
@@ -468,6 +466,8 @@ async def get_dropdown_values(name: str) -> list[dict[str, Any]]:
     if normalized_name.lower() == "all":
         return await get_all_dropdowns()
 
+    _ensure_supported_dropdown_name(normalized_name)
+
     query_def = _DROPDOWN_QUERIES.get(normalized_name)
 
     if query_def:
@@ -523,6 +523,8 @@ async def upsert_dropdown_values(name: str, rows: list[dict[str, Any]]) -> dict[
     if normalized_name.lower() == "all":
         raise HTTPException(status_code=400, detail={"error": "Dropdown type must be specified"})
 
+    _ensure_supported_dropdown_name(normalized_name)
+
     table, primary_key, column_map = _get_dropdown_definition(normalized_name)
     try:
         normalized_rows = _normalize_dropdown_rows(rows, primary_key, column_map)
@@ -542,13 +544,6 @@ async def upsert_dropdown_values(name: str, rows: list[dict[str, Any]]) -> dict[
             else:
                 rows_with_pk.append(row)
 
-        if table == "tblUsers":
-            for row in rows_without_pk:
-                password_value = row.get("Password")
-                if password_value is None or (
-                    isinstance(password_value, str) and not password_value.strip()
-                ):
-                    row["Password"] = _DEFAULT_USER_PASSWORD
         total_count = 0
         if rows_with_pk:
             result = await _merge_upsert_dropdown_records_async(
@@ -577,6 +572,8 @@ async def delete_dropdown_values(name: str, rows: list[dict[str, Any]]) -> dict[
         raise HTTPException(status_code=400, detail={"error": "Dropdown type is required"})
     if normalized_name.lower() == "all":
         raise HTTPException(status_code=400, detail={"error": "Dropdown type must be specified"})
+
+    _ensure_supported_dropdown_name(normalized_name)
 
     table, primary_key, column_map = _get_dropdown_definition(normalized_name)
     try:
