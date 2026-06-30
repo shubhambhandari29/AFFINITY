@@ -215,39 +215,54 @@ async def get_underwriter_details(query_params: dict[str, Any]):
 
         query = """
             SELECT
-                CAST(a.AcctOwner AS VARCHAR(MAX)) AS AcctOwner,
+                CAST(m.EMailID AS VARCHAR(MAX)) AS AcctOwnerEmail,
+
                 CAST(p.UnderwriterName AS VARCHAR(MAX)) AS UnderwriterName,
-                CAST(u.[UW Email] AS VARCHAR(MAX)) AS UWEmail,
-                CAST(p.UWMgr AS VARCHAR(MAX)) AS UWMgr
+                CAST(uw.[UW Email] AS VARCHAR(MAX)) AS UnderwriterEmail,
+
+                CAST(p.UWMgr AS VARCHAR(MAX)) AS UWMgr,
+                CAST(uwmgr.[UW Email] AS VARCHAR(MAX)) AS UWMgrEmail
+
             FROM tblAcctSpecial a
+
             LEFT JOIN tblPolicies p
                 ON a.CustomerNum = p.CustomerNum
-            LEFT JOIN tblUnderwriters u
+
+            LEFT JOIN tblUnderwriters uw
                 ON UPPER(LTRIM(RTRIM(p.UnderwriterName)))
-                 = UPPER(LTRIM(RTRIM(u.[UW Name])))
+                 = UPPER(LTRIM(RTRIM(uw.[UW Name])))
+
+            LEFT JOIN tblUnderwriters uwmgr
+                ON UPPER(LTRIM(RTRIM(p.UWMgr)))
+                 = UPPER(LTRIM(RTRIM(uwmgr.[UW Name])))
+
+            LEFT JOIN tblMGTUsers m
+                ON UPPER(LTRIM(RTRIM(a.AcctOwner)))
+                 = UPPER(LTRIM(RTRIM(m.SACName)))
+
             WHERE a.CustomerNum = ?
         """
 
         records = await run_raw_query_async(query, [customer_num])
 
         if not records:
-            return []
+            return {}
 
-        acct_owner = records[0].get("AcctOwner")
+        acct_owner_email = records[0].get("AcctOwnerEmail")
 
         underwriter_emails = sorted(
             {
-                record["UWEmail"]
+                record["UnderwriterEmail"]
                 for record in records
-                if record.get("UWEmail")
+                if record.get("UnderwriterEmail")
             }
         )
 
-        uw_managers = sorted(
+        uw_manager_emails = sorted(
             {
-                record["UWMgr"]
+                record["UWMgrEmail"]
                 for record in records
-                if record.get("UWMgr")
+                if record.get("UWMgrEmail")
             }
         )
 
@@ -255,18 +270,25 @@ async def get_underwriter_details(query_params: dict[str, Any]):
             {
                 record["UnderwriterName"]
                 for record in records
-                if record.get("UnderwriterName") and not record.get("UWEmail")
+                if record.get("UnderwriterName") and not record.get("UnderwriterEmail")
             }
         )
 
-        return [
+        missing_uw_managers = sorted(
             {
-                "AcctOwner": acct_owner,
-                "UnderwriterEmails": underwriter_emails,
-                "UWMgr": uw_managers,
-                "MissingUnderwriters": missing_underwriters,
+                record["UWMgr"]
+                for record in records
+                if record.get("UWMgr") and not record.get("UWMgrEmail")
             }
-        ]
+        )
+
+        return {
+            "AcctOwnerEmail": acct_owner_email,
+            "UnderwriterEmails": underwriter_emails,
+            "UWMgrEmails": uw_manager_emails,
+            "MissingUnderwriters": missing_underwriters,
+            "MissingUWManagers": missing_uw_managers,
+        }
 
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
