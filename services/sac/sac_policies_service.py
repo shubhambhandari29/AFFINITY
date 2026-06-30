@@ -217,10 +217,14 @@ async def get_underwriter_details(query_params: dict[str, Any]):
             SELECT
                 CAST(a.AcctOwner AS VARCHAR(MAX)) AS AcctOwner,
                 CAST(p.UnderwriterName AS VARCHAR(MAX)) AS UnderwriterName,
+                CAST(u.[UW Email] AS VARCHAR(MAX)) AS UWEmail,
                 CAST(p.UWMgr AS VARCHAR(MAX)) AS UWMgr
             FROM tblAcctSpecial a
             LEFT JOIN tblPolicies p
                 ON a.CustomerNum = p.CustomerNum
+            LEFT JOIN tblUnderwriters u
+                ON UPPER(LTRIM(RTRIM(p.UnderwriterName)))
+                 = UPPER(LTRIM(RTRIM(u.[UW Name])))
             WHERE a.CustomerNum = ?
         """
 
@@ -229,16 +233,13 @@ async def get_underwriter_details(query_params: dict[str, Any]):
         if not records:
             return []
 
-        acct_owner = next(
-            (record["AcctOwner"] for record in records if record.get("AcctOwner")),
-            None,
-        )
+        acct_owner = records[0].get("AcctOwner")
 
-        underwriter_names = sorted(
+        underwriter_emails = sorted(
             {
-                record["UnderwriterName"]
+                record["UWEmail"]
                 for record in records
-                if record.get("UnderwriterName")
+                if record.get("UWEmail")
             }
         )
 
@@ -250,11 +251,20 @@ async def get_underwriter_details(query_params: dict[str, Any]):
             }
         )
 
+        missing_underwriters = sorted(
+            {
+                record["UnderwriterName"]
+                for record in records
+                if record.get("UnderwriterName") and not record.get("UWEmail")
+            }
+        )
+
         return [
             {
                 "AcctOwner": acct_owner,
-                "UnderwriterName": underwriter_names,
+                "UnderwriterEmails": underwriter_emails,
                 "UWMgr": uw_managers,
+                "MissingUnderwriters": missing_underwriters,
             }
         ]
 
