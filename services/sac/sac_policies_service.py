@@ -214,7 +214,7 @@ async def get_underwriter_details(query_params: dict[str, Any]):
             )
 
         query = """
-            SELECT DISTINCT
+            SELECT
                 CAST(a.AcctOwner AS VARCHAR(MAX)) AS AcctOwner,
                 CAST(p.UnderwriterName AS VARCHAR(MAX)) AS UnderwriterName,
                 CAST(p.UWMgr AS VARCHAR(MAX)) AS UWMgr
@@ -222,15 +222,44 @@ async def get_underwriter_details(query_params: dict[str, Any]):
             LEFT JOIN tblPolicies p
                 ON a.CustomerNum = p.CustomerNum
             WHERE a.CustomerNum = ?
-            ORDER BY
-                UnderwriterName,
-                UWMgr;
         """
 
-        return await run_raw_query_async(query, [customer_num])
+        records = await run_raw_query_async(query, [customer_num])
+
+        if not records:
+            return []
+
+        acct_owner = next(
+            (record["AcctOwner"] for record in records if record.get("AcctOwner")),
+            None,
+        )
+
+        underwriter_names = sorted(
+            {
+                record["UnderwriterName"]
+                for record in records
+                if record.get("UnderwriterName")
+            }
+        )
+
+        uw_managers = sorted(
+            {
+                record["UWMgr"]
+                for record in records
+                if record.get("UWMgr")
+            }
+        )
+
+        return [
+            {
+                "AcctOwner": acct_owner,
+                "UnderwriterName": underwriter_names,
+                "UWMgr": uw_managers,
+            }
+        ]
 
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
     except Exception as exc:
-        logger.warning(f"Error fetching Underwriter details - {str(exc)}")
+        logger.warning(f"Error fetching underwriter details - {str(exc)}")
         raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc
