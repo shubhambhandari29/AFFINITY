@@ -1,27 +1,8 @@
-SELECT
-    A.CustomerNum,
-    CAST(A.TotalPrem AS VARCHAR(50)) AS CurrentTotalPrem,
-    CAST(ROUND(COALESCE(P.Premium, 0), 2) AS DECIMAL(18,2)) AS NewTotalPrem
-FROM dbo.tblAcctSpecial A
-OUTER APPLY
-(
-    SELECT SUM(PremiumAmt) AS Premium
-    FROM dbo.tblPolicies P
-    WHERE P.CustomerNum = A.CustomerNum
-      AND P.PolicyStatus = 'Active'
-) P
-WHERE CAST(A.TotalPrem AS VARCHAR(50)) = '0.00';
-
-UPDATE A
-SET TotalPrem = CONVERT(TEXT,
-                        CONVERT(VARCHAR(50),
-                                CAST(FLOOR(COALESCE(P.Premium,0) * 100) / 100.0 AS DECIMAL(18,2))))
-FROM dbo.tblAcctSpecial A
-OUTER APPLY
-(
-    SELECT SUM(PremiumAmt) AS Premium
-    FROM dbo.tblPolicies P
-    WHERE P.CustomerNum = A.CustomerNum
-      AND P.PolicyStatus = 'Active'
-) P
-WHERE CAST(A.TotalPrem AS VARCHAR(50)) = '0.00';
+SELECT DISTINCT 
+CAST(a.AcctOwner AS VARCHAR(MAX)) AS AcctOwner, 
+CAST(p.UnderwriterName AS VARCHAR(MAX)) AS UnderwriterName, 
+CAST(p.UWMgr AS VARCHAR(MAX)) AS UWMgr 
+FROM tblAcctSpecial AS a 
+LEFT JOIN tblPolicies AS p 
+ON a.CustomerNum = p.CustomerNum 
+WHERE a.CustomerNum = '1513841918'
