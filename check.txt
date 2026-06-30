@@ -1,13 +1,3 @@
-[
-    {
-        "AcctOwner": "John Smith",
-        "UnderwriterName": [
-            "ABC Underwriter",
-            "XYZ Underwriter"
-        ],
-        "UWMgr": [
-            "Manager A",
-            "Manager B"
-        ]
-    }
-]
+{"updateVia":"CustomerNum","updateViaValue":"1513841918","fieldName":"InsuredContact2","fieldValue":"Becca Lindsey"}
+
+{"updateVia":"PolicyNum","updateViaValue":"J443854","fieldName":"InsuredTitle2","fieldValue":"VP-HR"}
