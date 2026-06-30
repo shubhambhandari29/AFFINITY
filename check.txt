@@ -1,70 +1,27 @@
-Goal 1: Production Support, Stability & Continuous Improvement
-Objective:
-Ensure stable, secure, and uninterrupted operation of SCC Application post-go-live with structured support and continuous enhancements.
-Activities:
-Provide L1/L2/L3 production support for application incidents and service requests.
-Implement structured defect tracking, prioritization, root cause analysis (RCA), and resolution process.
-Deliver timely bug fixes, hotfix deployments, and minor UI/UX enhancements.
-Perform application health checks and regression validation testing to avoid recurrence of issues.
-Monitor application performance, API response times, and database health.
-Support production release management and controlled deployment activities.
-Maintain logging, error monitoring, and operational dashboards for issue visibility.
-Support configuration updates and environment maintenance across DEV/UAT/PROD.
-Provide periodic knowledge transfer and operational documentation updates.
-Conduct monthly service review meetings and backlog assessment.
-Deliverable:
-Stable, continuously monitored production application with defined SLAs, improved reliability, and controlled enhancement mechanisms.
-Goal 2: Dashboard Integration, Reporting & Data Continuity
-Objective:
-Ensure seamless reporting continuity and trusted business insights post-go-live of SCC Application.
-Activities:
-Switch Power BI (PBI) dashboard connectivity from legacy database to Production Azure SQL.
-Validate end-to-end data reconciliation between Legacy System and Azure SQL database.
-Support semantic model creation and optimization for reporting performance.
-Develop and enhance Power BI dashboards based on evolving business requirements.
-Perform dashboard validation and report certification before release.
-Maintain refresh schedules and monitor report execution failures.
-Implement data quality and consistency validation checks.
-Support new KPI, metric, and analytical report requests.
-Maintain reporting documentation and dashboard governance process.
-Deliverable:
-Fully functional Power BI dashboards connected to Production Azure SQL with validated reporting accuracy and operational continuity.
-Goal 3: Application Enhancement & Feature Expansion
-Objective:
-Support evolving business requirements through controlled application enhancements.
-Activities:
-Deliver approved minor and medium-scale feature enhancements.
-Enhance existing workflows, validations, and user experience improvements.
-Support configuration-driven business rule updates.
-Implement API enhancements and integration updates.
-Improve application scalability and maintainability.
-Conduct impact analysis for all enhancement requests.
-Maintain backward compatibility with existing production functionality.
-Deliverable:
-Enhanced application capabilities delivered through governed change management and controlled releases.
-Goal 4: Data Management, Compliance & Operational Support
-Objective:
-Ensure data integrity, operational continuity, and platform compliance.
-Activities:
-Support production data correction and controlled data maintenance activities.
-Execute data validation and reconciliation during production updates.
-Support archival, retention, and audit requirements.
-Monitor database performance and optimization opportunities.
-Maintain operational runbooks and SOPs.
-Support access requests and role management processes.
-Assist in audit preparation and production evidence gathering.
-Deliverable:
-Reliable and governed production operations with validated data integrity and compliance readiness.
-Goal 5: Performance, Monitoring & Technical Governance
-Objective:
-Maintain application performance, availability, and operational excellence.
-Activities:
-Monitor application availability and incident trends.
-Track API, backend, and database performance metrics.
-Perform periodic performance tuning and optimization.
-Support infrastructure configuration updates and deployment improvements.
-Conduct periodic security and dependency assessments.
-Implement preventive maintenance and technical debt reduction initiatives.
-Maintain technical documentation and architecture updates.
-Deliverable:
-High-performing, observable, and operationally governed production environment.
+SELECT
+    A.CustomerNum,
+    CAST(A.TotalPrem AS VARCHAR(50)) AS CurrentTotalPrem,
+    CAST(ROUND(COALESCE(P.Premium, 0), 2) AS DECIMAL(18,2)) AS NewTotalPrem
+FROM dbo.tblAcctSpecial A
+OUTER APPLY
+(
+    SELECT SUM(PremiumAmt) AS Premium
+    FROM dbo.tblPolicies P
+    WHERE P.CustomerNum = A.CustomerNum
+      AND P.PolicyStatus = 'Active'
+) P
+WHERE CAST(A.TotalPrem AS VARCHAR(50)) = '0.00';
+
+UPDATE A
+SET TotalPrem = CONVERT(TEXT,
+                        CONVERT(VARCHAR(50),
+                                CAST(FLOOR(COALESCE(P.Premium,0) * 100) / 100.0 AS DECIMAL(18,2))))
+FROM dbo.tblAcctSpecial A
+OUTER APPLY
+(
+    SELECT SUM(PremiumAmt) AS Premium
+    FROM dbo.tblPolicies P
+    WHERE P.CustomerNum = A.CustomerNum
+      AND P.PolicyStatus = 'Active'
+) P
+WHERE CAST(A.TotalPrem AS VARCHAR(50)) = '0.00';
