@@ -1,7 +1,11 @@
 UPDATE A
-SET TotalPrem = CONVERT(TEXT,
-                        CONVERT(VARCHAR(50),
-                                CAST(FLOOR(COALESCE(P.Premium,0) * 100) / 100.0 AS DECIMAL(18,2))))
+SET TotalPrem = CONVERT(
+                    TEXT,
+                    CONVERT(
+                        VARCHAR(50),
+                        CAST(FLOOR(COALESCE(P.Premium, 0) * 100) / 100.0 AS DECIMAL(18,2))
+                    )
+                )
 FROM dbo.tblAcctSpecial A
 OUTER APPLY
 (
@@ -10,4 +14,14 @@ OUTER APPLY
     WHERE P.CustomerNum = A.CustomerNum
       AND P.PolicyStatus = 'Active'
 ) P
-WHERE CAST(A.TotalPrem AS VARCHAR(50)) = '0.00';
+WHERE CAST(A.TotalPrem AS VARCHAR(50)) = '0.00'
+  AND CAST(A.CustomerNum AS VARCHAR(20)) NOT IN
+  (
+      '1510889532',
+      '1512695127',
+      '0038018290',
+      '1533972594',
+      '1518293878',
+      '1509457024',
+      '1518789664'
+  );
