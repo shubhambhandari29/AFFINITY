@@ -341,7 +341,6 @@ async def delete_records_async(
         partial(delete_records, table=table, data_list=data_list, key_columns=key_columns)
     )
 
-
 def update_records(
     table: str,
     updates: list[dict[str, Any]],
