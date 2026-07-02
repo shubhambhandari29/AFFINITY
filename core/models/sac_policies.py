@@ -10,7 +10,7 @@ class SacPolicyUpsert(BaseModel):
     PK_Number (identity column) is preferred when updating an existing row.
     """
 
-    PK_Number: int | None = None
+    PK_Number: int | str | None = None
     CustomerNum: str = Field(..., min_length=1)
     PolicyNum: str = Field(..., min_length=1)
     PolMod: str = Field(..., min_length=1)
