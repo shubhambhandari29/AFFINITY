@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblPolicies"
 PRIMARY_KEY = "PK_Number"
-ALLOWED_FILTERS = {"CustomerNum", "PolicyNum", "PolMod", "PK_Number"}
-PREMIUM_ALLOWED_FILTERS = {"CustomerNum", "PolicyNum", "PolMod", "PolicyStatus"}
+ALLOWED_FILTERS = {"CustomerNum", "PolicyNum", "PolMod", "PK_Number", "PolPref"}
+PREMIUM_ALLOWED_FILTERS = {"CustomerNum", "PolicyNum", "PolMod","PolPref", "PolicyStatus"}
 
 
 def _exclude_retired_stage(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -128,7 +128,6 @@ async def upsert_sac_policies(data: dict[str, Any]):
 
 
 async def update_field_for_all_policies(data: list[dict[str, Any]]):
-
     if not data:
         raise HTTPException(
             status_code=400,
@@ -136,7 +135,6 @@ async def update_field_for_all_policies(data: list[dict[str, Any]]):
         )
 
     normalized_updates = []
-
     try:
         for item in data:
 
@@ -213,7 +211,7 @@ async def get_premium(query_params: dict[str, Any]):
         query = "SELECT COALESCE(SUM(PremiumAmt), 0) AS Premium FROM tblPolicies"
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
-
+        print("QUERYY", query)
         rows = await run_raw_query_async(query, params)
         premium_value = rows[0]["Premium"] if rows else 0
         return premium_value
@@ -223,13 +221,13 @@ async def get_premium(query_params: dict[str, Any]):
     except Exception as e:
         logger.warning(f"Error fetching SAC policy premium - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
-    
+
+
 async def get_underwriter_details(query_params: dict[str, Any]):
     try:
         filters = sanitize_filters(query_params, ALLOWED_FILTERS)
 
         customer_num = filters.get("CustomerNum")
-
         if not customer_num:
             raise HTTPException(
                 status_code=400,
@@ -256,12 +254,12 @@ async def get_underwriter_details(query_params: dict[str, Any]):
                  = UPPER(LTRIM(RTRIM(uw.[UW Name])))
 
             LEFT JOIN tblUnderwriters uwmgr
-                ON UPPER(LTRIM(RTRIM(p.UWMgr)))
-                 = UPPER(LTRIM(RTRIM(uwmgr.[UW Name])))
+                ON UPPER(LTRIM(RTRIM(CAST(p.UWMgr as VARCHAR(MAX)))))
+                 = UPPER(LTRIM(RTRIM(CAST(uwmgr.[UW Name] as VARCHAR(MAX)))))
 
             LEFT JOIN tblMGTUsers m
-                ON UPPER(LTRIM(RTRIM(a.AcctOwner)))
-                 = UPPER(LTRIM(RTRIM(m.SACName)))
+                ON UPPER(LTRIM(RTRIM(CAST(a.AcctOwner as VARCHAR(MAX)))))
+                 = UPPER(LTRIM(RTRIM(CAST(m.SACName as VARCHAR(MAX)))))
 
             WHERE a.CustomerNum = ?
         """
