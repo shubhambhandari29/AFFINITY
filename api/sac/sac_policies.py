@@ -16,6 +16,16 @@ from services.sac.sac_policies_service import (
     upsert_sac_policies as upsert_sac_policies_service,
 )
 
+from core.models.sac_policies import (
+    SacPolicyBulkFieldUpdate,
+    SacPolicyUpsert,
+    SacPolicySyncAccountName,
+)
+
+from services.sac.sac_policies_service import (
+    sync_account_name as sync_account_name_service,
+)
+
 router = APIRouter(dependencies=[Depends(get_current_user_from_token)])
 
 
@@ -41,3 +51,7 @@ async def get_premium(request: Request):
 @router.get("/underwriter_details")
 async def get_underwriter_details(request: Request):
     return await get_underwriter_details_service(dict(request.query_params))
+
+@router.post("/sync_account_name")
+async def sync_account_name(payload: SacPolicySyncAccountName):
+    return await sync_account_name_service(payload.model_dump())

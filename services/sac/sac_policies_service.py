@@ -254,12 +254,12 @@ async def get_underwriter_details(query_params: dict[str, Any]):
                  = UPPER(LTRIM(RTRIM(uw.[UW Name])))
 
             LEFT JOIN tblUnderwriters uwmgr
-                ON UPPER(LTRIM(RTRIM(CAST(p.UWMgr as VARCHAR(MAX)))))
-                 = UPPER(LTRIM(RTRIM(CAST(uwmgr.[UW Name] as VARCHAR(MAX)))))
+                ON UPPER(LTRIM(RTRIM(CAST(p.UWMgr AS VARCHAR(MAX)))))
+                 = UPPER(LTRIM(RTRIM(CAST(uwmgr.[UW Name] AS VARCHAR(MAX)))))
 
             LEFT JOIN tblMGTUsers m
-                ON UPPER(LTRIM(RTRIM(CAST(a.AcctOwner as VARCHAR(MAX)))))
-                 = UPPER(LTRIM(RTRIM(CAST(m.SACName as VARCHAR(MAX)))))
+                ON UPPER(LTRIM(RTRIM(CAST(a.AcctOwner AS VARCHAR(MAX)))))
+                 = UPPER(LTRIM(RTRIM(CAST(m.SACName AS VARCHAR(MAX)))))
 
             WHERE a.CustomerNum = ?
         """
@@ -271,11 +271,27 @@ async def get_underwriter_details(query_params: dict[str, Any]):
 
         acct_owner_email = records[0].get("AcctOwnerEmail")
 
+        underwriter_names = sorted(
+            {
+                record["UnderwriterName"]
+                for record in records
+                if record.get("UnderwriterName")
+            }
+        )
+
         underwriter_emails = sorted(
             {
                 record["UnderwriterEmail"]
                 for record in records
                 if record.get("UnderwriterEmail")
+            }
+        )
+
+        uw_manager_names = sorted(
+            {
+                record["UWMgr"]
+                for record in records
+                if record.get("UWMgr")
             }
         )
 
@@ -305,7 +321,9 @@ async def get_underwriter_details(query_params: dict[str, Any]):
 
         return {
             "AcctOwnerEmail": acct_owner_email,
+            "UnderwriterNames": underwriter_names,
             "UnderwriterEmails": underwriter_emails,
+            "UWMgrNames": uw_manager_names,
             "UWMgrEmails": uw_manager_emails,
             "MissingUnderwriters": missing_underwriters,
             "MissingUWManagers": missing_uw_managers,
@@ -316,3 +334,37 @@ async def get_underwriter_details(query_params: dict[str, Any]):
     except Exception as exc:
         logger.warning(f"Error fetching underwriter details - {str(exc)}")
         raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc
+
+
+async def sync_account_name(data: dict[str, Any]):
+    try:
+        customer_num = data.get("CustomerNum")
+        account_name = data.get("AccountName")
+
+        if not customer_num:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "CustomerNum is required"},
+            )
+
+        return await update_records_async(
+            table=TABLE_NAME,
+            updates=[
+                {
+                    "fieldName": "AccountName",
+                    "fieldValue": account_name,
+                    "updateVia": "CustomerNum",
+                    "updateViaValue": customer_num,
+                }
+            ],
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as exc:
+        logger.error(f"Error syncing account name: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": str(exc)},
+        ) from exc

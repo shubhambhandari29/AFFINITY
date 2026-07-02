@@ -73,3 +73,8 @@ def normalize_money_string(value: Any) -> str | None:
     if "." in as_text:
         as_text = as_text.rstrip("0").rstrip(".")
     return as_text or "0"
+
+
+class SacPolicySyncAccountName(BaseModel):
+    CustomerNum: str = Field(..., min_length=1)
+    AccountName: str
