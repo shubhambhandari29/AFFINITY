@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import struct
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+import pytest
 
 import db
 
@@ -19,21 +21,6 @@ def test_build_connection_string_uses_settings(monkeypatch):
     assert "Server=server;" in conn_str
     assert "Database=db;" in conn_str
     assert "Authentication=auth;" in conn_str
-    assert conn_str.endswith("Encrypt=yes;TrustServerCertificate=no;")
-
-
-def test_build_connection_string_omits_authentication_for_token_mode(monkeypatch):
-    class DummySettings:
-        DB_DRIVER = "{Driver}"
-        DB_SERVER = "server"
-        DB_NAME = "db"
-        DB_AUTH = "DefaultAzureCredential"
-
-    monkeypatch.setattr(db, "settings", DummySettings)
-
-    conn_str = db._build_connection_string()
-
-    assert "Authentication=" not in conn_str
     assert conn_str.endswith("Encrypt=yes;TrustServerCertificate=no;")
 
 
@@ -91,64 +78,6 @@ def test_get_raw_connection_adds_output_converter(monkeypatch):
         123,
         db._handle_datetimeoffset,
     )
-
-
-def test_get_raw_connection_uses_access_token_for_token_mode(monkeypatch):
-    class DummySettings:
-        DB_AUTH = "AzureCliCredential"
-        AZURE_SQL_TOKEN_SCOPE = "scope"
-
-    class FakeToken:
-        token = "abc"
-
-    class FakeCredential:
-        def __init__(self):
-            self.scopes = []
-
-        def get_token(self, scope):
-            self.scopes.append(scope)
-            return FakeToken()
-
-    class FakeConn:
-        def __init__(self):
-            self.converter_args = None
-
-        def add_output_converter(self, dtype, func):
-            self.converter_args = (dtype, func)
-
-    class FakePyodbc:
-        SQL_SS_TIMESTAMPOFFSET = 123
-
-        def __init__(self):
-            self.connect_args = None
-            self.conn = FakeConn()
-
-        def connect(self, conn_str, **kwargs):
-            self.connect_args = (conn_str, kwargs)
-            return self.conn
-
-    fake_pyodbc = FakePyodbc()
-    fake_credential = FakeCredential()
-
-    monkeypatch.setattr(db, "settings", DummySettings)
-    monkeypatch.setattr(db, "pyodbc", fake_pyodbc)
-    monkeypatch.setattr(db, "_build_connection_string", lambda: "conn-str")
-    monkeypatch.setattr(db, "_get_access_token_credential", lambda auth_mode: fake_credential)
-
-    conn = db.get_raw_connection()
-
-    assert conn is fake_pyodbc.conn
-    assert fake_credential.scopes == ["scope"]
-    assert fake_pyodbc.connect_args is not None
-    conn_str, kwargs = fake_pyodbc.connect_args
-    assert conn_str == "conn-str"
-    token_struct = kwargs["attrs_before"][db.SQL_COPT_SS_ACCESS_TOKEN]
-    expected_token = struct.pack(
-        "<I6s",
-        6,
-        "abc".encode("utf-16-le"),
-    )
-    assert token_struct == expected_token
 
 
 def test_get_raw_connection_ignores_converter_errors(monkeypatch):

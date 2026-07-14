@@ -4,10 +4,8 @@ import struct
 import warnings
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from functools import lru_cache
 
 import pyodbc
-from azure.identity import AzureCliCredential, DefaultAzureCredential
 
 from core.config import settings
 
@@ -15,52 +13,17 @@ warnings.filterwarnings(
     "ignore", category=UserWarning, message="pandas only supports SQLAlchemy connectable"
 )
 
-SQL_COPT_SS_ACCESS_TOKEN = 1256
-TOKEN_AUTH_MODES = {
-    "azurecli",
-    "azureclicredential",
-    "defaultazurecredential",
-}
-
 
 # Build SQL connection string
 def _build_connection_string() -> str:
-    authentication = str(settings.DB_AUTH or "").strip()
-    auth_section = ""
-    if authentication and authentication.casefold() not in TOKEN_AUTH_MODES:
-        auth_section = f"Authentication={authentication};"
-
     return (
         f"Driver={settings.DB_DRIVER};"
         f"Server={settings.DB_SERVER};"
         f"Database={settings.DB_NAME};"
-        f"{auth_section}"
+        f"Authentication={settings.DB_AUTH};"
         "Encrypt=yes;"
         "TrustServerCertificate=no;"
     )
-
-
-def _normalized_auth_mode() -> str:
-    return str(settings.DB_AUTH or "").strip().casefold()
-
-
-def _uses_access_token_auth() -> bool:
-    return _normalized_auth_mode() in TOKEN_AUTH_MODES
-
-
-@lru_cache(maxsize=4)
-def _get_access_token_credential(auth_mode: str):
-    if auth_mode in {"azurecli", "azureclicredential"}:
-        return AzureCliCredential()
-
-    return DefaultAzureCredential(exclude_interactive_browser_credential=True)
-
-
-def _get_access_token_bytes() -> bytes:
-    credential = _get_access_token_credential(_normalized_auth_mode())
-    access_token = credential.get_token(settings.AZURE_SQL_TOKEN_SCOPE)
-    token_bytes = access_token.token.encode("utf-16-le")
-    return struct.pack(f"<I{len(token_bytes)}s", len(token_bytes), token_bytes)
 
 
 def _handle_datetimeoffset(dto_value: bytes | bytearray | memoryview | None) -> datetime | None:
@@ -95,13 +58,7 @@ def get_raw_connection() -> pyodbc.Connection:
     Services or context managers will use this.
     """
     conn_str = _build_connection_string()
-    connect_kwargs = {}
-    if _uses_access_token_auth():
-        connect_kwargs["attrs_before"] = {
-            SQL_COPT_SS_ACCESS_TOKEN: _get_access_token_bytes()
-        }
-
-    conn = pyodbc.connect(conn_str, **connect_kwargs)
+    conn = pyodbc.connect(conn_str)
     datetimeoffset_type = getattr(pyodbc, "SQL_SS_TIMESTAMPOFFSET", -155)
     try:
         conn.add_output_converter(datetimeoffset_type, _handle_datetimeoffset)

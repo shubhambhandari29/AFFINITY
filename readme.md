@@ -48,8 +48,7 @@ Each route validates input with a Pydantic schema, enforces authentication where
    DB_DRIVER={ODBC Driver 17 for SQL Server}
    DB_SERVER=<server>.database.windows.net
    DB_NAME=<database>
-   DB_AUTH=DefaultAzureCredential
-   AZURE_SQL_TOKEN_SCOPE=https://database.windows.net/.default
+   DB_AUTH=ActiveDirectoryInteractive
    SECRET_KEY=<random-64-character-string>
    ACCESS_TOKEN_VALIDITY=480
    REFRESH_TOKEN_VALIDITY=10080
@@ -60,8 +59,6 @@ Each route validates input with a Pydantic schema, enforces authentication where
    ```
    For multiple allowed frontend origins, use a comma-separated value:
    `FRONTEND_URL=https://sacplatformwebpreprd.azurewebsites.net,https://sacplatformpreprd.allmerica.com`
-
-   For local development, `DefaultAzureCredential` lets the app use your existing Azure CLI or other local developer login instead of prompting through the ODBC interactive flow on every backend reload. Run `az login` once if you want the CLI-backed path.
 
    Do not commit real secrets. Use your deployment platform's secret store in non-local environments.
 
