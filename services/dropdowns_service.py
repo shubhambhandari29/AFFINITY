@@ -6,7 +6,12 @@ from typing import Any
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 
-from core.db_helpers import run_raw_query_async
+from core.db_helpers import (
+    UPDATE_DATETIME_COLUMN,
+    run_raw_query_async,
+    strip_update_datetime,
+    table_supports_update_datetime,
+)
 from db import db_connection
 
 logger = logging.getLogger(__name__)
@@ -275,8 +280,10 @@ def _merge_upsert_dropdown_records(
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
+            supports_update_datetime = table_supports_update_datetime(cursor, table)
 
-            for data in data_list:
+            for incoming_data in data_list:
+                data = strip_update_datetime(incoming_data)
                 columns = list(data.keys())
                 for column in columns:
                     _ensure_safe_identifier(column)
@@ -302,23 +309,43 @@ def _merge_upsert_dropdown_records(
                 )
                 update_section = ""
                 if update_set:
+                    if supports_update_datetime:
+                        update_set += (
+                            f", {_quote_identifier(UPDATE_DATETIME_COLUMN)} = SYSDATETIMEOFFSET()"
+                        )
+                        difference_clause = " OR ".join(
+                            [
+                                f"(target.{_quote_identifier(col)} <> source.{_quote_identifier(col)} "
+                                f"OR (target.{_quote_identifier(col)} IS NULL "
+                                f"AND source.{_quote_identifier(col)} IS NOT NULL) "
+                                f"OR (target.{_quote_identifier(col)} IS NOT NULL "
+                                f"AND source.{_quote_identifier(col)} IS NULL))"
+                                for col in update_cols
+                            ]
+                        )
+                        match_condition = f" AND ({difference_clause})"
+                    else:
+                        match_condition = ""
                     update_section = f"""
-WHEN MATCHED THEN
+WHEN MATCHED{match_condition} THEN
     UPDATE SET {update_set}
 """
 
                 insert_columns = (
                     [col for col in columns if col not in key_columns]
                     if exclude_key_columns_from_insert
-                    else columns
+                    else list(columns)
                 )
                 if not insert_columns:
                     raise ValueError("No columns available for insert operation")
 
+                insert_values = [f"source.{_quote_identifier(col)}" for col in insert_columns]
+                if supports_update_datetime:
+                    insert_columns.append(UPDATE_DATETIME_COLUMN)
+                    insert_values.append("SYSDATETIMEOFFSET()")
+
                 insert_columns_sql = ", ".join([_quote_identifier(col) for col in insert_columns])
-                insert_values_sql = ", ".join(
-                    [f"source.{_quote_identifier(col)}" for col in insert_columns]
-                )
+                insert_values_sql = ", ".join(insert_values)
 
                 merge_query = f"""
 MERGE INTO {_quote_identifier(table)} AS target
@@ -362,8 +389,10 @@ def _insert_dropdown_records(
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
+            supports_update_datetime = table_supports_update_datetime(cursor, table)
 
-            for record in records:
+            for incoming_record in records:
+                record = strip_update_datetime(incoming_record)
                 if not record:
                     continue
 
@@ -373,6 +402,9 @@ def _insert_dropdown_records(
 
                 placeholders = ", ".join(["?"] * len(columns))
                 column_clause = ", ".join([_quote_identifier(col) for col in columns])
+                if supports_update_datetime:
+                    column_clause += f", {_quote_identifier(UPDATE_DATETIME_COLUMN)}"
+                    placeholders += ", SYSDATETIMEOFFSET()"
                 query = f"INSERT INTO {_quote_identifier(table)} ({column_clause}) VALUES ({placeholders})"
                 values = [record[col] for col in columns]
                 cursor.execute(query, values)

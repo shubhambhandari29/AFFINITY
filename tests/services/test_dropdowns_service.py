@@ -244,6 +244,9 @@ def test_merge_upsert_dropdown_records_executes_queries(monkeypatch):
         yield FakeConn()
 
     monkeypatch.setattr(dropdowns_service, "db_connection", fake_db_connection)
+    monkeypatch.setattr(
+        dropdowns_service, "table_supports_update_datetime", lambda cursor, table: False
+    )
 
     result = dropdowns_service._merge_upsert_dropdown_records(
         "tblDropDowns",
@@ -279,6 +282,9 @@ def test_insert_and_delete_dropdown_records(monkeypatch):
         yield FakeConn()
 
     monkeypatch.setattr(dropdowns_service, "db_connection", fake_db_connection)
+    monkeypatch.setattr(
+        dropdowns_service, "table_supports_update_datetime", lambda cursor, table: False
+    )
 
     insert_result = dropdowns_service._insert_dropdown_records(
         "tblDropDowns", [{"DD_Value": "A"}, {}]
@@ -291,3 +297,49 @@ def test_insert_and_delete_dropdown_records(monkeypatch):
     )
     assert delete_result == {"message": "Deletion successful", "count": 1}
     assert "DELETE FROM [tblDropDowns]" in executed[-1][0]
+
+
+def test_dropdown_writes_stamp_when_update_datetime_is_available(monkeypatch):
+    executed = []
+
+    class FakeCursor:
+        def execute(self, query, values):
+            executed.append((query, values))
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            return None
+
+    @contextmanager
+    def fake_db_connection():
+        yield FakeConn()
+
+    monkeypatch.setattr(dropdowns_service, "db_connection", fake_db_connection)
+    monkeypatch.setattr(
+        dropdowns_service, "table_supports_update_datetime", lambda cursor, table: True
+    )
+
+    dropdowns_service._merge_upsert_dropdown_records(
+        "tblDropDowns",
+        [{"DD_Key": 1, "DD_Value": "A", "UpdateDateTime": "client value"}],
+        ["DD_Key"],
+    )
+    dropdowns_service._insert_dropdown_records(
+        "tblDropDowns", [{"DD_Value": "A", "UpdateDateTime": "client value"}]
+    )
+
+    merge_query, merge_values = executed[0]
+    assert "[UpdateDateTime] = SYSDATETIMEOFFSET()" in merge_query
+    assert "INSERT ([DD_Key], [DD_Value], [UpdateDateTime])" in merge_query
+    assert "? AS [UpdateDateTime]" not in merge_query
+    assert merge_values == [1, "A"]
+
+    insert_query, insert_values = executed[1]
+    assert insert_query == (
+        "INSERT INTO [tblDropDowns] ([DD_Value], [UpdateDateTime]) "
+        "VALUES (?, SYSDATETIMEOFFSET())"
+    )
+    assert insert_values == ["A"]

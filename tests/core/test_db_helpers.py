@@ -42,6 +42,23 @@ def test_build_select_query_without_filters():
     assert params == []
 
 
+def test_table_supports_update_datetime_requires_datetimeoffset_seven():
+    captured = {}
+
+    class FakeCursor:
+        def execute(self, query, values):
+            captured["query"] = query
+            captured["values"] = values
+
+        def fetchone(self):
+            return (1,)
+
+    assert db_helpers.table_supports_update_datetime(FakeCursor(), "MyTable") is True
+    assert "type_info.name = 'datetimeoffset'" in captured["query"]
+    assert "column_info.scale = 7" in captured["query"]
+    assert captured["values"] == ["MyTable", "UpdateDateTime"]
+
+
 def test_fetch_records_converts_nan_to_none(monkeypatch):
     captured = {}
 
@@ -105,6 +122,7 @@ def test_merge_upsert_records_builds_merge_query(monkeypatch):
     import db
 
     monkeypatch.setattr(db, "db_connection", fake_db_connection)
+    monkeypatch.setattr(db_helpers, "table_supports_update_datetime", lambda cursor, table: False)
 
     result = db_helpers.merge_upsert_records(
         "MyTable",
@@ -142,6 +160,7 @@ def test_merge_upsert_records_excludes_key_columns_when_requested(monkeypatch):
     import db
 
     monkeypatch.setattr(db, "db_connection", fake_db_connection)
+    monkeypatch.setattr(db_helpers, "table_supports_update_datetime", lambda cursor, table: False)
 
     db_helpers.merge_upsert_records(
         "MyTable",
@@ -175,12 +194,173 @@ def test_insert_records_builds_insert_query(monkeypatch):
     import db
 
     monkeypatch.setattr(db, "db_connection", fake_db_connection)
+    monkeypatch.setattr(db_helpers, "table_supports_update_datetime", lambda cursor, table: False)
 
     result = db_helpers.insert_records("MyTable", [{"id": 1, "name": "Bob"}])
     assert result == {"message": "Insertion successful", "count": 1}
     query, values = executed[0]
     assert query == "INSERT INTO MyTable (id, name) VALUES (?, ?)"
     assert values == [1, "Bob"]
+
+
+def test_merge_upsert_records_stamps_only_changed_business_fields(monkeypatch):
+    executed = []
+
+    class FakeCursor:
+        def execute(self, query, values):
+            executed.append((query, values))
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            return None
+
+    @contextmanager
+    def fake_db_connection():
+        yield FakeConn()
+
+    import db
+
+    monkeypatch.setattr(db, "db_connection", fake_db_connection)
+    monkeypatch.setattr(db_helpers, "table_supports_update_datetime", lambda cursor, table: True)
+
+    db_helpers.merge_upsert_records(
+        "MyTable",
+        data_list=[{"id": 1, "name": "Alice", "UpdateDateTime": "client value"}],
+        key_columns=["id"],
+    )
+
+    query, values = executed[0]
+    assert "WHEN MATCHED AND" in query
+    assert "target.name <> source.name" in query
+    assert "UpdateDateTime = SYSDATETIMEOFFSET()" in query
+    assert "INSERT (id, name, UpdateDateTime)" in query
+    assert "VALUES (source.id, source.name, SYSDATETIMEOFFSET())" in query
+    assert "? AS UpdateDateTime" not in query
+    assert values == [1, "Alice"]
+
+
+def test_insert_records_stamps_and_ignores_client_timestamp(monkeypatch):
+    executed = []
+
+    class FakeCursor:
+        def execute(self, query, values):
+            executed.append((query, values))
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            return None
+
+    @contextmanager
+    def fake_db_connection():
+        yield FakeConn()
+
+    import db
+
+    monkeypatch.setattr(db, "db_connection", fake_db_connection)
+    monkeypatch.setattr(db_helpers, "table_supports_update_datetime", lambda cursor, table: True)
+
+    db_helpers.insert_records(
+        "MyTable", [{"id": 1, "name": "Bob", "UpdateDateTime": "client value"}]
+    )
+
+    query, values = executed[0]
+    assert query == (
+        "INSERT INTO MyTable (id, name, UpdateDateTime) "
+        "VALUES (?, ?, SYSDATETIMEOFFSET())"
+    )
+    assert values == [1, "Bob"]
+
+
+def test_update_records_stamps_only_when_value_changes(monkeypatch):
+    executed = []
+
+    class FakeCursor:
+        rowcount = 1
+
+        def execute(self, query, values):
+            executed.append((query, values))
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            return None
+
+    @contextmanager
+    def fake_db_connection():
+        yield FakeConn()
+
+    import db
+
+    monkeypatch.setattr(db, "db_connection", fake_db_connection)
+    monkeypatch.setattr(db_helpers, "table_supports_update_datetime", lambda cursor, table: True)
+
+    result = db_helpers.update_records(
+        "MyTable",
+        [
+            {
+                "fieldName": "name",
+                "fieldValue": "Alice",
+                "updateVia": "id",
+                "updateViaValue": 1,
+            }
+        ],
+    )
+
+    query, values = executed[0]
+    assert "SET name = ?, UpdateDateTime = SYSDATETIMEOFFSET()" in query
+    assert "name <> ?" in query
+    assert values == ("Alice", 1, "Alice", "Alice", "Alice")
+    assert result == {"message": "Update successful", "count": 1}
+
+
+def test_update_records_keeps_existing_query_without_timestamp_column(monkeypatch):
+    executed = []
+
+    class FakeCursor:
+        rowcount = 1
+
+        def execute(self, query, values):
+            executed.append((query, values))
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            return None
+
+    @contextmanager
+    def fake_db_connection():
+        yield FakeConn()
+
+    import db
+
+    monkeypatch.setattr(db, "db_connection", fake_db_connection)
+    monkeypatch.setattr(db_helpers, "table_supports_update_datetime", lambda cursor, table: False)
+
+    db_helpers.update_records(
+        "MyTable",
+        [
+            {
+                "fieldName": "name",
+                "fieldValue": "Alice",
+                "updateVia": "id",
+                "updateViaValue": 1,
+            }
+        ],
+    )
+
+    query, values = executed[0]
+    assert "UpdateDateTime" not in query
+    assert values == ("Alice", 1)
 
 
 def test_delete_records_builds_delete_query(monkeypatch):
