@@ -14,65 +14,11 @@ from db import db_connection
 logger = logging.getLogger(__name__)
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-UPDATE_DATETIME_COLUMN = "UpdateDateTime"
 
 
 def _ensure_safe_identifier(identifier: str) -> None:
     if not identifier or not _IDENTIFIER_PATTERN.match(identifier):
         raise ValueError(f"Invalid column or table name: {identifier}")
-
-
-def strip_update_datetime(data: dict[str, Any]) -> dict[str, Any]:
-    """Prevent callers from supplying the system-managed audit timestamp."""
-    return {
-        column: value
-        for column, value in data.items()
-        if column.casefold() != UPDATE_DATETIME_COLUMN.casefold()
-    }
-
-
-def table_supports_update_datetime(cursor: Any, table: str) -> bool:
-    """Return whether the target table has the expected audit timestamp column."""
-    _ensure_safe_identifier(table)
-
-    query = """
-        SELECT CASE WHEN EXISTS (
-            SELECT 1
-            FROM sys.columns AS column_info
-            INNER JOIN sys.types AS type_info
-                ON type_info.user_type_id = column_info.user_type_id
-            WHERE column_info.object_id = OBJECT_ID(?)
-              AND column_info.name = ?
-              AND type_info.name = 'datetimeoffset'
-              AND column_info.scale = 7
-        ) THEN 1 ELSE 0 END
-    """
-
-    try:
-        cursor.execute(query, [table, UPDATE_DATETIME_COLUMN])
-        row = cursor.fetchone()
-        return bool(row and row[0])
-    except Exception:
-        # Missing metadata access must not prevent an otherwise valid business write.
-        logger.warning(
-            "Could not verify %s on %s; skipping the audit timestamp",
-            UPDATE_DATETIME_COLUMN,
-            table,
-            exc_info=True,
-        )
-        return False
-
-
-def _build_value_difference_clause(columns: list[str]) -> str:
-    """Build a null-safe comparison between MERGE target and source columns."""
-    return " OR ".join(
-        (
-            f"(target.{column} <> source.{column} "
-            f"OR (target.{column} IS NULL AND source.{column} IS NOT NULL) "
-            f"OR (target.{column} IS NOT NULL AND source.{column} IS NULL))"
-        )
-        for column in columns
-    )
 
 
 def sanitize_filters(
@@ -187,10 +133,8 @@ def merge_upsert_records(
     try:
         with _db_connection() as conn:
             cursor = conn.cursor()
-            supports_update_datetime = table_supports_update_datetime(cursor, table)
 
-            for incoming_data in data_list:
-                data = strip_update_datetime(incoming_data)
+            for data in data_list:
                 columns = list(data.keys())
                 for column in columns:
                     _ensure_safe_identifier(column)
@@ -210,29 +154,18 @@ def merge_upsert_records(
                 )
                 update_section = ""
                 if update_set:
-                    if supports_update_datetime:
-                        update_set += f", {UPDATE_DATETIME_COLUMN} = SYSDATETIMEOFFSET()"
-                        difference_clause = _build_value_difference_clause(update_cols)
-                        match_condition = f" AND ({difference_clause})"
-                    else:
-                        match_condition = ""
                     update_section = f"""
-WHEN MATCHED{match_condition} THEN
+WHEN MATCHED THEN
     UPDATE SET {update_set}
 """
 
                 insert_columns = (
                     [col for col in columns if col not in key_columns]
                     if exclude_key_columns_from_insert
-                    else list(columns)
+                    else columns
                 )
                 if not insert_columns:
                     raise ValueError("No columns available for insert operation")
-
-                insert_values = ["source." + col for col in insert_columns]
-                if supports_update_datetime:
-                    insert_columns.append(UPDATE_DATETIME_COLUMN)
-                    insert_values.append("SYSDATETIMEOFFSET()")
 
                 merge_query = f"""
 MERGE INTO {table} AS target
@@ -240,7 +173,7 @@ USING (SELECT {using_cols}) AS source
 ON {on_clause}
 {update_section}WHEN NOT MATCHED THEN
     INSERT ({", ".join(insert_columns)})
-    VALUES ({", ".join(insert_values)});
+    VALUES ({", ".join(["source." + col for col in insert_columns])});
 """
                 values = list(data.values())
                 cursor.execute(merge_query, values)
@@ -279,10 +212,8 @@ def insert_records(
     try:
         with _db_connection() as conn:
             cursor = conn.cursor()
-            supports_update_datetime = table_supports_update_datetime(cursor, table)
 
-            for incoming_record in records:
-                record = strip_update_datetime(incoming_record)
+            for record in records:
                 if not record:
                     continue
 
@@ -292,9 +223,6 @@ def insert_records(
 
                 placeholders = ", ".join(["?"] * len(columns))
                 column_clause = ", ".join(columns)
-                if supports_update_datetime:
-                    column_clause += f", {UPDATE_DATETIME_COLUMN}"
-                    placeholders += ", SYSDATETIMEOFFSET()"
                 query = f"INSERT INTO {table} ({column_clause}) VALUES ({placeholders})"
                 values = [record[col] for col in columns]
                 cursor.execute(query, values)
@@ -440,7 +368,6 @@ def update_records(
     try:
         with _db_connection() as conn:
             cursor = conn.cursor()
-            supports_update_datetime = table_supports_update_datetime(cursor, table)
 
             total_count = 0
 
@@ -451,39 +378,19 @@ def update_records(
                 _ensure_safe_identifier(field_name)
                 _ensure_safe_identifier(update_via)
 
-                if field_name.casefold() == UPDATE_DATETIME_COLUMN.casefold():
-                    raise ValueError(f"{UPDATE_DATETIME_COLUMN} is system-managed")
-
-                if supports_update_datetime:
-                    query = f"""
-                    UPDATE {table}
-                    SET {field_name} = ?, {UPDATE_DATETIME_COLUMN} = SYSDATETIMEOFFSET()
-                    WHERE {update_via} = ?
-                      AND (
-                          {field_name} <> ?
-                          OR ({field_name} IS NULL AND ? IS NOT NULL)
-                          OR ({field_name} IS NOT NULL AND ? IS NULL)
-                      )
-                    """
-                    values = (
-                        update["fieldValue"],
-                        update["updateViaValue"],
-                        update["fieldValue"],
-                        update["fieldValue"],
-                        update["fieldValue"],
-                    )
-                else:
-                    query = f"""
+                query = f"""
                     UPDATE {table}
                     SET {field_name} = ?
                     WHERE {update_via} = ?
-                    """
-                    values = (
+                """
+
+                cursor.execute(
+                    query,
+                    (
                         update["fieldValue"],
                         update["updateViaValue"],
-                    )
-
-                cursor.execute(query, values)
+                    ),
+                )
 
                 if cursor.rowcount and cursor.rowcount > 0:
                     total_count += cursor.rowcount
