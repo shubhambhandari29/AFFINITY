@@ -38,7 +38,6 @@ from api.sac.search_sac_account import router as search_sac_account_router
 from core.config import settings
 
 app = FastAPI()
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
