@@ -33,6 +33,9 @@ class Settings:
     DB_NAME: str | None = os.getenv("DB_NAME")
     DB_DRIVER: str = os.getenv("DB_DRIVER", "{ODBC Driver 17 for SQL Server}")
     DB_AUTH: str | None = os.getenv("DB_AUTH")
+    AZURE_SQL_TOKEN_SCOPE: str = os.getenv(
+        "AZURE_SQL_TOKEN_SCOPE", "https://database.windows.net/.default"
+    )
 
     # Azure AD app credentials (used with SSO login)
     AZURE_TENANT_ID: str | None = os.getenv("AZURE_TENANT_ID")
