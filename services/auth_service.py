@@ -313,6 +313,7 @@ async def f5_login_user(login_data: dict[str, Any], response: Response):
         )
 
     role = _resolve_role_from_groups(groups)
+    print("Roles for user: ", role)
     if not role:
         logger.warning("F5 login failed: no SAC role groups matched (%s)", user_identifier)
         raise HTTPException(
@@ -423,4 +424,3 @@ async def refresh_user_token(request: Request, response: Response, token: str | 
     logger.info("Token refreshed for user %s", refreshed_user_identifier)
 
     return {"message": "Token refreshed", "token": new_token}
-

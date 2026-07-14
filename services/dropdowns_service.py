@@ -29,6 +29,11 @@ _DROPDOWN_QUERIES: dict[str, DropdownQuery] = {
         FROM tblMGTUsers
         ORDER BY SACName
     """,
+    "MgmtUsers": """
+        SELECT SACName, EMailID, EmpTitle, TelNum, TelExt, LANID, FaxNum, CellNum
+        FROM tblMGTUsers
+        ORDER BY SACName
+    """,
     "LossCtlRep1": """
         SELECT PK_Number, RepName, LCEmail, LCTel, LAN_ID
         FROM tblLossCtrl
@@ -88,6 +93,11 @@ _DROPDOWN_DEFINITIONS: dict[str, dict[str, Any]] = {
         "columns": ["SACName", "EmpTitle", "TelNum", "EMailID", "TelExt", "FaxNum", "CellNum"],
     },
     "AcctOwner": {
+        "table": "tblMGTUsers",
+        "primary_key": "LANID",
+        "columns": ["SACName", "EmpTitle", "TelNum", "EMailID", "TelExt", "FaxNum", "CellNum"],
+    },
+    "MgmtUsers": {
         "table": "tblMGTUsers",
         "primary_key": "LANID",
         "columns": ["SACName", "EmpTitle", "TelNum", "EMailID", "TelExt", "FaxNum", "CellNum"],
