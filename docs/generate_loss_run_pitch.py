@@ -119,15 +119,19 @@ def bullet_list(slide, items, x, y, w, h, size=15, color=DARK, bullet_color=TEAL
 
 
 # 1 — Cover
-slide = prs.slides.add_slide(prs.slide_layouts[6]); set_bg(slide, ORANGE)
-add_text(slide, "SPECIAL ACCOUNTS", 0.75, 0.62, 4.5, 0.3, 11, WHITE, True)
-add_text(slide, "Loss Run Generation", 0.75, 1.32, 8.7, 0.7, 34, WHITE, True)
-add_text(slide, "Current-state understanding and application integration proposal", 0.75, 2.12, 9.8, 0.55, 20, RGBColor(218, 228, 239))
-rounded_box(slide, "DISCOVERY SUMMARY", 0.78, 3.15, 2.25, 0.48, NAVY, NAVY, WHITE, 11)
-add_text(slide, "What happens today  •  What can be reused  •  What a future user flow could look like", 0.8, 3.95, 10.5, 0.5, 16, WHITE)
-for i, (label, fill) in enumerate([("DATA", NAVY), ("PROCESS", TEAL), ("EXCEL", GOLD), ("APPLICATION", NAVY)]):
-    rounded_box(slide, label, 0.8 + i*2.15, 5.15, 1.75, 0.62, fill, fill, WHITE, 12)
-add_text(slide, "Prepared from SpecialAccountsToExcel.py and the supplied SAC_Loss_Run view definition", 0.8, 6.72, 11.3, 0.25, 9, WHITE)
+slide = prs.slides.add_slide(prs.slide_layouts[6]); set_bg(slide, WHITE)
+accent = slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.RECTANGLE, Inches(0), Inches(0), Inches(0.26), Inches(7.5))
+accent.fill.solid(); accent.fill.fore_color.rgb = ORANGE; accent.line.fill.background()
+corner = slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.RECTANGLE, Inches(10.70), Inches(0), Inches(2.63), Inches(0.34))
+corner.fill.solid(); corner.fill.fore_color.rgb = ORANGE; corner.line.fill.background()
+add_text(slide, "SPECIAL ACCOUNTS", 0.82, 0.72, 4.5, 0.3, 11, ORANGE, True)
+add_text(slide, "Loss Run Generation", 0.82, 1.48, 9.8, 0.72, 36, NAVY, True)
+add_text(slide, "Current-state understanding and application integration proposal", 0.82, 2.35, 10.8, 0.55, 20, DARK)
+line = slide.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.RECTANGLE, Inches(0.84), Inches(3.20), Inches(1.35), Inches(0.07))
+line.fill.solid(); line.fill.fore_color.rgb = ORANGE; line.line.fill.background()
+add_text(slide, "Purpose", 0.82, 3.65, 1.2, 0.30, 14, ORANGE, True)
+add_text(slide, "Document what the existing loss-run process does today and present a possible path to make it available through the current application.", 0.82, 4.08, 10.75, 1.10, 22, NAVY, True)
+add_text(slide, "Prepared from SpecialAccountsToExcel.py and the supplied SAC_Loss_Run view definition", 0.84, 6.72, 11.3, 0.25, 9, MID_GREY)
 
 
 # 2 — Executive understanding
@@ -153,36 +157,52 @@ footer(slide, 2)
 
 # 3 — Source systems
 slide = prs.slides.add_slide(prs.slide_layouts[6]); set_bg(slide)
-title(slide, "Current source systems and database relationship", "Current state")
-rounded_box(slide, "Same SQL Server / Managed Instance", 3.05, 1.48, 7.25, 0.64, NAVY, NAVY, WHITE, 18)
-arrow(slide, 4.52, 2.18, 0.38, 0.45, "down", TEAL)
-arrow(slide, 8.40, 2.18, 0.38, 0.45, "down", TEAL)
-rounded_box(slide, "CLM_LakeHouse", 0.72, 2.70, 5.75, 2.95, LIGHT_BLUE, BLUE, NAVY, 21,
+title(slide, "Where the view lives—and where its data comes from", "Current state")
+rounded_box(slide, "Same SQL Server / Managed Instance", 2.35, 1.40, 8.65, 0.58, NAVY, NAVY, WHITE, 17)
+rounded_box(slide, "CLM_LakeHouse", 0.72, 2.45, 5.15, 3.20, LIGHT_BLUE, ORANGE, NAVY, 21,
             "Claims source database")
-rounded_box(slide, "CLMAA_SpecialAccounts", 6.85, 2.70, 5.75, 2.95, LIGHT_TEAL, TEAL, NAVY, 21,
+add_text(slide, "Underlying source tables", 1.14, 3.35, 4.30, 0.28, 14, ORANGE, True, PP_ALIGN.CENTER)
+add_text(slide, "Claims • Policies • Financials\nClaimants • Vehicles • Litigation", 1.10, 3.82, 4.38, 0.78, 15, DARK, False, PP_ALIGN.CENTER)
+add_text(slide, "The view reads these tables", 1.12, 4.90, 4.30, 0.28, 11, MID_GREY, True, PP_ALIGN.CENTER)
+rounded_box(slide, "CLMAA_SpecialAccounts", 7.40, 2.45, 5.20, 3.20, LIGHT_TEAL, TEAL, NAVY, 21,
             "Special Accounts database")
-add_text(slide, "Claims  •  Policies  •  Financials\nClaimants  •  Vehicles  •  Litigation", 1.35, 4.05, 4.5, 0.8, 15, DARK, False, PP_ALIGN.CENTER)
-add_text(slide, "tblAcctSpecial\nEligible customer configuration", 7.25, 3.88, 2.25, 0.8, 14, DARK, True, PP_ALIGN.CENTER)
-add_text(slide, "SAC_Loss_Run\nReporting view", 9.82, 3.88, 2.25, 0.8, 14, DARK, True, PP_ALIGN.CENTER)
-arrow(slide, 6.32, 4.00, 0.42, 0.34, "right", GOLD)
-add_text(slide, "cross-database reads", 5.53, 4.40, 1.85, 0.32, 10, MID_GREY, True, PP_ALIGN.CENTER)
+rounded_box(slide, "tblAcctSpecial", 7.82, 3.47, 1.85, 1.10, WHITE, GOLD, NAVY, 14,
+            "Eligible customers")
+rounded_box(slide, "SAC_Loss_Run", 10.05, 3.47, 2.05, 1.10, ORANGE, ORANGE, WHITE, 15,
+            "Reporting view lives here")
+arrow(slide, 9.70, 3.86, 0.28, 0.25, "right", GOLD)
+arrow(slide, 6.05, 3.72, 1.05, 0.48, "right", ORANGE)
+add_text(slide, "cross-database read", 5.80, 4.28, 1.55, 0.28, 10, MID_GREY, True, PP_ALIGN.CENTER)
 pill(slide, "CONFIRMED", 0.75, 6.22, 1.25, GREEN)
-add_text(slide, "Both databases are on the same server; they are separate databases.", 2.17, 6.19, 8.6, 0.35, 15, DARK)
+add_text(slide, "The view is stored in CLMAA_SpecialAccounts, but its SQL reads claims data from CLM_LakeHouse.", 2.17, 6.16, 10.0, 0.48, 15, DARK)
 footer(slide, 3)
 
 
 # 4 — Queries
 slide = prs.slides.add_slide(prs.slide_layouts[6]); set_bg(slide)
-title(slide, "Two queries drive the current notebook", "Current state")
-pill(slide, "QUERY 1", 0.78, 1.55, 1.10, BLUE)
-rounded_box(slide, "Find eligible customers", 0.78, 2.03, 5.75, 1.15, LIGHT_BLUE, BLUE, NAVY, 20,
-            "Reads tblAcctSpecial")
-bullet_list(slide, ["Account status is Active", "Loss-run frequency is provided", "Frequency is not ‘Not Needed’"], 1.05, 3.48, 5.15, 1.65, 15)
-pill(slide, "QUERY 2", 6.80, 1.55, 1.10, TEAL)
-rounded_box(slide, "Read prepared loss-run data", 6.80, 2.03, 5.75, 1.15, LIGHT_TEAL, TEAL, NAVY, 20,
-            "SELECT * FROM SAC_Loss_Run")
-bullet_list(slide, ["Returns report-ready rows for qualifying accounts", "Notebook separates the result by customer", "Future UI flow can request only the selected customer"], 7.08, 3.48, 5.10, 1.65, 15)
-rounded_box(slide, "The complex calculations are inside the view—not recreated by the notebook.", 2.10, 5.63, 9.15, 0.72, LIGHT_GOLD, GOLD, NAVY, 17)
+title(slide, "What the notebook queries—and how each result is used", "Current state")
+pill(slide, "QUERY 1", 0.72, 1.48, 1.08, ORANGE)
+rounded_box(slide, "Eligible-customer query", 0.72, 1.96, 5.83, 0.72, LIGHT_BLUE, ORANGE, NAVY, 19)
+add_text(slide, "Source", 0.98, 2.91, 0.80, 0.25, 11, ORANGE, True)
+add_text(slide, "CLMAA_SpecialAccounts.dbo.tblAcctSpecial", 1.82, 2.88, 4.35, 0.32, 13, NAVY, True)
+add_text(slide, "Filters", 0.98, 3.42, 0.80, 0.25, 11, ORANGE, True)
+add_text(slide, "Active account • frequency present • frequency is not ‘Not Needed’", 1.82, 3.39, 4.45, 0.55, 13, DARK)
+add_text(slide, "Returns", 0.98, 4.17, 0.80, 0.25, 11, ORANGE, True)
+add_text(slide, "Customer number, customer name and loss-run frequency", 1.82, 4.14, 4.35, 0.52, 13, DARK)
+add_text(slide, "Used for", 0.98, 4.88, 0.80, 0.25, 11, ORANGE, True)
+add_text(slide, "Builds the list of customers processed by the notebook", 1.82, 4.85, 4.35, 0.52, 13, DARK)
+
+pill(slide, "QUERY 2", 6.82, 1.48, 1.08, TEAL)
+rounded_box(slide, "Loss-run data query", 6.82, 1.96, 5.80, 0.72, LIGHT_TEAL, TEAL, NAVY, 19)
+add_text(slide, "Source", 7.08, 2.91, 0.80, 0.25, 11, TEAL, True)
+add_text(slide, "CLMAA_SpecialAccounts.dbo.SAC_Loss_Run", 7.92, 2.88, 4.30, 0.32, 13, NAVY, True)
+add_text(slide, "Statement", 7.08, 3.42, 0.80, 0.25, 11, TEAL, True)
+add_text(slide, "SELECT * FROM SAC_Loss_Run", 7.92, 3.39, 4.30, 0.32, 13, DARK, True)
+add_text(slide, "Returns", 7.08, 4.17, 0.80, 0.25, 11, TEAL, True)
+add_text(slide, "Prepared policy, claim, feature, financial and report fields", 7.92, 4.14, 4.30, 0.52, 13, DARK)
+add_text(slide, "Used for", 7.08, 4.88, 0.80, 0.25, 11, TEAL, True)
+add_text(slide, "Filtered in Python by customer, then written into Excel", 7.92, 4.85, 4.30, 0.52, 13, DARK)
+rounded_box(slide, "Important: the notebook loads the complete view result; the proposed UI flow could query only the selected customer.", 1.18, 5.78, 10.98, 0.70, LIGHT_GOLD, GOLD, NAVY, 15)
 footer(slide, 4)
 
 
@@ -207,50 +227,49 @@ footer(slide, 5)
 
 # 6 — Workbook process/output
 slide = prs.slides.add_slide(prs.slide_layouts[6]); set_bg(slide)
-title(slide, "How the current workbook is produced", "Current state")
-steps = [
-    ("1", "Select customer rows"), ("2", "Format identifiers"),
-    ("3", "Split claims / record only"), ("4", "Fill Excel template"),
-    ("5", "Set refresh on open"), ("6", "Save customer workbook")
+title(slide, "How the notebook turns view data into a workbook", "Current state")
+workbook_steps = [
+    ("1", "Customer selection", "Keeps only rows belonging to the current customer."),
+    ("2", "Data formatting", "Preserves identifiers and formats exposure values."),
+    ("3", "Report separation", "Splits normal claims from Record Only incidents."),
+    ("4", "Template population", "Writes data into Claims Data and Record Only tables."),
+    ("5", "Workbook updates", "Adds cover details and sets pivots to refresh on open."),
+    ("6", "File creation", "Saves one dated .xlsx workbook for the customer."),
 ]
-for i, (num, label) in enumerate(steps):
-    x = 0.65 + i*2.10
-    rounded_box(slide, num, x+0.63, 1.65, 0.48, 0.48, TEAL, TEAL, WHITE, 14)
-    rounded_box(slide, label, x, 2.25, 1.75, 0.95, LIGHT_GREY, RGBColor(211, 218, 225), NAVY, 13)
-    if i < len(steps)-1:
-        arrow(slide, x+1.79, 2.54, 0.27, 0.24, "right", GOLD)
-add_text(slide, "Current output", 0.75, 3.83, 2.0, 0.3, 14, TEAL, True)
-rounded_box(slide, "Microsoft Excel (.xlsx)", 0.75, 4.28, 3.10, 1.45, LIGHT_GOLD, GOLD, NAVY, 20,
-            "One workbook per qualifying customer")
-rounded_box(slide, "Workbook structure", 4.12, 4.28, 3.85, 1.45, LIGHT_BLUE, BLUE, NAVY, 20,
-            "Cover Page • Claims Data • Record Only")
-rounded_box(slide, "Summary output", 8.25, 4.28, 4.30, 1.45, LIGHT_TEAL, TEAL, NAVY, 20,
-            "Summary by Policy Year • Chart • refresh on open")
-add_text(slide, "Current filename pattern: <Customer Name>_<YYYY_MM_DD>.xlsx", 0.78, 6.22, 8.8, 0.3, 13, MID_GREY)
+for i, (num, head, body) in enumerate(workbook_steps):
+    row, col = divmod(i, 3)
+    x, y = 0.72 + col*4.20, 1.52 + row*2.05
+    rounded_box(slide, num, x, y, 0.52, 0.52, ORANGE, ORANGE, WHITE, 15)
+    add_text(slide, head, x+0.70, y-0.01, 3.05, 0.30, 16, NAVY, True)
+    add_text(slide, body, x+0.70, y+0.43, 3.10, 0.72, 12, DARK)
+rounded_box(slide, "OUTPUT", 0.75, 5.75, 1.05, 0.42, NAVY, NAVY, WHITE, 11)
+add_text(slide, "One Microsoft Excel workbook per qualifying customer", 2.02, 5.73, 4.55, 0.35, 15, NAVY, True)
+add_text(slide, "Cover Page • Claims Data • Record Only • Summary by Policy Year • Chart", 6.55, 5.73, 5.90, 0.46, 13, DARK)
+add_text(slide, "Filename: <Customer Name>_<YYYY_MM_DD>.xlsx", 2.02, 6.35, 6.3, 0.28, 11, MID_GREY)
 footer(slide, 6)
 
 
 # 7 — Proposed future state
 slide = prs.slides.add_slide(prs.slide_layouts[6]); set_bg(slide)
-title(slide, "Potential future flow within the existing application", "Proposed")
+title(slide, "How this could work within the existing application", "Proposed")
 flow = [
-    ("User", "Selects a customer", NAVY),
-    ("Application UI", "Requests a loss run", BLUE),
-    ("FastAPI", "Validates and coordinates", TEAL),
-    ("SAC_Loss_Run", "Returns selected customer's data", GOLD),
-    ("Excel service", "Fills existing template", GREEN),
-    ("Download", "Returns .xlsx to user", NAVY),
+    ("1", "User request", "User selects a customer and clicks Generate Loss Run."),
+    ("2", "API validation", "FastAPI confirms authentication and the customer request."),
+    ("3", "View query", "Application requests only that customer's loss-run rows."),
+    ("4", "Excel creation", "Service applies current formatting and fills the template."),
+    ("5", "File response", "The completed .xlsx workbook is returned to the user."),
 ]
-for i, (head, body, color) in enumerate(flow):
-    x = 0.52 + i*2.12
-    rounded_box(slide, head, x, 2.05, 1.72, 0.72, color, color, WHITE, 15)
-    add_text(slide, body, x, 2.92, 1.72, 0.60, 11, DARK, False, PP_ALIGN.CENTER)
+for i, (num, head, body) in enumerate(flow):
+    x = 0.55 + i*2.55
+    rounded_box(slide, num, x+0.72, 1.48, 0.48, 0.48, ORANGE, ORANGE, WHITE, 14)
+    rounded_box(slide, head, x, 2.08, 2.05, 0.66, NAVY if i in (0, 4) else ORANGE, NAVY if i in (0, 4) else ORANGE, WHITE, 14)
+    add_text(slide, body, x, 2.94, 2.05, 0.90, 11, DARK, False, PP_ALIGN.CENTER)
     if i < len(flow)-1:
-        arrow(slide, x+1.78, 2.28, 0.29, 0.25, "right", GOLD)
-rounded_box(slide, "Reuse", 0.78, 4.38, 1.25, 0.42, TEAL, TEAL, WHITE, 11)
-add_text(slide, "Database view • business calculations • Excel template • authentication • database connection", 2.25, 4.38, 10.0, 0.42, 15, DARK)
-rounded_box(slide, "Adapt", 0.78, 5.25, 1.25, 0.42, GOLD, GOLD, WHITE, 11)
-add_text(slide, "Databricks-specific code • file handling • API response • user feedback and error handling", 2.25, 5.25, 10.0, 0.42, 15, DARK)
+        arrow(slide, x+2.12, 2.29, 0.35, 0.25, "right", GOLD)
+rounded_box(slide, "What stays", 0.78, 4.47, 1.35, 0.42, TEAL, TEAL, WHITE, 11)
+add_text(slide, "SAC_Loss_Run view • business calculations • Excel layout and report rules", 2.35, 4.44, 9.70, 0.42, 14, DARK)
+rounded_box(slide, "What changes", 0.78, 5.23, 1.35, 0.42, GOLD, GOLD, WHITE, 11)
+add_text(slide, "User initiates the report • application queries one customer • workbook is delivered through the UI", 2.35, 5.20, 9.70, 0.50, 14, DARK)
 pill(slide, "PROPOSAL — NOT YET IMPLEMENTED", 0.78, 6.27, 2.72, BLUE)
 footer(slide, 7)
 
