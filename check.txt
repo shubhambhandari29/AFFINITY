@@ -1,145 +1,135 @@
-WITH LAST_DRIVER AS (SELECT CLM_NBR, MAX(CLM_CNTCT_KEY) AS LAST_DRIVER_KEY
-                                       FROM    CLM_LakeHouse.dbo.DW_CLMS_CLM_CNTCT_DIMNSN
-                                       WHERE (CURR_VERSN_IND = 'Y') AND (INVLV_PARTY_ROLE_CD = 'ID') AND (UPPER(CLM_CNTCT_ROLE_CD) = 'driver')
-                                       GROUP BY CLM_NBR), ALAE AS
-    (SELECT SUM(CLM_TXN_AMT) AS TotalExpenses, CLM_NBR, CLM_FTR_NBR
-    FROM    CLM_LakeHouse.dbo.DW_FINCL_LOSS_TXN_SS_F
-    WHERE (LOSS_TXN_TYPE_DESC LIKE '%Expense%') AND (COST_CATGRY_DESC <> 'State Penalties' OR
-                 COST_CATGRY_DESC IS NULL)
-    GROUP BY CLM_NBR, CLM_FTR_NBR), LAST_TXN AS
-    (SELECT CLM_NBR, CLM_FTR_NBR, MAX(FTR_KEY) AS LAST_FTR_KEY, MAX(LOSS_TXN_PRCSS_DT_DIMKEY) AS LAST_TXN_PRCSS_DT_DIMKEY
-    FROM    CLM_LakeHouse.dbo.DW_FINCL_LOSS_FTR_SS_F
-    GROUP BY CLM_NBR, CLM_FTR_NBR), LAST_FTR_VERSN AS
-    (SELECT CLM_NBR, CLM_FTR_NBR, MAX(VERSN_BEG_DT) AS LAST_VERSN
-    FROM    CLM_LakeHouse.dbo.DW_CLMS_FTR_DIMNSN
-    GROUP BY CLM_NBR, CLM_FTR_NBR), LAST_LGL AS
-    (SELECT CLM_KEY, FTR_KEY, MAX(CLMS_LGL_KEY) AS LAST_CLMS_LGL_KEY
-    FROM    CLM_LakeHouse.dbo.DW_CLMS_LGL_FACT
-    WHERE (EFF_IND = 1)
-    GROUP BY CLM_KEY, FTR_KEY), CUSTOMERS AS
-    (SELECT CustomerNum, CustomerName, LossRunDistFreq
-    FROM    dbo.tblAcctSpecial AS a
-    WHERE (AcctStatus = 'Active') AND (LossRunDistFreq <> 'Not Needed') AND (LossRunDistFreq <> '')), DATA AS
-    (SELECT CD.CLM_NBR, FD.CLM_FTR_NBR, LFIN.LAST_TXN_PRCSS_DT_DIMKEY, POL.PMS_CUSTMR_NBR, POL.POL_NAMED_INSRD_TXT, POL.POL_SYM, POL.POL_NBR, POL.POL_MOD, DATETRUNC(DAY, POL.POL_EFF_DT) AS POL_EFF_DT, DATETRUNC(DAY, POL.POL_EXP_DT) 
-                 AS POL_EXP_DT, POL.PRDCNG_AGNT_CD, RPA.CUR_PA_FULL_NM, CD.CLM_KEY, CASE WHEN UPPER(CD.POL_HLDR_CLM_NBR) = 'TRUE' THEN '' ELSE CD.POL_HLDR_CLM_NBR END AS POL_HLDR_CLM_NBR, CD.ACCT_LOSS_LOC_ID, DATETRUNC(DAY, CD.DT_OF_LOSS) 
-                 AS DT_OF_LOSS, LFINCL.MAJ_PERIL_CD, RMP.MAJ_PERIL_DESC, LD.LITGTN_STATUS_CD, LD.LITGTN_STATUS_DESC, CASE WHEN CD.ACDNT_ST_ABBR <> '!' THEN ISNULL(CD.ACDNT_ST_ABBR, CD.CLM_JRSDTN_ST_ABBR) 
-                 ELSE CD.CLM_JRSDTN_ST_ABBR END AS ACDNT_ST_ABBR, CLMNT.CLMNT_FULL_NM, CLMNT.CLMNT_CO_NM, ISNULL(CLMNT.OCUPTN_TXT, ' ') AS OCUPTN_TXT, LFINCL.CLM_DRVR_KEY, DRVD.DRV_REL_TO_INSURED_CODE, { fn CONCAT(LDRVD.CLM_CNTCT_FIRST_NM, 
-                 ' ', LDRVD.CLM_CNTCT_LAST_NM) } AS INSURED_DRIVER, CASE WHEN UPPER(VD.INVLV_VEH_TYPE_CD) = 'INSURED' THEN ISNULL(VD.VEH_TOTL_LOSS_IND, 'N') END AS VEH_TOTL_LOSS_IND, CASE WHEN UPPER(VD.INVLV_VEH_TYPE_CD) 
-                 = 'INSURED' THEN VD.VEH_YEAR END AS VEH_YEAR, CASE WHEN UPPER(VD.INVLV_VEH_TYPE_CD) = 'INSURED' THEN VD.VEH_MANUFACTURER_CODE END AS VEH_MANUFACTURER_CODE, CASE WHEN UPPER(VD.INVLV_VEH_TYPE_CD) 
-                 = 'INSURED' THEN VD.VEH_MODEL END AS VEH_MODEL, CASE WHEN UPPER(VD.INVLV_VEH_TYPE_CD) = 'INSURED' THEN VD.VEH_VIN_NUMBER END AS VEH_VIN_NUMBER, CASE WHEN UPPER(VD.INVLV_VEH_TYPE_CD) 
-                 = 'INSURED' THEN VD.VEH_LICENSE_PLATE END AS VEH_LICENSE_PLATE, CASE WHEN UPPER(VD.INVLV_VEH_TYPE_CD) = 'INSURED' THEN VD.VEH_REGISTERED_STATE_ABBR END AS VEH_REGISTERED_STATE_ABBR, UPPER(FD.FTR_ASGNED_USER_FULL_NM) 
-                 AS FTR_ASGNED_USER_FULL_NM, UPPER(FD.FTR_ASGN_USER_EMAIL_ADDR) AS FTR_ASGN_USER_EMAIL_ADDR, FD.FTR_ASGN_USER_PHONE_NBR, 
-                 CASE WHEN CD.CLM_LOB_CD = 'wc' THEN CD.AIA_POSTNS_1_AND_2_DESC ELSE CD.CAUSE_OF_LOSS END AS CAUSE_OF_LOSS, CASE WHEN CD.CLM_LOB_CD = 'wc' THEN CD.AIA_POSTNS_3_AND_4_DESC ELSE CD.LOSS_DESC END AS LOSS_DESC, 
-                 CASE WHEN CD.CLM_LOB_CD = 'wc' THEN CD.AIA_POSTNS_5_AND_6_DESC ELSE CD.CONTRIBUTING_FCTR END AS CONTRIBUTING_FCTR, CD.MF_PRODT_DESC, CD.MF_DESC, CD.POL_HLDR_RGN_DESC, CD.POL_HLDR_RETAILER_DESC, CD.CLM_RPTD_DT, 
-                 CD.CLM_STATUS, CD.CLM_CLOSE_DT, CD.RCRD_SRC_CD, CD.INCID_RPT_IND, DATENAME(WEEKDAY, CD.DT_OF_LOSS) AS DAY_DT_OF_LOSS, FD.EXPOSR_IND, FD.FTR_TYPE_CD, FD.FTR_TYPE_DESC, FD.FTR_COVG_TYPE_CD, FD.FTR_COVG_TYPE_DESC, 
-                 ISNULL(LFINCL.FTR_CHNG_IN_OSLS_AMT, 0) AS FTR_CHNG_IN_OSLS_AMT, ISNULL(LFINCL.FTR_PDLS_INCL_SLVG_SUBRO_AMT, 0) - ISNULL(LFINCL.DEDTBL_RECOVRY_AMT, 0) AS FTR_PDLS_INCL_SLVG_SUBRO_AMT, ISNULL(LFINCL.FTR_SLVG_AMT, 0) 
-                 AS FTR_SLVG_AMT, ISNULL(LFINCL.FTR_SUBRO_AMT, 0) AS FTR_SUBRO_AMT, ISNULL(LFINCL.LOSS_RECOVRY_AMT, 0) AS LOSS_RECOVRY_AMT, ISNULL(LFINCL.DEDTBL_RECOVRY_AMT, 0) AS DEDTBL_RECOVRY_AMT, CAST(ISNULL(ALAE.TotalExpenses, 0) 
-                 AS DECIMAL(18, 2)) AS FTR_ALAE_AMT, ISNULL(LFINCL.FTR_ALAE_AMT - LFINCL.EXPNSE_RECOVRY_AMT, 0) AS FTR_ALAE_AMT2, ISNULL(LFINCL.EXPNSE_RECOVRY_AMT, 0) AS expnse_recovry_amt, ISNULL(LFINCL.FTR_INCUR_INCL_SLVG_SUBRO_AMT, 0) 
-                 - ISNULL(LFINCL.DEDTBL_RECOVRY_AMT, 0) AS FTR_INCUR_INCL_SLVG_SUBRO_AMT, ISNULL(LFINCL.FTR_PDLS_EXCL_SLVG_SUBRO_AMT, 0) - ISNULL(LFINCL.DEDTBL_RECOVRY_AMT, 0) AS FTR_PDLS_EXCL_SLVG_SUBRO_AMT, 
-                 ISNULL(LFINCL.CHNG_IN_ALAE_RSRV_AMT, 0) AS CHNG_IN_ALAE_RSRV_AMT, CD.CURR_VERSN_IND
-    FROM    CLM_LakeHouse.dbo.DW_CLMS_CLM_DIMNSN AS CD LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DW_CLMS_FTR_DIMNSN AS FD ON CD.CLM_NBR = FD.CLM_NBR AND FD.CURR_VERSN_IND = 'Y' LEFT OUTER JOIN
-                 LAST_TXN AS LFIN ON LFIN.CLM_NBR = CD.CLM_NBR AND LFIN.CLM_FTR_NBR = FD.CLM_FTR_NBR LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DW_FINCL_LOSS_FTR_SS_F AS LFINCL ON LFIN.CLM_NBR = LFINCL.CLM_NBR AND LFIN.CLM_FTR_NBR = LFINCL.CLM_FTR_NBR LEFT OUTER JOIN
-                 ALAE ON ALAE.CLM_NBR = LFIN.CLM_NBR AND LFIN.CLM_FTR_NBR = ALAE.CLM_FTR_NBR LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DW_POL_DIMNSN AS POL ON CD.POL_SYM = POL.POL_SYM AND UPPER(CD.POL_NBR) = POL.POL_NBR AND CD.POL_MOD = POL.POL_MOD AND POL.POL_CURR_VERSN_IND = 'Y' LEFT OUTER JOIN
-                 LAST_LGL AS LL ON LFINCL.CLM_KEY = LL.CLM_KEY AND LFINCL.FTR_KEY = LL.FTR_KEY LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DW_CLMS_LGL_FACT AS LF ON LFINCL.FTR_KEY = LF.FTR_KEY AND LFINCL.CLM_KEY = LF.CLM_KEY AND LF.CLMS_LGL_KEY = LL.LAST_CLMS_LGL_KEY LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DW_CLMS_LGL_DIMNSN AS LD ON LF.CLMS_LGL_KEY = LD.CLMS_LGL_KEY LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DM_RETNTN_PRDCNG_AGNT_HR_D AS RPA ON POL.PRDCNG_AGNT_CD = RPA.CUR_ENTR_PA_CD LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DW_CLMS_CLMNT_DIMNSN AS CLMNT ON FD.CLMNT_HCS_SYS_ID = CLMNT.CLMNT_HCS_SYS_ID AND CLMNT.CURR_VERSN_IND = 'Y' LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DW_CLMS_DRVR_DIMNSN AS DRVD ON LFINCL.CLM_DRVR_KEY = DRVD.CLM_DRVR_KEY LEFT OUTER JOIN
-                 LAST_DRIVER AS LDRD ON LFINCL.CLM_NBR = LDRD.CLM_NBR LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DW_CLMS_CLM_CNTCT_DIMNSN AS LDRVD ON LDRVD.CLM_NBR = LDRD.CLM_NBR AND LDRVD.CLM_CNTCT_KEY = LDRD.LAST_DRIVER_KEY LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DW_CLMS_VEH_DIMNSN AS VD ON FD.VEH_HCS_SYS_ID = VD.VEH_HCS_SYS_ID AND VD.CURR_VERSN_IND = 'Y' LEFT OUTER JOIN
-                 CLM_LakeHouse.dbo.DW_REF_MAJ_PERIL AS RMP ON LFINCL.MAJ_PERIL_CD = RMP.MAJ_PERIL_CD AND DATETRUNC(DAY, LFINCL.RCRD_INSRT_DT) BETWEEN DATETRUNC(DAY, RMP.VERSN_BEG_DT) AND DATETRUNC(DAY, RMP.VERSN_END_DT)
-    WHERE (UPPER(ISNULL(CD.ACCT_LOSS_LOC_ID, 'NA')) NOT LIKE '%REKEY%') AND (CD.CURR_VERSN_IND = 'Y') AND (POL.PMS_CUSTMR_NBR IN
-                     (SELECT CustomerNum
-                     FROM    CUSTOMERS)))
-    SELECT PMS_CUSTMR_NBR AS [Customer Number], POL_NAMED_INSRD_TXT AS [Policy Insured Name], CLM_NBR AS [Claim Number], CLM_FTR_NBR AS Exposure, { fn CONCAT(CLMNT_FULL_NM, CLMNT_CO_NM) } AS [Claimant Name], 
-                ACCT_LOSS_LOC_ID AS [Account Location Identifier], ACDNT_ST_ABBR AS [Accident State], POL_SYM AS [Policy Symbol], POL_NBR AS [Policy Number], POL_MOD AS [Policy MOD], CONVERT(varchar, POL_EFF_DT, 101) AS [Policy Effective Date], CONVERT(varchar, 
-                POL_EXP_DT, 101) AS [Policy Expiration Date], CONVERT(varchar, DT_OF_LOSS, 101) AS [Loss Date], CONVERT(varchar, CLM_RPTD_DT, 101) AS [Date of Notice], DATEDIFF(DAY, DT_OF_LOSS, CLM_RPTD_DT) AS [Lag Time], CLM_STATUS AS [Claim Status], CONVERT(varchar, 
-                CLM_CLOSE_DT, 101) AS [Claim Closed Date], FTR_COVG_TYPE_DESC AS Coverage, SUM(FTR_CHNG_IN_OSLS_AMT) AS [Outstanding Loss Reserve], SUM(FTR_PDLS_INCL_SLVG_SUBRO_AMT) AS [Total Paid Loss Net Salvage/Subro/Loss Recovery], 
-                SUM(FTR_CHNG_IN_OSLS_AMT) + SUM(FTR_PDLS_INCL_SLVG_SUBRO_AMT) AS [Incurred w/o ALAE], SUM(CHNG_IN_ALAE_RSRV_AMT) AS [ALAE Reserve], CAST(CASE WHEN ISNULL(SUM(D .FTR_ALAE_AMT2), 0) = 0 THEN SUM(CAST(D .FTR_ALAE_AMT AS DECIMAL(18, 2))) 
-                ELSE SUM(CAST(D .FTR_ALAE_AMT2 AS DECIMAL(18, 2))) END AS DECIMAL(18, 2)) AS [ALAE Paid], CAST(CASE WHEN ISNULL(SUM(D .FTR_ALAE_AMT2), 0) = 0 THEN SUM(CAST(D .FTR_ALAE_AMT AS DECIMAL(18, 2))) ELSE SUM(CAST(D .FTR_ALAE_AMT2 AS DECIMAL(18, 2))) 
-                END + SUM(CAST(CHNG_IN_ALAE_RSRV_AMT AS DECIMAL(18, 2))) + SUM(CAST(FTR_CHNG_IN_OSLS_AMT AS DECIMAL(18, 2))) + SUM(CAST(FTR_PDLS_INCL_SLVG_SUBRO_AMT AS DECIMAL(18, 2))) AS DECIMAL(18, 2)) AS [Total Incurred + ALAE], SUM(FTR_SLVG_AMT) 
-                AS [Salvage Recovery], SUM(FTR_SUBRO_AMT) AS [Subro Recovery], SUM(LOSS_RECOVRY_AMT) AS [Loss Recovery], SUM(DEDTBL_RECOVRY_AMT) AS [Deductible Recovery], ISNULL(SUM(expnse_recovry_amt), 0) AS [Expense Recovery], 
-                LITGTN_STATUS_DESC AS [Litigation Status], CAUSE_OF_LOSS AS [Cause Of Loss], LOSS_DESC AS [Description of Loss], CONTRIBUTING_FCTR AS [Contributing Factor], MF_PRODT_DESC AS Product, MF_DESC AS Manufacturer, 
-                POL_HLDR_RGN_DESC AS [Policy Region Description], POL_HLDR_RETAILER_DESC AS [Policy Holder Retailer Desc], ISNULL(POL_HLDR_CLM_NBR, '') AS [Policy Holder Claim Number], OCUPTN_TXT AS Occupation, DAY_DT_OF_LOSS AS [Accident Day Of Week], 
-                INSURED_DRIVER AS [Insured Driver], VEH_TOTL_LOSS_IND AS [Total Loss Indicator], VEH_YEAR AS [Vehicle Year], VEH_MANUFACTURER_CODE AS [Vehicle Manufacturer], VEH_MODEL AS [Vehicle Model], VEH_VIN_NUMBER AS [Vehicle ID Number], 
-                VEH_LICENSE_PLATE AS [Vehicle License Plate], VEH_REGISTERED_STATE_ABBR AS [Vehicle License State], FTR_ASGNED_USER_FULL_NM AS Adjuster, INCID_RPT_IND AS [Record Only Indicator], { fn CONCAT(POL_SYM, '-', POL_NBR, '-', POL_MOD) } AS Policy, 
-                YEAR(POL_EFF_DT) AS [Policy Year], CASE WHEN SUM(D .FTR_INCUR_INCL_SLVG_SUBRO_AMT) > 50000 THEN 1 ELSE 0 END AS [Claims above 50K], { fn CONCAT(CLM_NBR, CLM_FTR_NBR) } AS [Claim Feature Number], SUM(FTR_INCUR_INCL_SLVG_SUBRO_AMT) 
-                AS [Total Incurred]
-   FROM    DATA AS D
-   GROUP BY PMS_CUSTMR_NBR, POL_NAMED_INSRD_TXT, ACCT_LOSS_LOC_ID, POL_SYM, POL_NBR, POL_MOD, POL_EFF_DT, POL_EXP_DT, POL_HLDR_CLM_NBR, CLM_NBR, CLM_FTR_NBR, FTR_COVG_TYPE_DESC, DT_OF_LOSS, ACDNT_ST_ABBR, LITGTN_STATUS_DESC, 
-                CAUSE_OF_LOSS, LOSS_DESC, CONTRIBUTING_FCTR, MF_PRODT_DESC, MF_DESC, POL_HLDR_RGN_DESC, POL_HLDR_RETAILER_DESC, CLM_RPTD_DT, CLM_STATUS, CLM_CLOSE_DT, { fn CONCAT(CLMNT_FULL_NM, CLMNT_CO_NM) }, OCUPTN_TXT, DAY_DT_OF_LOSS, 
-                INSURED_DRIVER, VEH_TOTL_LOSS_IND, VEH_YEAR, VEH_MANUFACTURER_CODE, VEH_MODEL, VEH_VIN_NUMBER, VEH_LICENSE_PLATE, VEH_REGISTERED_STATE_ABBR, FTR_ASGNED_USER_FULL_NM, INCID_RPT_IND, CURR_VERSN_IND
-   HAVING (CLM_STATUS IN ('Closed', 'closed')) AND (DATETRUNC(DAY, POL_EFF_DT) > DATEADD(MONTH, - 72, DATETRUNC(YEAR, GETDATE()))) OR
-                (SUM(FTR_CHNG_IN_OSLS_AMT) > 0) OR
-                (CLM_STATUS IN ('Open', 'open'))
+Here’s a simple summary you can share with your team.
 
+## Current understanding
 
+`SpecialAccountsToExcel.py` generates loss-run Excel reports for Special Accounts.
 
+The process works like this:
 
+1. It identifies active customers who require loss-run reports.
+2. It reads claim information from the existing `SAC_Loss_Run` database view.
+3. The database view prepares most of the report data, including policy, claim, reserve, payment, recovery, and expense information.
+4. The script separates normal claims from “Record Only” incidents.
+5. It opens the existing Excel template.
+6. It fills the Claims Data and Record Only worksheets.
+7. It updates the customer number, customer name, and report date on the cover page.
+8. It prepares the workbook so its summaries and pivot tables refresh when opened.
+9. It saves one Excel file for each customer.
 
----------------------------------------------------------------------
+The database view prepares the data, while the Python script mainly formats that data into the required Excel report.
 
+## Proposed FastAPI implementation
 
-SELECT TOP (1000) [Customer Number]
-      ,[Policy Insured Name]
-      ,[Claim Number]
-      ,[Exposure]
-      ,[Claimant Name]
-      ,[Account Location Identifier]
-      ,[Accident State]
-      ,[Policy Symbol]
-      ,[Policy Number]
-      ,[Policy MOD]
-      ,[Policy Effective Date]
-      ,[Policy Expiration Date]
-      ,[Loss Date]
-      ,[Date of Notice]
-      ,[Lag Time]
-      ,[Claim Status]
-      ,[Claim Closed Date]
-      ,[Coverage]
-      ,[Outstanding Loss Reserve]
-      ,[Total Paid Loss Net Salvage/Subro/Loss Recovery]
-      ,[Incurred w/o ALAE]
-      ,[ALAE Reserve]
-      ,[ALAE Paid]
-      ,[Total Incurred + ALAE]
-      ,[Salvage Recovery]
-      ,[Subro Recovery]
-      ,[Loss Recovery]
-      ,[Deductible Recovery]
-      ,[Expense Recovery]
-      ,[Litigation Status]
-      ,[Cause Of Loss]
-      ,[Description of Loss]
-      ,[Contributing Factor]
-      ,[Product]
-      ,[Manufacturer]
-      ,[Policy Region Description]
-      ,[Policy Holder Retailer Desc]
-      ,[Policy Holder Claim Number]
-      ,[Occupation]
-      ,[Accident Day Of Week]
-      ,[Insured Driver]
-      ,[Total Loss Indicator]
-      ,[Vehicle Year]
-      ,[Vehicle Manufacturer]
-      ,[Vehicle Model]
-      ,[Vehicle ID Number]
-      ,[Vehicle License Plate]
-      ,[Vehicle License State]
-      ,[Adjuster]
-      ,[Record Only Indicator]
-      ,[Policy]
-      ,[Policy Year]
-      ,[Claims above 50K]
-      ,[Claim Feature Number]
-      ,[Total Incurred]
-  FROM [CLMAA_SpecialAccounts].[dbo].[SAC_Loss_Run]
+We can add this functionality to the existing application in the following way:
 
+```text
+User selects a customer
+        ↓
+User clicks “Generate Loss Run”
+        ↓
+UI calls a FastAPI endpoint
+        ↓
+API reads that customer’s data from SAC_Loss_Run
+        ↓
+API fills the existing Excel template
+        ↓
+Excel file is returned to the user
+```
 
+The implementation can be divided into three parts:
+
+- **UI:** Add a “Generate Loss Run” button.
+- **API:** Add a protected endpoint that receives the customer number.
+- **Service:** Read the loss-run data, create the workbook, and return it for download.
+
+For the first version, we should continue using the existing database view. We only need to change it if testing shows that its data or business rules are incorrect.
+
+## Suggested implementation plan
+
+1. Obtain the official `SACLossRunTemplate.xlsx` file.
+2. Confirm that the application can read the `SAC_Loss_Run` view.
+3. Create a service that reads loss-run data for one selected customer.
+4. Move the reusable Excel-generation logic from the Databricks script into the service.
+5. Add a FastAPI endpoint that returns the generated Excel file.
+6. Connect the UI button to the endpoint.
+7. Compare the new report with an existing report for the same customer.
+8. Test customers with:
+
+   - Normal claims
+   - Record-only incidents
+   - Both types of records
+   - No available records
+   - Large numbers of claims
+
+## Main challenges
+
+### Excel template dependency
+
+The report depends on an existing Excel template with specific worksheets, tables, formulas, pivots, and charts. We need to store and protect the correct template inside the application.
+
+If worksheet or table names are changed, report generation could fail.
+
+### Pivot tables and calculations
+
+Python fills the workbook, but it does not fully calculate Excel pivot tables. The workbook is marked to refresh when the user opens it in Excel.
+
+We should confirm that this behavior is acceptable.
+
+### Database access
+
+The application must have permission to read the `SAC_Loss_Run` view and all data required by it.
+
+The Databricks script has its own connection setup, while the application uses its existing database configuration. We need to verify that both point to the correct database and environment.
+
+### Report generation time
+
+Some customers may have many claims. Their reports could take longer to generate.
+
+For the first version, the user can wait for the download. If reports take too long, we may later need a background process with a “report is ready” notification.
+
+### File size and memory
+
+The existing script loads data for every customer. The API should load data only for the selected customer to reduce memory usage and make generation faster.
+
+### Data formatting
+
+Fields such as claim number, policy number, customer number, and exposure may contain leading zeros. We must keep them as text so Excel does not change their values.
+
+Currency and date fields must also remain consistent with the existing report.
+
+### Customer names and filenames
+
+Customer names may contain characters that are unsafe in filenames. The API should create a safe filename, preferably using both customer number and name.
+
+### Multiple users
+
+Several users might generate reports at the same time. The current script uses the same temporary filename for every report, which could cause one report to overwrite another.
+
+The FastAPI version should create a separate temporary file or an in-memory workbook for each request.
+
+### Security
+
+The endpoint should use the application’s existing authentication. Users should only be able to generate reports for customers they are permitted to access.
+
+### Business-rule validation
+
+We should confirm the rules used by the database view, particularly:
+
+- How many years of closed claims should be included?
+- Should all open claims be included regardless of age?
+- What qualifies as a “Record Only” incident?
+- How should claims above $50,000 be counted?
+- What should happen when a customer has no records?
+
+## Recommended first version
+
+The first version should be kept simple:
+
+- Generate a report for one selected customer.
+- Continue using the existing database view.
+- Continue using the existing Excel template.
+- Return the workbook directly as a download.
+- Do not change the view unless report comparison identifies a problem.
+- Do not include automatic email distribution yet.
+
+This approach keeps the initial change small and allows us to verify that the application-generated report matches the current Databricks-generated report.
