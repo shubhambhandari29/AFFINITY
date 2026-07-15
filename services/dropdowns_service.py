@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 
-from core.db_helpers import run_raw_query_async
+from core.db_helpers import add_update_datetime_if_supported, run_raw_query_async
 from db import db_connection
 
 logger = logging.getLogger(__name__)
@@ -275,6 +275,7 @@ def _merge_upsert_dropdown_records(
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
+            data_list = add_update_datetime_if_supported(cursor, table, data_list)
 
             for data in data_list:
                 columns = list(data.keys())
@@ -362,6 +363,7 @@ def _insert_dropdown_records(
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
+            records = add_update_datetime_if_supported(cursor, table, records)
 
             for record in records:
                 if not record:

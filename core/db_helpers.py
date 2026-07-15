@@ -3,6 +3,7 @@
 import logging
 import re
 from collections.abc import Iterable
+from datetime import datetime, timezone
 from functools import partial
 from typing import Any
 
@@ -14,11 +15,48 @@ from db import db_connection
 logger = logging.getLogger(__name__)
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_UPDATE_DATETIME_COLUMN = "UpdateDateTime"
 
 
 def _ensure_safe_identifier(identifier: str) -> None:
     if not identifier or not _IDENTIFIER_PATTERN.match(identifier):
         raise ValueError(f"Invalid column or table name: {identifier}")
+
+
+def _table_has_update_datetime(cursor: Any, table: str) -> bool:
+    """Return whether the SQL Server table has the standard audit column."""
+    cursor.execute(
+        """
+SELECT 1
+FROM sys.columns
+WHERE object_id = OBJECT_ID(?) AND name = ?
+""",
+        [table, _UPDATE_DATETIME_COLUMN],
+    )
+    return cursor.fetchone() is not None
+
+
+def _utc_datetimeoffset_string() -> str:
+    """Return a UTC datetimeoffset(7)-compatible value."""
+    now = datetime.now(timezone.utc)
+    return f"{now:%Y-%m-%d %H:%M:%S}.{now.microsecond:06d}0 +00:00"
+
+
+def add_update_datetime_if_supported(
+    cursor: Any,
+    table: str,
+    records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Copy records and add a server-owned UTC audit value when supported."""
+    copied_records = [dict(record) for record in records]
+    if not copied_records or not _table_has_update_datetime(cursor, table):
+        return copied_records
+
+    timestamp = _utc_datetimeoffset_string()
+    for record in copied_records:
+        if record:
+            record[_UPDATE_DATETIME_COLUMN] = timestamp
+    return copied_records
 
 
 def sanitize_filters(
@@ -133,6 +171,7 @@ def merge_upsert_records(
     try:
         with _db_connection() as conn:
             cursor = conn.cursor()
+            data_list = add_update_datetime_if_supported(cursor, table, data_list)
 
             for data in data_list:
                 columns = list(data.keys())
@@ -212,6 +251,7 @@ def insert_records(
     try:
         with _db_connection() as conn:
             cursor = conn.cursor()
+            records = add_update_datetime_if_supported(cursor, table, records)
 
             for record in records:
                 if not record:

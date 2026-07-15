@@ -227,6 +227,11 @@ def test_delete_dropdown_values_rejects_users():
 
 def test_merge_upsert_dropdown_records_executes_queries(monkeypatch):
     executed = []
+    monkeypatch.setattr(
+        dropdowns_service,
+        "add_update_datetime_if_supported",
+        lambda cursor, table, rows: rows,
+    )
 
     class FakeCursor:
         def execute(self, query, values):
@@ -262,6 +267,11 @@ def test_merge_upsert_dropdown_records_executes_queries(monkeypatch):
 
 def test_insert_and_delete_dropdown_records(monkeypatch):
     executed = []
+    monkeypatch.setattr(
+        dropdowns_service,
+        "add_update_datetime_if_supported",
+        lambda cursor, table, rows: rows,
+    )
 
     class FakeCursor:
         def execute(self, query, values):

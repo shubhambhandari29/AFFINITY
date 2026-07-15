@@ -86,6 +86,9 @@ def test_run_raw_query_uses_params(monkeypatch):
 
 def test_merge_upsert_records_builds_merge_query(monkeypatch):
     executed = []
+    monkeypatch.setattr(
+        db_helpers, "add_update_datetime_if_supported", lambda cursor, table, rows: rows
+    )
 
     class FakeCursor:
         def execute(self, query, values):
@@ -123,6 +126,9 @@ def test_merge_upsert_records_builds_merge_query(monkeypatch):
 
 def test_merge_upsert_records_excludes_key_columns_when_requested(monkeypatch):
     executed = []
+    monkeypatch.setattr(
+        db_helpers, "add_update_datetime_if_supported", lambda cursor, table, rows: rows
+    )
 
     class FakeCursor:
         def execute(self, query, values):
@@ -156,6 +162,9 @@ def test_merge_upsert_records_excludes_key_columns_when_requested(monkeypatch):
 
 def test_insert_records_builds_insert_query(monkeypatch):
     executed = []
+    monkeypatch.setattr(
+        db_helpers, "add_update_datetime_if_supported", lambda cursor, table, rows: rows
+    )
 
     class FakeCursor:
         def execute(self, query, values):
@@ -181,6 +190,43 @@ def test_insert_records_builds_insert_query(monkeypatch):
     query, values = executed[0]
     assert query == "INSERT INTO MyTable (id, name) VALUES (?, ?)"
     assert values == [1, "Bob"]
+
+
+def test_add_update_datetime_if_supported_adds_utc_timestamp(monkeypatch):
+    class FakeCursor:
+        def execute(self, query, values):
+            assert "sys.columns" in query
+            assert values == ["MyTable", "UpdateDateTime"]
+
+        def fetchone(self):
+            return (1,)
+
+    monkeypatch.setattr(
+        db_helpers,
+        "_utc_datetimeoffset_string",
+        lambda: "2026-05-08 19:58:00.4800450 +00:00",
+    )
+    original = [{"id": 1, "UpdateDateTime": "client value"}]
+
+    result = db_helpers.add_update_datetime_if_supported(FakeCursor(), "MyTable", original)
+
+    assert result == [{"id": 1, "UpdateDateTime": "2026-05-08 19:58:00.4800450 +00:00"}]
+    assert original == [{"id": 1, "UpdateDateTime": "client value"}]
+
+
+def test_add_update_datetime_if_supported_leaves_rows_unchanged_without_column():
+    class FakeCursor:
+        def execute(self, query, values):
+            return None
+
+        def fetchone(self):
+            return None
+
+    original = [{"id": 1}]
+    result = db_helpers.add_update_datetime_if_supported(FakeCursor(), "MyTable", original)
+
+    assert result == original
+    assert result is not original
 
 
 def test_delete_records_builds_delete_query(monkeypatch):
