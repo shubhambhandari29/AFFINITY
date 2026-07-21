@@ -16,8 +16,11 @@ from core.db_helpers import run_raw_query_async
 logger = logging.getLogger(__name__)
 
 # TODO: Replace these absolute paths with the production file locations.
-LOSS_RUN_TEMPLATE_PATH = Path("/Users/shuvi/Desktop/AFFINITY/SACLossRunTemplate.xlsx")
-LOSS_RUN_OUTPUT_DIR = Path("/Users/shuvi/Desktop/AFFINITY")
+BASE_DIR = Path(__file__).parent
+
+LOSS_RUN_TEMPLATE_PATH = BASE_DIR / "SACLossRunTemplate.xlsx"
+
+LOSS_RUN_OUTPUT_DIR = BASE_DIR / "Reports"
 
 RECORD_ONLY_EXCLUDED_COLUMNS = [
     "Claims above 50K",
