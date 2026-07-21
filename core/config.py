@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -24,6 +25,8 @@ def _parse_origins(value: str | None) -> list[str]:
 
 
 class Settings:
+
+    PROJECT_ROOT: Path = Path(__file__).resolve().parents[1]
 
     # Feature flags / environment toggles
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "local")
@@ -53,6 +56,13 @@ class Settings:
 
     # Outlook compose settings
     OUTLOOK_COMPOSE_BASE_URL: str = os.getenv("OUTLOOK_COMPOSE_BASE_URL")
+
+    # Loss-run files. These defaults are temporary local placeholders and should
+    # be replaced with deployed storage paths in each environment.
+    LOSS_RUN_TEMPLATE_PATH: Path = Path(
+        os.getenv("LOSS_RUN_TEMPLATE_PATH", PROJECT_ROOT / "SACLossRunTemplate.xlsx")
+    )
+    LOSS_RUN_OUTPUT_DIR: Path = Path(os.getenv("LOSS_RUN_OUTPUT_DIR", PROJECT_ROOT))
 
 
 settings = Settings()

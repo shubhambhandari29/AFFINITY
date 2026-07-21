@@ -28,6 +28,7 @@ from api.sac.claim_review_frequency import router as claim_review_frequency_rout
 from api.sac.deduct_bill_distribution import router as deduct_bill_distribution_router
 from api.sac.deduct_bill_frequency import router as deduct_bill_frequency_router
 from api.sac.hcm_users import router as hcm_users_router
+from api.sac.loss_run import router as loss_run_router
 from api.sac.loss_run_distribution import router as loss_run_distribution_router
 from api.sac.loss_run_frequency import router as loss_run_frequency_router
 from api.sac.sac_account import router as sac_account_router
@@ -91,6 +92,7 @@ app.include_router(
 app.include_router(
     loss_run_frequency_router, prefix="/loss_run_frequency", tags=["loss_run_frequency"]
 )
+app.include_router(loss_run_router, prefix="/loss_run", tags=["loss_run"])
 app.include_router(
     claim_review_frequency_router, prefix="/claim_review_frequency", tags=["claim_review_frequency"]
 )
