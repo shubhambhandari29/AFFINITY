@@ -10,10 +10,13 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import TableColumn
 
-from core.config import settings
 from core.db_helpers import run_raw_query_async
 
 logger = logging.getLogger(__name__)
+
+# TODO: Replace these absolute paths with the production file locations.
+LOSS_RUN_TEMPLATE_PATH = Path("/Users/shuvi/Desktop/AFFINITY/SACLossRunTemplate.xlsx")
+LOSS_RUN_OUTPUT_DIR = Path("/Users/shuvi/Desktop/AFFINITY")
 
 RECORD_ONLY_EXCLUDED_COLUMNS = [
     "Claims above 50K",
@@ -87,7 +90,7 @@ def _create_workbook(
             columns=record_only.columns,
         )
 
-    workbook = load_workbook(settings.LOSS_RUN_TEMPLATE_PATH)
+    workbook = load_workbook(LOSS_RUN_TEMPLATE_PATH)
     _write_excel_table(workbook["Claims Data"], "ClaimsData", claims.reset_index(drop=True))
     _write_excel_table(
         workbook["Record Only"], "RecordOnlyData", record_only.reset_index(drop=True)
@@ -109,66 +112,135 @@ def _create_workbook(
     workbook.close()
 
 
-async def generate_loss_run(customer_num: str) -> Path:
-    customer_num = customer_num.strip()
-    if not customer_num:
-        raise HTTPException(status_code=400, detail={"error": "Customer number is required"})
-
-    if not settings.LOSS_RUN_TEMPLATE_PATH.is_file():
+async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
+    if not LOSS_RUN_TEMPLATE_PATH.is_file():
         raise HTTPException(
             status_code=500,
             detail={
                 "error": (
-                    "Loss-run template is not configured. Place SACLossRunTemplate.xlsx "
-                    "in the repository root or set LOSS_RUN_TEMPLATE_PATH."
+                    "Loss-run template was not found. Update LOSS_RUN_TEMPLATE_PATH "
+                    "in loss_run_service.py."
                 )
             },
         )
 
     try:
-        customers = await run_raw_query_async(
-            """
-            SELECT CustomerNum, CustomerName
-            FROM dbo.tblAcctSpecial
-            WHERE CustomerNum = ?
-            """,
-            [customer_num],
-        )
-        if not customers:
-            raise HTTPException(status_code=404, detail={"error": "Customer not found"})
+        if customer_nums is None:
+            customers = await run_raw_query_async(
+                """
+                SELECT CustomerNum, CustomerName
+                FROM dbo.tblAcctSpecial
+                WHERE AcctStatus = 'Active'
+                  AND LossRunDistFreq <> 'Not Needed'
+                  AND LossRunDistFreq <> ''
+                """
+            )
+            requested_numbers = list(
+                dict.fromkeys(str(customer["CustomerNum"]).strip() for customer in customers)
+            )
+            records = await run_raw_query_async("SELECT * FROM dbo.SAC_Loss_Run")
+        else:
+            requested_numbers = list(
+                dict.fromkeys(
+                    str(customer_num).strip()
+                    for customer_num in customer_nums
+                    if str(customer_num).strip()
+                )
+            )
+            if not requested_numbers:
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": "At least one customer number is required"},
+                )
 
-        records = await run_raw_query_async(
-            """
-            SELECT *
-            FROM dbo.SAC_Loss_Run
-            WHERE [Customer Number] = ?
-            """,
-            [customer_num],
-        )
-        if not records:
-            raise HTTPException(
-                status_code=404,
-                detail={"error": "No loss-run records found for this customer"},
+            placeholders = ", ".join("?" for _ in requested_numbers)
+            customers = await run_raw_query_async(
+                f"""
+                SELECT CustomerNum, CustomerName
+                FROM dbo.tblAcctSpecial
+                WHERE CustomerNum IN ({placeholders})
+                """,
+                requested_numbers,
+            )
+            records = await run_raw_query_async(
+                f"""
+                SELECT *
+                FROM dbo.SAC_Loss_Run
+                WHERE [Customer Number] IN ({placeholders})
+                """,
+                requested_numbers,
             )
 
-        customer_name = str(customers[0].get("CustomerName") or customer_num).strip()
-        safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", customer_name).strip(" .")
-        filename = f"{safe_name or customer_num}_{datetime.now():%Y_%m_%d}.xlsx"
-        settings.LOSS_RUN_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = settings.LOSS_RUN_OUTPUT_DIR / filename
+        customer_names = {
+            str(customer["CustomerNum"])
+            .strip(): str(customer.get("CustomerName") or customer["CustomerNum"])
+            .strip()
+            for customer in customers
+        }
+        records_by_customer: dict[str, list[dict]] = {}
+        for record in records:
+            customer_num = str(record.get("Customer Number") or "").strip()
+            records_by_customer.setdefault(customer_num, []).append(record)
 
-        await run_in_threadpool(
-            _create_workbook,
-            records,
-            customer_num,
-            customer_name,
-            output_path,
-        )
-        return output_path
+        LOSS_RUN_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        generated_files = []
+        failures = []
+
+        for customer_num in requested_numbers:
+            customer_name = customer_names.get(customer_num)
+            customer_records = records_by_customer.get(customer_num)
+
+            if customer_name is None:
+                failures.append({"customerNumber": customer_num, "reason": "Customer not found"})
+                continue
+            if not customer_records:
+                failures.append(
+                    {
+                        "customerNumber": customer_num,
+                        "reason": "No loss-run records found",
+                    }
+                )
+                continue
+
+            safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", customer_name).strip(" .")
+            filename = f"{safe_name or customer_num}_{datetime.now():%Y_%m_%d}.xlsx"
+            output_path = LOSS_RUN_OUTPUT_DIR / filename
+
+            try:
+                await run_in_threadpool(
+                    _create_workbook,
+                    customer_records,
+                    customer_num,
+                    customer_name,
+                    output_path,
+                )
+                generated_files.append(
+                    {
+                        "customerNumber": customer_num,
+                        "customerName": customer_name,
+                        "fileName": filename,
+                    }
+                )
+            except Exception:
+                logger.exception("Failed to create loss-run workbook for customer %s", customer_num)
+                failures.append(
+                    {
+                        "customerNumber": customer_num,
+                        "reason": "Failed to generate workbook",
+                    }
+                )
+
+        return {
+            "requestedCount": len(requested_numbers),
+            "generatedCount": len(generated_files),
+            "failedCount": len(failures),
+            "files": generated_files,
+            "failures": failures,
+        }
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Failed to generate loss run for customer %s", customer_num)
+        logger.exception("Failed to generate loss-run reports")
         raise HTTPException(
-            status_code=500, detail={"error": "Failed to generate loss-run report"}
+            status_code=500, detail={"error": "Failed to generate loss-run reports"}
         ) from exc

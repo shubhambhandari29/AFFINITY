@@ -33,7 +33,7 @@ def test_create_workbook_populates_claims_record_only_and_cover(tmp_path, monkey
     template_path = tmp_path / "SACLossRunTemplate.xlsx"
     output_path = tmp_path / "Customer_2026_07_16.xlsx"
     _make_template(template_path)
-    monkeypatch.setattr(loss_run_service.settings, "LOSS_RUN_TEMPLATE_PATH", template_path)
+    monkeypatch.setattr(loss_run_service, "LOSS_RUN_TEMPLATE_PATH", template_path)
 
     records = [
         {
@@ -66,20 +66,24 @@ def test_create_workbook_populates_claims_record_only_and_cover(tmp_path, monkey
     workbook.close()
 
 
-def test_generate_loss_run_reads_one_customer_and_writes_to_configured_dir(tmp_path, monkeypatch):
+def test_generate_selected_loss_runs_handles_one_or_more_customers(tmp_path, monkeypatch):
     template_path = tmp_path / "SACLossRunTemplate.xlsx"
     template_path.touch()
-    monkeypatch.setattr(loss_run_service.settings, "LOSS_RUN_TEMPLATE_PATH", template_path)
-    monkeypatch.setattr(loss_run_service.settings, "LOSS_RUN_OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(loss_run_service, "LOSS_RUN_TEMPLATE_PATH", template_path)
+    monkeypatch.setattr(loss_run_service, "LOSS_RUN_OUTPUT_DIR", tmp_path)
 
     calls = []
 
     async def fake_query(query, params):
         calls.append((query, params))
         if "tblAcctSpecial" in query:
-            return [{"CustomerNum": "00123", "CustomerName": "Example/Customer"}]
+            return [
+                {"CustomerNum": "00123", "CustomerName": "Example/Customer"},
+                {"CustomerNum": "00456", "CustomerName": "No Data Customer"},
+            ]
         return [
             {
+                "Customer Number": "00123",
                 "Claim Number": "C-1",
                 "Record Only Indicator": "N",
             }
@@ -95,25 +99,64 @@ def test_generate_loss_run_reads_one_customer_and_writes_to_configured_dir(tmp_p
     monkeypatch.setattr(loss_run_service, "_create_workbook", fake_create)
     monkeypatch.setattr(loss_run_service, "run_in_threadpool", fake_threadpool)
 
-    result = asyncio.run(loss_run_service.generate_loss_run("00123"))
+    result = asyncio.run(loss_run_service.generate_loss_runs(["00123", "00456", "00123"]))
 
-    assert result.parent == tmp_path
-    assert result.name.startswith("Example_Customer_")
+    assert result["requestedCount"] == 2
+    assert result["generatedCount"] == 1
+    assert result["failedCount"] == 1
+    assert result["files"][0]["fileName"].startswith("Example_Customer_")
+    assert result["failures"] == [
+        {"customerNumber": "00456", "reason": "No loss-run records found"}
+    ]
     assert len(calls) == 2
-    assert calls[0][1] == ["00123"]
-    assert calls[1][1] == ["00123"]
-    assert "WHERE [Customer Number] = ?" in calls[1][0]
+    assert calls[0][1] == ["00123", "00456"]
+    assert calls[1][1] == ["00123", "00456"]
+    assert "WHERE [Customer Number] IN (?, ?)" in calls[1][0]
 
 
-def test_generate_loss_run_requires_template(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        loss_run_service.settings,
-        "LOSS_RUN_TEMPLATE_PATH",
-        tmp_path / "missing.xlsx",
-    )
+def test_generate_all_loss_runs_uses_current_eligibility_rules(tmp_path, monkeypatch):
+    template_path = tmp_path / "SACLossRunTemplate.xlsx"
+    template_path.touch()
+    monkeypatch.setattr(loss_run_service, "LOSS_RUN_TEMPLATE_PATH", template_path)
+    monkeypatch.setattr(loss_run_service, "LOSS_RUN_OUTPUT_DIR", tmp_path)
+
+    calls = []
+
+    async def fake_query(query, params=None):
+        calls.append((query, params))
+        if "tblAcctSpecial" in query:
+            return [{"CustomerNum": "00123", "CustomerName": "Example Customer"}]
+        return [
+            {
+                "Customer Number": "00123",
+                "Claim Number": "C-1",
+                "Record Only Indicator": "N",
+            }
+        ]
+
+    def fake_create(records, customer_num, customer_name, output_path):
+        output_path.touch()
+
+    async def fake_threadpool(func, *args):
+        return func(*args)
+
+    monkeypatch.setattr(loss_run_service, "run_raw_query_async", fake_query)
+    monkeypatch.setattr(loss_run_service, "_create_workbook", fake_create)
+    monkeypatch.setattr(loss_run_service, "run_in_threadpool", fake_threadpool)
+
+    result = asyncio.run(loss_run_service.generate_loss_runs())
+
+    assert result["generatedCount"] == 1
+    assert "AcctStatus = 'Active'" in calls[0][0]
+    assert "LossRunDistFreq <> 'Not Needed'" in calls[0][0]
+    assert calls[1][0].strip() == "SELECT * FROM dbo.SAC_Loss_Run"
+
+
+def test_generate_loss_runs_requires_template(tmp_path, monkeypatch):
+    monkeypatch.setattr(loss_run_service, "LOSS_RUN_TEMPLATE_PATH", tmp_path / "missing.xlsx")
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(loss_run_service.generate_loss_run("00123"))
+        asyncio.run(loss_run_service.generate_loss_runs(["00123"]))
 
     assert exc_info.value.status_code == 500
-    assert "template is not configured" in exc_info.value.detail["error"]
+    assert "LOSS_RUN_TEMPLATE_PATH" in exc_info.value.detail["error"]

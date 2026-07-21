@@ -1,24 +1,27 @@
 import asyncio
 
-from fastapi.responses import FileResponse
-
 from api.sac import loss_run
 
 
-def test_download_loss_run_returns_generated_workbook(tmp_path, monkeypatch):
-    output_path = tmp_path / "Customer_2026_07_16.xlsx"
-    output_path.touch()
+def test_generate_all_loss_runs_calls_batch_service(monkeypatch):
+    async def fake_generate(customer_nums=None):
+        assert customer_nums is None
+        return {"generatedCount": 2}
 
-    async def fake_generate(customer_num):
-        assert customer_num == "00123"
-        return output_path
+    monkeypatch.setattr(loss_run, "generate_loss_runs", fake_generate)
 
-    monkeypatch.setattr(loss_run, "generate_loss_run", fake_generate)
+    assert asyncio.run(loss_run.generate_all_loss_runs()) == {"generatedCount": 2}
 
-    response = asyncio.run(loss_run.download_loss_run("00123"))
 
-    assert isinstance(response, FileResponse)
-    assert response.path == output_path
-    assert response.media_type == (
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+def test_generate_selected_loss_runs_passes_customer_array(monkeypatch):
+    captured = {}
+
+    async def fake_generate(customer_nums=None):
+        captured["customer_nums"] = customer_nums
+        return {"generatedCount": 1}
+
+    monkeypatch.setattr(loss_run, "generate_loss_runs", fake_generate)
+    payload = loss_run.LossRunSelection(customerNumbers=["00123"])
+
+    assert asyncio.run(loss_run.generate_selected_loss_runs(payload)) == {"generatedCount": 1}
+    assert captured["customer_nums"] == ["00123"]
