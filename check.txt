@@ -1,6 +1,5 @@
-[LOSS RUN TIMING] mode=selected customer_query=0.12s customer_count=1
-WARNING:  StatReload detected changes in 'services\sac\sac_policies_service.py'. Reloading...
-INFO:     Shutting down
-[LOSS RUN TIMING] mode=selected view_query=727.94s row_count=0
-[LOSS RUN TIMING] mode=selected grouping=0.00s grouped_customers=0
-[LOSS RUN TIMING] mode=selected total=728.07s requested=1 generated=0 failed=1
+[LOSS RUN TIMING] mode=selected customer_query=0.14s customer_count=1
+[LOSS RUN TIMING] mode=selected view_query=887.06s row_count=152
+[LOSS RUN TIMING] mode=selected grouping=0.00s grouped_customers=1
+[LOSS RUN TIMING] customer=1514748014 workbook=0.99s row_count=152
+[LOSS RUN TIMING] mode=selected total=888.28s requested=1 generated=1 failed=0
