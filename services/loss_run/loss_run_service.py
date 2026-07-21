@@ -2,7 +2,6 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from time import perf_counter
 
 import pandas as pd
 from fastapi import HTTPException
@@ -117,9 +116,6 @@ def _create_workbook(
 
 
 async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
-    total_started = perf_counter()
-    mode = "all" if customer_nums is None else "selected"
-
     if not LOSS_RUN_TEMPLATE_PATH.is_file():
         raise HTTPException(
             status_code=500,
@@ -133,7 +129,6 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
 
     try:
         if customer_nums is None:
-            customer_query_started = perf_counter()
             customers = await run_raw_query_async(
                 """
                 SELECT CustomerNum, CustomerName
@@ -143,24 +138,11 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
                   AND LossRunDistFreq <> ''
                 """
             )
-            logger.warning(
-                "[LOSS RUN TIMING] mode=%s customer_query=%.2fs customer_count=%d",
-                mode,
-                perf_counter() - customer_query_started,
-                len(customers),
-            )
             requested_numbers = list(
                 dict.fromkeys(str(customer["CustomerNum"]).strip() for customer in customers)
             )
 
-            view_query_started = perf_counter()
             records = await run_raw_query_async("SELECT * FROM dbo.SAC_Loss_Run")
-            logger.warning(
-                "[LOSS RUN TIMING] mode=%s view_query=%.2fs row_count=%d",
-                mode,
-                perf_counter() - view_query_started,
-                len(records),
-            )
         else:
             requested_numbers = list(
                 dict.fromkeys(
@@ -176,7 +158,6 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
                 )
 
             placeholders = ", ".join("?" for _ in requested_numbers)
-            customer_query_started = perf_counter()
             customers = await run_raw_query_async(
                 f"""
                 SELECT CustomerNum, CustomerName
@@ -185,14 +166,7 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
                 """,
                 requested_numbers,
             )
-            logger.warning(
-                "[LOSS RUN TIMING] mode=%s customer_query=%.2fs customer_count=%d",
-                mode,
-                perf_counter() - customer_query_started,
-                len(customers),
-            )
 
-            view_query_started = perf_counter()
             records = await run_raw_query_async(
                 f"""
                 SELECT *
@@ -201,14 +175,7 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
                 """,
                 requested_numbers,
             )
-            logger.warning(
-                "[LOSS RUN TIMING] mode=%s view_query=%.2fs row_count=%d",
-                mode,
-                perf_counter() - view_query_started,
-                len(records),
-            )
 
-        grouping_started = perf_counter()
         customer_names = {
             str(customer["CustomerNum"])
             .strip(): str(customer.get("CustomerName") or customer["CustomerNum"])
@@ -219,15 +186,9 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
         for record in records:
             customer_num = str(record.get("Customer Number") or "").strip()
             records_by_customer.setdefault(customer_num, []).append(record)
-        logger.warning(
-            "[LOSS RUN TIMING] mode=%s grouping=%.2fs grouped_customers=%d",
-            mode,
-            perf_counter() - grouping_started,
-            len(records_by_customer),
-        )
 
         LOSS_RUN_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        generated_files = []
+        generated_count = 0
         failures = []
 
         for customer_num in requested_numbers:
@@ -251,7 +212,6 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
             output_path = LOSS_RUN_OUTPUT_DIR / filename
 
             try:
-                workbook_started = perf_counter()
                 await run_in_threadpool(
                     _create_workbook,
                     customer_records,
@@ -259,19 +219,7 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
                     customer_name,
                     output_path,
                 )
-                generated_files.append(
-                    {
-                        "customerNumber": customer_num,
-                        "customerName": customer_name,
-                        "fileName": filename,
-                    }
-                )
-                logger.warning(
-                    "[LOSS RUN TIMING] customer=%s workbook=%.2fs row_count=%d",
-                    customer_num,
-                    perf_counter() - workbook_started,
-                    len(customer_records),
-                )
+                generated_count += 1
             except Exception:
                 logger.exception("Failed to create loss-run workbook for customer %s", customer_num)
                 failures.append(
@@ -281,19 +229,10 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
                     }
                 )
 
-        logger.warning(
-            "[LOSS RUN TIMING] mode=%s total=%.2fs requested=%d generated=%d failed=%d",
-            mode,
-            perf_counter() - total_started,
-            len(requested_numbers),
-            len(generated_files),
-            len(failures),
-        )
         return {
             "requestedCount": len(requested_numbers),
-            "generatedCount": len(generated_files),
+            "generatedCount": generated_count,
             "failedCount": len(failures),
-            "files": generated_files,
             "failures": failures,
         }
     except HTTPException:

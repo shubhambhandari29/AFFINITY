@@ -104,10 +104,10 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(tmp_path, mon
     assert result["requestedCount"] == 2
     assert result["generatedCount"] == 1
     assert result["failedCount"] == 1
-    assert result["files"][0]["fileName"].startswith("Example_Customer_")
     assert result["failures"] == [
         {"customerNumber": "00456", "reason": "No loss-run records found"}
     ]
+    assert "files" not in result
     assert len(calls) == 2
     assert calls[0][1] == ["00123", "00456"]
     assert calls[1][1] == ["00123", "00456"]
