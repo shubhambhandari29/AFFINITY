@@ -1,6 +1,6 @@
 import asyncio
 
-from api.sac import loss_run
+from api.loss_run import loss_run
 
 
 def test_generate_all_loss_runs_calls_batch_service(monkeypatch):

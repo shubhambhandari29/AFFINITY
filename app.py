@@ -28,7 +28,7 @@ from api.sac.claim_review_frequency import router as claim_review_frequency_rout
 from api.sac.deduct_bill_distribution import router as deduct_bill_distribution_router
 from api.sac.deduct_bill_frequency import router as deduct_bill_frequency_router
 from api.sac.hcm_users import router as hcm_users_router
-from api.sac.loss_run import router as loss_run_router
+from api.loss_run.loss_run import router as loss_run_router
 from api.sac.loss_run_distribution import router as loss_run_distribution_router
 from api.sac.loss_run_frequency import router as loss_run_frequency_router
 from api.sac.sac_account import router as sac_account_router

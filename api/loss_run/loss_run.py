@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from core.models.loss_run import LossRunSelection
+from core.models.loss_run.loss_run import LossRunSelection
 from services.auth_service import get_current_user_from_token
-from services.sac.loss_run_service import generate_loss_runs
+from services.loss_run.loss_run_service import generate_loss_runs
 
 router = APIRouter(dependencies=[Depends(get_current_user_from_token)])
 
