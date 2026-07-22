@@ -204,3 +204,31 @@ def test_get_premium_invalid_filters(monkeypatch):
 
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == {"error": "bad filter"}
+
+
+def test_get_underwriter_details_only_queries_active_accounts(monkeypatch):
+    captured = {}
+
+    async def fake_run_raw_query_async(query, params):
+        captured["query"] = query
+        captured["params"] = params
+        return []
+
+    monkeypatch.setattr(
+        sac_policies_service,
+        "sanitize_filters",
+        lambda query_params, allowed: query_params,
+    )
+    monkeypatch.setattr(
+        sac_policies_service,
+        "run_raw_query_async",
+        fake_run_raw_query_async,
+    )
+
+    result = asyncio.run(
+        sac_policies_service.get_underwriter_details({"CustomerNum": "123"})
+    )
+
+    assert result == {}
+    assert "a.AcctStatus = 'Active'" in captured["query"]
+    assert captured["params"] == ["123"]
