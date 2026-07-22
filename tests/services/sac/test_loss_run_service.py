@@ -3,7 +3,9 @@ import asyncio
 import pytest
 from fastapi import HTTPException
 from openpyxl import Workbook, load_workbook
+from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from PIL import Image as PILImage
 
 from services.loss_run import loss_run_service
 
@@ -12,6 +14,9 @@ def _make_template(path):
     workbook = Workbook()
     cover = workbook.active
     cover.title = "Cover Page"
+    logo_path = path.parent / "test-logo.png"
+    PILImage.new("RGB", (4, 4), "orange").save(logo_path)
+    cover.add_image(ExcelImage(logo_path), "A1")
 
     for sheet_name, table_name in (
         ("Claims Data", "ClaimsData"),
@@ -57,6 +62,7 @@ def test_create_workbook_populates_claims_record_only_and_cover(tmp_path, monkey
     workbook = load_workbook(output_path)
     assert workbook["Cover Page"]["B2"].value == "00123"
     assert workbook["Cover Page"]["B3"].value == "Example Customer"
+    assert len(workbook["Cover Page"]._images) == 1
     assert workbook["Claims Data"]["B2"].value == "C-1"
     assert workbook["Claims Data"]["C2"].value == "01"
     assert workbook["Record Only"]["B2"].value == "C-2"
