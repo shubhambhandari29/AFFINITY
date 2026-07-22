@@ -262,7 +262,7 @@ async def get_underwriter_details(query_params: dict[str, Any]):
                  = UPPER(LTRIM(RTRIM(CAST(m.SACName AS VARCHAR(MAX)))))
 
             WHERE a.CustomerNum = ?
-              AND a.AcctStatus = 'Active'
+              AND p.PolicyStatus = 'Active'
         """
 
         records = await run_raw_query_async(query, [customer_num])

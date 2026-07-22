@@ -206,7 +206,7 @@ def test_get_premium_invalid_filters(monkeypatch):
     assert excinfo.value.detail == {"error": "bad filter"}
 
 
-def test_get_underwriter_details_only_queries_active_accounts(monkeypatch):
+def test_get_underwriter_details_only_queries_active_policies(monkeypatch):
     captured = {}
 
     async def fake_run_raw_query_async(query, params):
@@ -230,5 +230,5 @@ def test_get_underwriter_details_only_queries_active_accounts(monkeypatch):
     )
 
     assert result == {}
-    assert "a.AcctStatus = 'Active'" in captured["query"]
+    assert "p.PolicyStatus = 'Active'" in captured["query"]
     assert captured["params"] == ["123"]
