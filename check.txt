@@ -1,18 +1,10 @@
-URL for tempalte file:  https://adb-8608532567795739.19.azuredatabricks.net/explore/data/volumes/claims_data_pre_prod/gold/statics?o=8608532567795739
-
-
-FASTAPI hosted here:  https://portal.azure.com/#@HANOVER2.onmicrosoft.com/resource/subscriptions/9508f8e2-b0e6-49c0-98fa-b614a7c025f6/resourceGroups/CLMS_SACPlatform_PREPRD-RG/providers/Microsoft.Web/sites/SACPlatformAPIPreprd/appServices
-
-
-FASTAPI app runs on azure app service. there are two differnet apps for pre prod and prod env. 
-this is the MI of pre prod app and its on: bb8645bb-88c9-4a65-bb39-adf60bd93fd8
-
-4. not sure if our app is assigned to our databricks workspace.  we need to see if it is or not. let me know how we can check and where
-
-5. where do we need to run these queries? if I dont have the access I'll see and tell concerned people.
-
-6. again where can we check, and how we ensure it.
-
-7. existing app receives secrets through azure environment variables. 
-
-
+root@c801dd99b913:/home/site/wwwroot# curl -I --connect-timeout 15 https://adb-8608532567795739.19.azuredatabricks.net
+HTTP/2 404 
+x-databricks-org-id: 8608532567795739
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+x-content-type-options: nosniff
+x-request-id: 093ec190-1452-46e0-a4c6-83f4a8810137
+vary: Accept-Encoding
+date: Fri, 24 Jul 2026 08:12:20 GMT
+server: databricks
+server-timing: request_id;dur=0;desc="093ec190-1452-46e0-a4c6-83f4a8810137", client_protocol;dur=0;desc="HTTP/2"
