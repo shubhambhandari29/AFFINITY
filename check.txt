@@ -1,32 +1,18 @@
-SQL Server parse and compile time: 
-   CPU time = 1891 ms, elapsed time = 1916 ms.
-SQL Server parse and compile time: 
-   CPU time = 0 ms, elapsed time = 0 ms.
+URL for tempalte file:  https://adb-8608532567795739.19.azuredatabricks.net/explore/data/volumes/claims_data_pre_prod/gold/statics?o=8608532567795739
 
-(152 rows affected)
-Table 'DW_CLMS_CLMNT_DIMNSN'. Scan count 9, logical reads 336863, physical reads 3, page server reads 0, read-ahead reads 335765, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_REF_MAJ_PERIL'. Scan count 9, logical reads 133, physical reads 1, page server reads 0, read-ahead reads 44, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_CLMS_VEH_DIMNSN'. Scan count 9, logical reads 181979, physical reads 3, page server reads 0, read-ahead reads 181204, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_CLMS_CLM_CNTCT_DIMNSN'. Scan count 9, logical reads 1725517, physical reads 3, page server reads 0, read-ahead reads 1722376, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_CLMS_LGL_DIMNSN'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_CLMS_LGL_FACT'. Scan count 18, logical reads 23344, physical reads 3, page server reads 0, read-ahead reads 11110, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_FINCL_LOSS_TXN_SS_F_FILTERED'. Scan count 9, logical reads 812, physical reads 3, page server reads 0, read-ahead reads 768, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_FINCL_LOSS_FTR_SS_F_FILTERED'. Scan count 18, logical reads 21292, physical reads 6, page server reads 0, read-ahead reads 9955, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_CLMS_FTR_DIMNSN'. Scan count 9, logical reads 2481720, physical reads 3, page server reads 0, read-ahead reads 2477695, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_CLMS_CLM_DIMNSN'. Scan count 9, logical reads 7182555, physical reads 9, page server reads 0, read-ahead reads 7151081, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_POL_DIMNSN'. Scan count 9, logical reads 6226735, physical reads 0, page server reads 0, read-ahead reads 6185931, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'DW_CLMS_DRVR_DIMNSN'. Scan count 302, logical reads 1208, physical reads 4, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'tblAcctSpecial'. Scan count 0, logical reads 24, physical reads 2, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'Worktable'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'Worktable'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
-Table 'Worktable'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
 
- SQL Server Execution Times:
-   CPU time = 183203 ms,  elapsed time = 746298 ms.
-SQL Server parse and compile time: 
-   CPU time = 0 ms, elapsed time = 0 ms.
+FASTAPI hosted here:  https://portal.azure.com/#@HANOVER2.onmicrosoft.com/resource/subscriptions/9508f8e2-b0e6-49c0-98fa-b614a7c025f6/resourceGroups/CLMS_SACPlatform_PREPRD-RG/providers/Microsoft.Web/sites/SACPlatformAPIPreprd/appServices
 
- SQL Server Execution Times:
-   CPU time = 0 ms,  elapsed time = 0 ms.
 
-Completion time: 2026-07-21T20:26:53.0162661+05:30
+FASTAPI app runs on azure app service. there are two differnet apps for pre prod and prod env. 
+this is the MI of pre prod app and its on: bb8645bb-88c9-4a65-bb39-adf60bd93fd8
+
+4. not sure if our app is assigned to our databricks workspace.  we need to see if it is or not. let me know how we can check and where
+
+5. where do we need to run these queries? if I dont have the access I'll see and tell concerned people.
+
+6. again where can we check, and how we ensure it.
+
+7. existing app receives secrets through azure environment variables. 
+
+
