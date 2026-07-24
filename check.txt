@@ -1,0 +1,147 @@
+{
+    "apiVersion": "2026-01-01",
+    "id": "/subscriptions/9508f8e2-b0e6-49c0-98fa-b614a7c025f6/resourceGroups/prpre2-clms-databricks-rg01/providers/Microsoft.Databricks/workspaces/prpre2-clms-dbw01",
+    "name": "prpre2-clms-dbw01",
+    "type": "microsoft.databricks/workspaces",
+    "sku": {
+        "name": "premium"
+    },
+    "location": "eastus2",
+    "tags": {
+        "Environment": "pre-prod",
+        "Resource Purpose": "Databricks Services",
+        "Department": "Claims Analytics",
+        "Cost Center": "356147",
+        "Region": "EAST US 2",
+        "Application": "Unassigned",
+        "Architect": "Coughlin, Jeremy",
+        "Business Owner": "Valentine, Brett",
+        "Business Unit": "Claims",
+        "Data Classification": "Internal",
+        "Operational Owner": "Matta, Bhavna",
+        "Project Code": "9999",
+        "Activity Code": "9999"
+    },
+    "properties": {
+        "computeMode": "Hybrid",
+        "isUcEnabled": false,
+        "privateEndpointConnections": [
+            {
+                "id": "/subscriptions/9508f8e2-b0e6-49c0-98fa-b614a7c025f6/resourceGroups/prpre2-clms-databricks-rg01/providers/Microsoft.Databricks/workspaces/prpre2-clms-dbw01/privateEndpointConnections/prpre2-clms-dbw01linkdb",
+                "name": "prpre2-clms-dbw01linkdb",
+                "type": "Microsoft.Databricks/workspaces/privateEndpointConnections",
+                "properties": {
+                    "privateEndpoint": {
+                        "id": "/subscriptions/9508f8e2-b0e6-49c0-98fa-b614a7c025f6/resourceGroups/prpre2-clms-databricks-rg01/providers/Microsoft.Network/privateEndpoints/prpre2-clms-dbw01linkdb"
+                    },
+                    "groupIds": [
+                        "databricks_ui_api"
+                    ],
+                    "privateLinkServiceConnectionState": {
+                        "status": "Approved",
+                        "description": "Auto-approved",
+                        "actionsRequired": "None"
+                    },
+                    "provisioningState": "Succeeded"
+                }
+            },
+            {
+                "id": "/subscriptions/9508f8e2-b0e6-49c0-98fa-b614a7c025f6/resourceGroups/prpre2-clms-databricks-rg01/providers/Microsoft.Databricks/workspaces/prpre2-clms-dbw01/privateEndpointConnections/prpre2clmssynws01.synapse-ws-dbw--prpre2-clms-dbw01-conn",
+                "name": "prpre2clmssynws01.synapse-ws-dbw--prpre2-clms-dbw01-conn",
+                "type": "Microsoft.Databricks/workspaces/privateEndpointConnections",
+                "properties": {
+                    "privateEndpoint": {
+                        "id": "/subscriptions/a4473b92-ecfc-41c9-bac4-754a42ae2cd1/resourceGroups/vnet-a4473b92-eastus2-124-rg/providers/Microsoft.Network/privateEndpoints/prpre2clmssynws01.synapse-ws-dbw--prpre2-clms-dbw01"
+                    },
+                    "groupIds": [
+                        "databricks_ui_api"
+                    ],
+                    "privateLinkServiceConnectionState": {
+                        "status": "Approved",
+                        "description": "Approved",
+                        "actionsRequired": "None"
+                    },
+                    "provisioningState": "Succeeded"
+                }
+            }
+        ],
+        "publicNetworkAccess": "Disabled",
+        "requiredNsgRules": "NoAzureDatabricksRules",
+        "managedResourceGroupId": "/subscriptions/9508f8e2-b0e6-49c0-98fa-b614a7c025f6/resourceGroups/managed-rg-prpre2-clms-dbw01",
+        "parameters": {
+            "customPrivateSubnetName": {
+                "type": "String",
+                "value": "prpre2-clms-vnet01-container01"
+            },
+            "customPublicSubnetName": {
+                "type": "String",
+                "value": "prpre2-clms-vnet01-host01"
+            },
+            "customVirtualNetworkId": {
+                "type": "String",
+                "value": "/subscriptions/9508f8e2-b0e6-49c0-98fa-b614a7c025f6/resourceGroups/ppe-clms-core-network-rg01/providers/Microsoft.Network/virtualNetworks/ppe-clmsVnet01"
+            },
+            "enableFedRampCertification": {
+                "type": "Bool",
+                "value": false
+            },
+            "enableNoPublicIp": {
+                "type": "Bool",
+                "value": true
+            },
+            "prepareEncryption": {
+                "type": "Bool",
+                "value": false
+            },
+            "requireInfrastructureEncryption": {
+                "type": "Bool",
+                "value": true
+            },
+            "resourceTags": {
+                "type": "Object",
+                "value": {
+                    "application": "databricks",
+                    "databricks-environment": "true",
+                    "BusinessOwner": "Jackie Varanelli",
+                    "BusinessUnit": "ENT",
+                    "Environment": "pre-prod",
+                    "CostCenter": "356147",
+                    "Resource Purpose": "Databricks Services",
+                    "Department": "Claims Analytics"
+                }
+            },
+            "storageAccountName": {
+                "type": "String",
+                "value": "dbstorageewepalkaeog3e"
+            },
+            "storageAccountSkuName": {
+                "type": "String",
+                "value": "Standard_GRS"
+            }
+        },
+        "provisioningState": "Succeeded",
+        "authorizations": [
+            {
+                "principalId": "9a74af6f-d153-4348-988a-e2672920bee9",
+                "roleDefinitionId": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635"
+            }
+        ],
+        "createdBy": {
+            "oid": "244aab29-4d84-4254-ab21-5f2cd1e6127d",
+            "applicationId": "c83f0b90-047f-4268-ad9f-486c1f9ef78c"
+        },
+        "updatedBy": {
+            "oid": "244aab29-4d84-4254-ab21-5f2cd1e6127d",
+            "applicationId": "c83f0b90-047f-4268-ad9f-486c1f9ef78c"
+        },
+        "workspaceId": "8608532567795739",
+        "workspaceUrl": "adb-8608532567795739.19.azuredatabricks.net",
+        "createdDateTime": "2023-03-29T22:58:54.0197584Z"
+    },
+    "systemData": {
+        "createdAt": "0001-01-01T00:00:00Z",
+        "lastModifiedBy": "d97f331d-0fea-44b0-b8e7-9f4f178217ce",
+        "lastModifiedByType": "Application",
+        "lastModifiedAt": "2025-08-01T18:29:12.7343363Z"
+    }
+}
