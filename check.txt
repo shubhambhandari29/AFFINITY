@@ -1,8 +1,16 @@
-
-
 {
-  "detail": {
-    "error": "Unable to read the loss-run template from Databricks",
-    "reason": "default auth: cannot configure default credentials, please check https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication to configure credentials for your preferred authentication method. Config: host=https://adb-8608532567795739.19.azuredatabricks.net, account_id=ea828ec7-837b-496e-a62e-d717e2cd1f96, workspace_id=8608532567795739, discovery_url=https://adb-8608532567795739.19.azuredatabricks.net/oidc/.well-known/oauth-authorization-server, token_audience=https://adb-8608532567795739.19.azuredatabricks.net/oidc/v1/token, profile=claims-preprod, auth_type=databricks-cli"
-  }
+  "status": "success",
+  "message": "Databricks loss-run template is accessible and valid",
+  "templatePath": "/Volumes/claims_data_pre_prod/gold/statics/SACLossRunTemplate.xlsx",
+  "fileSizeBytes": 49781,
+  "sheetNames": [
+    "Cover Page",
+    "Summary By Policy Year",
+    "Chart",
+    "Claims Data",
+    "Record Only"
+  ],
+  "claimsDataTableFound": true,
+  "recordOnlyDataTableFound": true,
+  "coverImageCount": 1
 }
