@@ -25,3 +25,12 @@ def test_generate_selected_loss_runs_passes_customer_array(monkeypatch):
 
     assert asyncio.run(loss_run.generate_selected_loss_runs(payload)) == {"generatedCount": 1}
     assert captured["customer_nums"] == ["00123"]
+
+
+def test_databricks_template_endpoint_calls_test_service(monkeypatch):
+    async def fake_test_access():
+        return {"status": "success"}
+
+    monkeypatch.setattr(loss_run, "test_databricks_template_access", fake_test_access)
+
+    assert asyncio.run(loss_run.test_databricks_template()) == {"status": "success"}
