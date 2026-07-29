@@ -4,3 +4,7 @@
     "reason": "403 Client Error: Forbidden for url: https://adb-8608532567795739.19.azuredatabricks.net/api/2.0/fs/files/Volumes/claims_data_pre_prod/gold/statics/SACLossRunTemplate.xlsx"
   }
 }
+
+
+
+Ok, the databricks sp named SACPlatformAPIPreprd (uuid: b8645bb-88c9-4a65-bb39-adf60bd93fd8) is now added to the preprod workspace and has read on the "statics" volume, read/write on the "external_volume" volume, and has "can restart" on the "claims_data_science_common_compute" cluster
