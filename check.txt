@@ -8,3 +8,85 @@
 
 
 Ok, the databricks sp named SACPlatformAPIPreprd (uuid: b8645bb-88c9-4a65-bb39-adf60bd93fd8) is now added to the preprod workspace and has read on the "statics" volume, read/write on the "external_volume" volume, and has "can restart" on the "claims_data_science_common_compute" cluster
+
+
+The administrator completed most of the setup, but two things need confirmation.
+
+## 1. The identity UUID appears incorrect
+
+Our confirmed App Service managed-identity Object ID is:
+
+```text
+bb8645bb-88c9-4a65-bb39-adf60bd93fd8
+```
+
+The administrator wrote:
+
+```text
+b8645bb-88c9-4a65-bb39-adf60bd93fd8
+```
+
+The value in their message is missing the first `b` and is not a valid UUID because its first section has only seven characters. It may only be a typing mistake in their message, but they should confirm the actual Databricks service principal.
+
+They should verify that the Databricks principal corresponds to the App Service identity with Object ID:
+
+```text
+bb8645bb-88c9-4a65-bb39-adf60bd93fd8
+```
+
+The Databricks service principal may display the corresponding Entra Application/Client ID instead of the Object ID, so both identifiers should be compared in Entra ID.
+
+## 2. Catalog and schema permissions were not mentioned
+
+They confirmed:
+
+- Read on `statics`
+- Read/write on `external_volume`
+
+But reading a volume also requires:
+
+```text
+USE CATALOG on claims_data_pre_prod
+USE SCHEMA on claims_data_pre_prod.gold
+READ VOLUME on claims_data_pre_prod.gold.statics
+```
+
+They did not mention `USE CATALOG` or `USE SCHEMA`. Missing either one can produce the current `403 Forbidden`.
+
+The cluster permission:
+
+```text
+CAN RESTART on claims_data_science_common_compute
+```
+
+is unrelated to the Files API and is not needed for downloading the template.
+
+## Message to send them
+
+> Thank you. The App Service is successfully authenticating with its managed identity and reaching the Databricks Files API, but the file download returns HTTP 403.
+>
+> Could you please confirm:
+>
+> 1. The assigned Databricks service principal corresponds to the App Service managed-identity Object/Principal ID `bb8645bb-88c9-4a65-bb39-adf60bd93fd8`. The UUID in the message appears to be missing the first `b`.
+> 2. The principal has `USE CATALOG` on `claims_data_pre_prod`.
+> 3. The principal has `USE SCHEMA` on `claims_data_pre_prod.gold`.
+> 4. The principal has `READ VOLUME` on `claims_data_pre_prod.gold.statics`.
+> 5. The principal is assigned specifically to workspace `prpre2-clms-dbw01`.
+>
+> The `CAN RESTART` cluster permission is not required for this Files API test.
+
+They can verify with:
+
+```sql
+SHOW GRANTS ON CATALOG claims_data_pre_prod;
+```
+
+```sql
+SHOW GRANTS ON SCHEMA claims_data_pre_prod.gold;
+```
+
+```sql
+SHOW GRANTS ON VOLUME claims_data_pre_prod.gold.statics;
+```
+
+The same `SACPlatformAPIPreprd` principal should appear in all three results.
