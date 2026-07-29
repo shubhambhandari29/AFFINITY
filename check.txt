@@ -1,16 +1,6 @@
 {
-  "status": "success",
-  "message": "Databricks loss-run template is accessible and valid",
-  "templatePath": "/Volumes/claims_data_pre_prod/gold/statics/SACLossRunTemplate.xlsx",
-  "fileSizeBytes": 49781,
-  "sheetNames": [
-    "Cover Page",
-    "Summary By Policy Year",
-    "Chart",
-    "Claims Data",
-    "Record Only"
-  ],
-  "claimsDataTableFound": true,
-  "recordOnlyDataTableFound": true,
-  "coverImageCount": 1
+  "detail": {
+    "error": "Unable to read the loss-run template from Databricks",
+    "reason": "403 Client Error: Forbidden for url: https://adb-8608532567795739.19.azuredatabricks.net/api/2.0/fs/files/Volumes/claims_data_pre_prod/gold/statics/SACLossRunTemplate.xlsx"
+  }
 }
