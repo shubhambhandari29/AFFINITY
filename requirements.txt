@@ -15,4 +15,3 @@ pytest==8.3.2
 pytest-cov==5.0.0
 requests==2.32.3
 azure-identity==1.19.0
-databricks-sdk==0.121.0

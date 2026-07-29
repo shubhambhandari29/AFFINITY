@@ -37,33 +37,39 @@ def _template_bytes() -> bytes:
 
 
 def test_downloads_and_validates_template(monkeypatch):
-    class Response:
-        contents = BytesIO(_template_bytes())
-
-    class Files:
+    class Credential:
         @staticmethod
-        def download(path):
-            assert path == databricks_template_test_service.DATABRICKS_TEMPLATE_PATH
-            return Response()
+        def get_token(scope):
+            assert scope == databricks_template_test_service.DATABRICKS_TOKEN_SCOPE
+            return type("AccessToken", (), {"token": "test-token"})()
 
-    class Client:
-        files = Files()
+    class Response:
+        content = _template_bytes()
 
-    class WorkspaceClient:
-        def __new__(cls, *, host, profile):
-            assert host == databricks_template_test_service.DATABRICKS_HOST
-            assert profile == databricks_template_test_service.DATABRICKS_PROFILE
-            return Client()
+        @staticmethod
+        def raise_for_status():
+            return None
 
-    monkeypatch.setitem(
-        __import__("sys").modules,
-        "databricks.sdk",
-        type("SDK", (), {"WorkspaceClient": WorkspaceClient}),
+    def fake_get(url, *, headers, timeout):
+        assert url == (
+            f"{databricks_template_test_service.DATABRICKS_HOST}/api/2.0/fs/files"
+            f"{databricks_template_test_service.DATABRICKS_TEMPLATE_PATH}"
+        )
+        assert headers == {"Authorization": "Bearer test-token"}
+        assert timeout == 60
+        return Response()
+
+    monkeypatch.setattr(
+        databricks_template_test_service,
+        "ManagedIdentityCredential",
+        Credential,
     )
+    monkeypatch.setattr(databricks_template_test_service.requests, "get", fake_get)
 
     result = databricks_template_test_service._download_and_validate_template()
 
     assert result["status"] == "success"
+    assert result["authenticationMode"] == "system-assigned-managed-identity"
     assert result["claimsDataTableFound"] is True
     assert result["recordOnlyDataTableFound"] is True
     assert result["fileSizeBytes"] > 0

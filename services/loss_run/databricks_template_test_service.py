@@ -1,11 +1,14 @@
 from io import BytesIO
+from urllib.parse import quote
 
+import requests
+from azure.identity import ManagedIdentityCredential
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 from openpyxl import load_workbook
 
 DATABRICKS_HOST = "https://adb-8608532567795739.19.azuredatabricks.net"
-DATABRICKS_PROFILE = "claims-preprod"
+DATABRICKS_TOKEN_SCOPE = "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d/.default"
 DATABRICKS_TEMPLATE_PATH = "/Volumes/claims_data_pre_prod/gold/statics/SACLossRunTemplate.xlsx"
 
 REQUIRED_SHEETS = {
@@ -18,16 +21,16 @@ REQUIRED_SHEETS = {
 
 
 def _download_and_validate_template() -> dict:
-    from databricks.sdk import WorkspaceClient
+    access_token = ManagedIdentityCredential().get_token(DATABRICKS_TOKEN_SCOPE)
+    file_url = f"{DATABRICKS_HOST}/api/2.0/fs/files" f"{quote(DATABRICKS_TEMPLATE_PATH, safe='/')}"
 
-    client = WorkspaceClient(
-        host=DATABRICKS_HOST,
-        profile=DATABRICKS_PROFILE,
+    response = requests.get(
+        file_url,
+        headers={"Authorization": f"Bearer {access_token.token}"},
+        timeout=60,
     )
-
-    response = client.files.download(DATABRICKS_TEMPLATE_PATH)
-    with response.contents as stream:
-        template_bytes = stream.read()
+    response.raise_for_status()
+    template_bytes = response.content
 
     workbook = load_workbook(BytesIO(template_bytes))
     try:
@@ -42,6 +45,7 @@ def _download_and_validate_template() -> dict:
         return {
             "status": "success",
             "message": "Databricks loss-run template is accessible and valid",
+            "authenticationMode": "system-assigned-managed-identity",
             "templatePath": DATABRICKS_TEMPLATE_PATH,
             "fileSizeBytes": len(template_bytes),
             "sheetNames": workbook.sheetnames,
