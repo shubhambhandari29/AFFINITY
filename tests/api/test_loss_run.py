@@ -27,10 +27,23 @@ def test_generate_selected_loss_runs_passes_customer_array(monkeypatch):
     assert captured["customer_nums"] == ["00123"]
 
 
-def test_databricks_template_endpoint_calls_test_service(monkeypatch):
-    async def fake_test_access():
-        return {"status": "success"}
+def test_local_databricks_endpoint_calls_local_test_service(monkeypatch):
+    async def fake_local_test():
+        return {"authenticationMode": "local-oauth-profile"}
 
-    monkeypatch.setattr(loss_run, "test_databricks_template_access", fake_test_access)
+    monkeypatch.setattr(loss_run, "test_local_databricks_access", fake_local_test)
 
-    assert asyncio.run(loss_run.test_databricks_template()) == {"status": "success"}
+    assert asyncio.run(loss_run.test_local_databricks()) == {
+        "authenticationMode": "local-oauth-profile"
+    }
+
+
+def test_azure_databricks_endpoint_calls_azure_test_service(monkeypatch):
+    async def fake_azure_test():
+        return {"authenticationMode": "system-assigned-managed-identity"}
+
+    monkeypatch.setattr(loss_run, "test_azure_databricks_access", fake_azure_test)
+
+    assert asyncio.run(loss_run.test_azure_databricks()) == {
+        "authenticationMode": "system-assigned-managed-identity"
+    }
