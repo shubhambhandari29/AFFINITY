@@ -204,3 +204,29 @@ def test_get_premium_invalid_filters(monkeypatch):
 
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == {"error": "bad filter"}
+
+
+def test_get_underwriter_details_returns_empty_arrays_when_no_records(monkeypatch):
+    async def fake_run_raw_query_async(query, params):
+        return []
+
+    monkeypatch.setattr(sac_policies_service, "run_raw_query_async", fake_run_raw_query_async)
+    monkeypatch.setattr(
+        sac_policies_service,
+        "sanitize_filters",
+        lambda filters_input, allowed: filters_input,
+    )
+
+    result = asyncio.run(
+        sac_policies_service.get_underwriter_details({"CustomerNum": "1"})
+    )
+
+    assert result == {
+        "AcctOwnerEmail": [],
+        "UnderwriterNames": [],
+        "UnderwriterEmails": [],
+        "UWMgrNames": [],
+        "UWMgrEmails": [],
+        "MissingUnderwriters": [],
+        "MissingUWManagers": [],
+    }
