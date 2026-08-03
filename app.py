@@ -25,6 +25,7 @@ from api.dropdowns import router as dropdowns_router
 from api.hcm.hcm_account import router as hcm_account_router
 from api.hcm.hcm_account_associations import router as hcm_account_associations_router
 from api.hcm.hcm_users import router as hcm_only_users_router
+from api.hcm.search_hcm_account import router as search_hcm_account_router
 from api.outlook_compose import router as outlook_compose_router
 from api.sac.claim_review_distribution import router as claim_review_distribution_router
 from api.sac.claim_review_frequency import router as claim_review_frequency_router
@@ -73,6 +74,9 @@ app.include_router(
     hcm_account_associations_router,
     prefix="/hcm_account_associations",
     tags=["hcm_account_associations"],
+)
+app.include_router(
+    search_hcm_account_router, prefix="/search_hcm_account", tags=["search_hcm_account"]
 )
 app.include_router(
     sac_account_associations_router,

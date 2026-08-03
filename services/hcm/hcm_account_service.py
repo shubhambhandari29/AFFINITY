@@ -57,8 +57,7 @@ async def upsert_hcm_account(data: dict[str, Any]):
         return await merge_upsert_records_async(
             table=TABLE_NAME,
             data_list=[sanitized_data],
-            key_columns=[PRIMARY_KEY],
-            exclude_key_columns_from_insert=True,
+            key_columns=[PRIMARY_KEY]
         )
     except Exception as e:
         logger.warning(f"HCM account upsert failed - {str(e)}")

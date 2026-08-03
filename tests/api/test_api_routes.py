@@ -43,6 +43,7 @@ GET_REQUEST_ENDPOINTS = [
 
 QUERY_ENDPOINTS = [
     ("api.sac.search_sac_account", "get_sac_account_records", "get_sac_account_records_service"),
+    ("api.hcm.search_hcm_account", "get_hcm_account_records", "get_hcm_account_records_service"),
     ("api.affinity.search_affinity_program", "get_affinity_program_records", "get_affinity_program_records_service"),
 ]
 
