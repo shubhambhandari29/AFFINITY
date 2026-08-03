@@ -1,52 +1,11 @@
-USE [CLMAA_SpecialAccounts]
-GO
+payload (http://localhost:8000/hcm_account/upsert)
 
-/****** Object:  Table [dbo].[tblHcmAccount]    Script Date: 8/3/2026 4:02:16 PM ******/
-SET ANSI_NULLS ON
-GO
-
-SET QUOTED_IDENTIFIER ON
-GO
-
-CREATE TABLE [dbo].[tblHcmAccount](
-	[CustomerName] [varchar](255) NULL,
-	[CustomerNum] [varchar](50) NOT NULL,
-	[OnBoardDate] [datetime] NULL,
-	[AccountNotes] [varchar](8000) NULL,
-	[DateCreated] [datetime] NULL,
-	[CreatedBy] [varchar](255) NULL,
-	[SAC_Contact1] [varchar](50) NULL,
-	[SAC_Contact2] [varchar](50) NULL,
-	[LossCtlRep1] [varchar](50) NULL,
-	[LossCtlRep2] [varchar](50) NULL,
-	[BranchName] [varchar](50) NULL,
-	[HCMAccess] [varchar](50) NULL,
-	[DiscDate] [varchar](50) NULL,
-	[AcctOwner] [varchar](50) NULL,
-	[OBMethod] [varchar](255) NULL,
-	[CRThresh] [money] NULL,
-	[AcctStatus] [varchar](50) NULL,
-	[TermDate] [datetime] NULL,
-	[TermCode] [text] NULL,
-	[SACApproved] [varchar](50) NULL,
-	[DateNotif] [datetime] NULL,
-	[RiskSolMgr] [varchar](50) NULL,
-	[HCM_LOC_ONLY] [text] NULL,
-	[RenewLetterDt] [datetime] NULL,
-	[RelatedEnt] [text] NULL,
-	[ChangeNotes] [varchar](max) NULL,
-	[Stage] [varchar](50) NULL,
-	[IsSubmitted] [int] NULL,
-	[MarketSegmentation] [varchar](100) NULL,
-	[EffectiveDate] [date] NULL,
-	[AcctSpecialKey] [int] IDENTITY(1,1) NOT NULL,
-	[InsertDateTime] [datetimeoffset](7) NOT NULL,
-	[UpdateDateTime] [datetimeoffset](7) NOT NULL,
- CONSTRAINT [aaaaatblHCM_PK] PRIMARY KEY NONCLUSTERED 
-(
-	[CustomerNum] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
-GO
+{"AcctStatus":"Active","CustomerName":"as","CustomerNum":"1111111111","SAC_Contact1":"","LossCtlRep1":"","DateCreated":"2026-08-03","RelatedEnt":"","DateNotif":"","SAC_Contact2":"Jenna Houle","LossCtlRep2":"","OnBoardDate":"2026-08-03","TermDate":"","AcctOwner":"","RiskSolMgr":"","OBMethod":"","TermCode":"","BranchName":"Midwest - 05 - Western Michigan Branch","MarketSegmentation":"","HCMAccess":"","EffectiveDate":"","DiscDate":"","Stage":"Admin","IsSubmitted":0}
 
 
+response:  
+{
+    "detail": {
+        "error": "('22007', '[22007] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Conversion failed when converting date and/or time from character string. (241) (SQLExecDirectW)')"
+    }
+}
