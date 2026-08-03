@@ -4,9 +4,9 @@ from pydantic import BaseModel
 
 
 class HCMAccountUpsert(BaseModel):
-    PK_Number: int | None = None
-    CustomerName: str | None = None
     CustomerNum: str | None = None
+    AcctSpecialKey: int | None = None
+    CustomerName: str | None = None
     OnBoardDate: datetime | None = None
     AccountNotes: str | None = None
     DateCreated: datetime | None = None

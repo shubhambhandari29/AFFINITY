@@ -14,7 +14,12 @@ from core.db_helpers import (
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblHcmAccount"
-PRIMARY_KEY = "PK_Number"
+PRIMARY_KEY = "CustomerNum"
+EXCLUDE_COLUMNS = {"PK_Number", "AcctSpecialKey"}
+
+
+def _sanitize_account_record(record: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in record.items() if k not in EXCLUDE_COLUMNS}
 
 
 async def get_hcm_account(query_params: dict[str, Any]):
@@ -32,14 +37,15 @@ async def get_hcm_account(query_params: dict[str, Any]):
 async def upsert_hcm_account(data: dict[str, Any]):
     try:
         normalized_data = normalize_payload_dates(data)
-        pk_value = normalized_data.get(PRIMARY_KEY)
+        sanitized_data = _sanitize_account_record(normalized_data)
+        pk_value = sanitized_data.get(PRIMARY_KEY)
         if pk_value in (None, ""):
-            sanitized = {k: v for k, v in normalized_data.items() if k != PRIMARY_KEY}
-            return await insert_records_async(table=TABLE_NAME, records=[sanitized])
+            sanitized_insert = {k: v for k, v in sanitized_data.items() if k != PRIMARY_KEY}
+            return await insert_records_async(table=TABLE_NAME, records=[sanitized_insert])
 
         return await merge_upsert_records_async(
             table=TABLE_NAME,
-            data_list=[normalized_data],
+            data_list=[sanitized_data],
             key_columns=[PRIMARY_KEY],
             exclude_key_columns_from_insert=True,
         )
