@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 TABLE_NAME = "tblHcmOnlyUsers"
 PRIMARY_KEY = "PK_Number"
 FILTER_MAP = {"CustomerNum": "CustNum"}
-UPSERT_KEY_COLUMNS = ["CustNum", "UserName"]
 
 
 def _remap_keys(payload: dict[str, Any]) -> dict[str, Any]:
@@ -54,20 +53,20 @@ async def upsert_hcm_users(data_list: list[dict[str, Any]]):
         to_insert: list[dict[str, Any]] = []
 
         for record in payload:
-            customer_num = record.get("CustNum")
-            user_name = record.get("UserName")
+            pk_value = record.get(PRIMARY_KEY)
             sanitized_record = {k: v for k, v in record.items() if k != PRIMARY_KEY}
-            if customer_num in (None, "") or user_name in (None, ""):
-                if sanitized_record:
-                    to_insert.append(sanitized_record)
+
+            if pk_value in (None, ""):
+                to_insert.append(sanitized_record)
             else:
-                to_update.append(sanitized_record)
+                to_update.append({**sanitized_record, PRIMARY_KEY: pk_value})
 
         if to_update:
             await merge_upsert_records_async(
                 table=TABLE_NAME,
                 data_list=to_update,
-                key_columns=UPSERT_KEY_COLUMNS,
+                key_columns=[PRIMARY_KEY],
+                exclude_key_columns_from_insert=True,
             )
 
         if to_insert:
