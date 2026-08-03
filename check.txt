@@ -1,9 +1,23 @@
-['5666666666', 'Active', '23213r3443564', '', '', datetime.datetime(2026, 8, 3, 0, 0), '', None, 'Jenna Houle', '', datetime.datetime(2026, 8, 3, 0, 0), None, '', '', '', '', 'Midwest - 05 - Western Michigan Branch', '', '', None, None, 'Admin', 0, '2026-08-03 13:51:24.0004810 +00:00']
+-- Confirm every HCM date-related column’s exact type
+SELECT
+    COLUMN_NAME,
+    DATA_TYPE,
+    DATETIME_PRECISION,
+    IS_NULLABLE,
+    COLUMN_DEFAULT
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'tblHcmAccount'
+  AND (
+      COLUMN_NAME LIKE '%Date%'
+      OR COLUMN_NAME LIKE '%Dt%'
+  )
+ORDER BY ORDINAL_POSITION;
 
-{"AcctStatus":"Active","CustomerName":"23213r3443564","CustomerNum":"5666666666","SAC_Contact1":"","LossCtlRep1":"","DateCreated":"2026-08-03","RelatedEnt":"","DateNotif":"","SAC_Contact2":"Jenna Houle","LossCtlRep2":"","OnBoardDate":"2026-08-03","TermDate":"","AcctOwner":"","RiskSolMgr":"","OBMethod":"","TermCode":"","BranchName":"Midwest - 05 - Western Michigan Branch","MarketSegmentation":"","HCMAccess":"","EffectiveDate":"","DiscDate":"","Stage":"Admin","IsSubmitted":0}
 
-{
-    "detail": {
-        "error": "('22007', '[22007] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Conversion failed when converting date and/or time from character string. (241) (SQLExecDirectW)')"
-    }
-}
+
+-- Check triggers specific to HCM
+SELECT
+    tr.name AS TriggerName,
+    OBJECT_DEFINITION(tr.object_id) AS TriggerDefinition
+FROM sys.triggers tr
+WHERE tr.parent_id = OBJECT_ID('tblHcmAccount');

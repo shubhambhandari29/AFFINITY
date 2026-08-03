@@ -1,9 +1,9 @@
 import logging
-from datetime import date, datetime
 from typing import Any
 
 from fastapi import HTTPException
 
+from core.date_utils import normalize_payload_dates
 from core.db_helpers import (
     fetch_records_async,
     insert_records_async,
@@ -33,33 +33,6 @@ def _sanitize_account_record(record: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in record.items() if k not in EXCLUDE_COLUMNS}
 
 
-def _coerce_hcm_date_value(value: Any) -> datetime | None:
-    if value in (None, ""):
-        return None
-
-    if isinstance(value, datetime):
-        return value
-
-    if isinstance(value, date):
-        return datetime.combine(value, datetime.min.time())
-
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return None
-        return datetime.strptime(text, "%Y-%m-%d")
-
-    return None
-
-
-def _normalize_hcm_account_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(payload)
-    for field in _DATE_FIELDS:
-        if field in normalized:
-            normalized[field] = _coerce_hcm_date_value(normalized.get(field))
-    return normalized
-
-
 async def get_hcm_account(query_params: dict[str, Any]):
     try:
         filters = sanitize_filters(query_params)
@@ -74,7 +47,7 @@ async def get_hcm_account(query_params: dict[str, Any]):
 
 async def upsert_hcm_account(data: dict[str, Any]):
     try:
-        normalized_data = _normalize_hcm_account_payload(data)
+        normalized_data = normalize_payload_dates(data, fields=_DATE_FIELDS)
         sanitized_data = _sanitize_account_record(normalized_data)
         pk_value = sanitized_data.get(PRIMARY_KEY)
         if pk_value in (None, ""):
