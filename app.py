@@ -22,6 +22,9 @@ from api.affinity.search_affinity_program import (
 )
 from api.auth import router as auth_router
 from api.dropdowns import router as dropdowns_router
+from api.hcm.hcm_account import router as hcm_account_router
+from api.hcm.hcm_account_associations import router as hcm_account_associations_router
+from api.hcm.hcm_users import router as hcm_users_router
 from api.outlook_compose import router as outlook_compose_router
 from api.sac.claim_review_distribution import router as claim_review_distribution_router
 from api.sac.claim_review_frequency import router as claim_review_frequency_router
@@ -62,6 +65,15 @@ app.include_router(dropdowns_router, prefix="/dropdowns", tags=["dropdowns"])
 
 # sac
 app.include_router(sac_account_router, prefix="/sac_account", tags=["sac_account"])
+
+# hcm
+app.include_router(hcm_account_router, prefix="/hcm_account", tags=["hcm_account"])
+app.include_router(hcm_users_router, prefix="/hcm_users", tags=["hcm_users"])
+app.include_router(
+    hcm_account_associations_router,
+    prefix="/hcm_account_associations",
+    tags=["hcm_account_associations"],
+)
 app.include_router(
     sac_account_associations_router,
     prefix="/sac_account_associations",

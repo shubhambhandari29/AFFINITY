@@ -40,9 +40,13 @@ async def upsert_sac_policies(payload: SacPolicyUpsert):
 
 
 @router.post("/update_field_for_all_policies")
-async def update_field_for_all_policies(payload: list[SacPolicyBulkFieldUpdate]):
-    return await update_field_for_all_policies_service(
-        [item.model_dump() for item in payload])
+async def update_field_for_all_policies(payload: list[SacPolicyBulkFieldUpdate] | SacPolicyBulkFieldUpdate):
+    if isinstance(payload, list):
+        data = [item.model_dump() for item in payload]
+    else:
+        data = payload.model_dump()
+
+    return await update_field_for_all_policies_service(data)
 
 @router.get("/get_premium")
 async def get_premium(request: Request):

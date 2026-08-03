@@ -23,6 +23,9 @@ GET_REQUEST_ENDPOINTS = [
     ("api.sac.deduct_bill_frequency", "get_frequency", "get_frequency_service"),
     ("api.sac.loss_run_frequency", "get_frequency", "get_frequency_service"),
     ("api.sac.hcm_users", "get_hcm_users", "get_hcm_users_service"),
+    ("api.hcm.hcm_account", "get_hcm_account", "get_hcm_account_service"),
+    ("api.hcm.hcm_users", "get_hcm_users", "get_hcm_users_service"),
+    ("api.hcm.hcm_account_associations", "get_hcm_account_associations", "get_hcm_account_associations_service"),
     ("api.sac.sac_account", "get_sac_account", "get_sac_account_service"),
     ("api.sac.sac_account_associations", "get_associations", "get_associations_service"),
     ("api.sac.sac_affiliates", "get_affiliates", "get_affiliates_service"),
@@ -54,6 +57,8 @@ LIST_PAYLOAD_ENDPOINTS = [
     ("api.sac.deduct_bill_frequency", "upsert_frequency", "upsert_frequency_service"),
     ("api.sac.loss_run_frequency", "upsert_frequency", "upsert_frequency_service"),
     ("api.sac.hcm_users", "upsert_hcm_users", "upsert_hcm_users_service"),
+    ("api.hcm.hcm_users", "upsert_hcm_users", "upsert_hcm_users_service"),
+    ("api.hcm.hcm_account_associations", "upsert_hcm_account_associations", "upsert_hcm_account_associations_service"),
     ("api.sac.sac_affiliates", "upsert_affiliates", "upsert_affiliates_service"),
     ("api.affinity.claim_review_distribution", "upsert_distribution", "upsert_distribution_service"),
     ("api.affinity.claim_review_distribution", "delete_distribution", "delete_distribution_service"),
@@ -66,6 +71,7 @@ LIST_PAYLOAD_ENDPOINTS = [
 
 SINGLE_PAYLOAD_ENDPOINTS = [
     ("api.sac.sac_account", "upsert_sac_account", "upsert_sac_account_service"),
+    ("api.hcm.hcm_account", "upsert_hcm_account", "upsert_hcm_account_service"),
     ("api.sac.sac_account_associations", "add_associations", "add_associations_service"),
     ("api.sac.sac_account_associations", "delete_associations", "delete_associations_service"),
     ("api.sac.sac_policies", "upsert_sac_policies", "upsert_sac_policies_service"),

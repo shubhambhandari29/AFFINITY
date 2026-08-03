@@ -127,7 +127,10 @@ async def upsert_sac_policies(data: dict[str, Any]):
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
 
 
-async def update_field_for_all_policies(data: list[dict[str, Any]]):
+async def update_field_for_all_policies(data: list[dict[str, Any]] | dict[str, Any]):
+    if isinstance(data, dict):
+        data = [data]
+
     if not data:
         raise HTTPException(
             status_code=400,
