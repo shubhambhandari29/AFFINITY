@@ -1,10 +1,9 @@
 import logging
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any
 
 from fastapi import HTTPException
 
-from core.date_utils import format_records_dates, normalize_payload_dates
 from core.db_helpers import (
     fetch_records_async,
     insert_records_async,
@@ -34,12 +33,27 @@ def _sanitize_account_record(record: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in record.items() if k not in EXCLUDE_COLUMNS}
 
 
+def _coerce_hcm_date_value(value: Any) -> datetime | None:
+    if value in (None, ""):
+        return None
+
+    if isinstance(value, datetime):
+        return value
+
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        return datetime.strptime(text, "%Y-%m-%d")
+
+    return None
+
+
 def _normalize_hcm_account_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    normalized = normalize_payload_dates(payload, fields=_DATE_FIELDS)
+    normalized = dict(payload)
     for field in _DATE_FIELDS:
-        value = normalized.get(field)
-        if isinstance(value, date) and not isinstance(value, datetime):
-            normalized[field] = datetime.combine(value, datetime.min.time())
+        if field in normalized:
+            normalized[field] = _coerce_hcm_date_value(normalized.get(field))
     return normalized
 
 
@@ -47,7 +61,7 @@ async def get_hcm_account(query_params: dict[str, Any]):
     try:
         filters = sanitize_filters(query_params)
         records = await fetch_records_async(table=TABLE_NAME, filters=filters)
-        return format_records_dates(records)
+        return records
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
     except Exception as e:

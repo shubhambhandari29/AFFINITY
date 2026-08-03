@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import datetime
 
 from services.hcm import hcm_account_service
 
