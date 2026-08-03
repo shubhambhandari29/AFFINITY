@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -39,6 +39,9 @@ def _coerce_hcm_date_value(value: Any) -> datetime | None:
 
     if isinstance(value, datetime):
         return value
+
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
 
     if isinstance(value, str):
         text = value.strip()

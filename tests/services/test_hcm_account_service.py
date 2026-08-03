@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from services.hcm import hcm_account_service
 
@@ -19,3 +19,11 @@ def test_normalize_hcm_account_payload_converts_datetime_fields():
     assert normalized["EffectiveDate"] == datetime(2026, 8, 4, 0, 0)
     assert normalized["DiscDate"] == datetime(2026, 8, 5, 0, 0)
     assert normalized["TermDate"] is None
+
+
+def test_normalize_hcm_account_payload_converts_date_objects():
+    payload = {"EffectiveDate": date(2026, 8, 4)}
+
+    normalized = hcm_account_service._normalize_hcm_account_payload(payload)
+
+    assert normalized["EffectiveDate"] == datetime(2026, 8, 4, 0, 0)
