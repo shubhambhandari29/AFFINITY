@@ -262,13 +262,20 @@ async def get_underwriter_details(query_params: dict[str, Any]):
                  = UPPER(LTRIM(RTRIM(CAST(m.SACName AS VARCHAR(MAX)))))
 
             WHERE a.CustomerNum = ?
-              AND p.PolicyStatus = 'Active'
         """
 
         records = await run_raw_query_async(query, [customer_num])
 
         if not records:
-            return {}
+            return {
+                "AcctOwnerEmail": [],
+                "UnderwriterNames": [],
+                "UnderwriterEmails": [],
+                "UWMgrNames": [],
+                "UWMgrEmails": [],
+                "MissingUnderwriters": [],
+                "MissingUWManagers": [],
+            }
 
         acct_owner_email = records[0].get("AcctOwnerEmail")
 
