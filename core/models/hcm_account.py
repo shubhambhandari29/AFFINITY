@@ -1,9 +1,22 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+
+def _alias_generator(field_name: str) -> str:
+    if "_" in field_name:
+        parts = field_name.split("_")
+        return parts[0].lower() + "".join(part.title() for part in parts[1:])
+    return field_name[0].lower() + field_name[1:]
 
 
 class HCMAccountUpsert(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+        alias_generator=_alias_generator,
+    )
+
     CustomerNum: str | None = None
     AcctSpecialKey: int | None = None
     CustomerName: str | None = None
@@ -35,9 +48,5 @@ class HCMAccountUpsert(BaseModel):
     IsSubmitted: int | None = None
     MarketSegmentation: str | None = None
     EffectiveDate: date | None = None
-    AcctSpecialKey: int | None = None
     InsertDateTime: datetime | None = None
     UpdateDateTime: datetime | None = None
-
-    class Config:
-        extra = "allow"
