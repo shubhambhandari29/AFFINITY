@@ -17,7 +17,17 @@ logger = logging.getLogger(__name__)
 TABLE_NAME = "tblHcmAccount"
 PRIMARY_KEY = "CustomerNum"
 EXCLUDE_COLUMNS = {"PK_Number", "AcctSpecialKey"}
-DATETIME_FIELDS = {"OnBoardDate", "DateCreated", "TermDate", "DateNotif", "RenewLetterDt"}
+_DATE_FIELDS = {
+    "OnBoardDate",
+    "DateCreated",
+    "DiscDate",
+    "TermDate",
+    "DateNotif",
+    "RenewLetterDt",
+    "EffectiveDate",
+    "InsertDateTime",
+    "UpdateDateTime",
+}
 
 
 def _sanitize_account_record(record: dict[str, Any]) -> dict[str, Any]:
@@ -25,8 +35,8 @@ def _sanitize_account_record(record: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_hcm_account_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    normalized = normalize_payload_dates(payload)
-    for field in DATETIME_FIELDS:
+    normalized = normalize_payload_dates(payload, fields=_DATE_FIELDS)
+    for field in _DATE_FIELDS:
         value = normalized.get(field)
         if isinstance(value, date) and not isinstance(value, datetime):
             normalized[field] = datetime.combine(value, datetime.min.time())
@@ -57,7 +67,8 @@ async def upsert_hcm_account(data: dict[str, Any]):
         return await merge_upsert_records_async(
             table=TABLE_NAME,
             data_list=[sanitized_data],
-            key_columns=[PRIMARY_KEY]
+            key_columns=[PRIMARY_KEY],
+            exclude_key_columns_from_insert=True,
         )
     except Exception as e:
         logger.warning(f"HCM account upsert failed - {str(e)}")
