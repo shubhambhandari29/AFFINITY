@@ -6,6 +6,8 @@ import importlib
 import pytest
 from fastapi import Response
 
+from app import app
+
 
 class DummyModel:
     def __init__(self, data):
@@ -13,6 +15,15 @@ class DummyModel:
 
     def model_dump(self):
         return dict(self._data)
+
+
+def test_sac_and_hcm_only_user_routes_are_registered():
+    routes = {(route.path, frozenset(route.methods or [])) for route in app.routes}
+
+    assert ("/hcm_users/", frozenset({"GET"})) in routes
+    assert ("/hcm_users/upsert", frozenset({"POST"})) in routes
+    assert ("/hcm_only_users/", frozenset({"GET"})) in routes
+    assert ("/hcm_only_users/upsert", frozenset({"POST"})) in routes
 
 
 GET_REQUEST_ENDPOINTS = [

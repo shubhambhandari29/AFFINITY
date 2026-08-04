@@ -66,6 +66,7 @@ app.include_router(dropdowns_router, prefix="/dropdowns", tags=["dropdowns"])
 
 # sac
 app.include_router(sac_account_router, prefix="/sac_account", tags=["sac_account"])
+app.include_router(hcm_users_router, prefix="/hcm_users", tags=["hcm_users"])
 
 # hcm
 app.include_router(hcm_account_router, prefix="/hcm_account", tags=["hcm_account"])
