@@ -1,7 +1,38 @@
 import asyncio
-from datetime import date
+from datetime import date, datetime
 
 from services.hcm import hcm_account_service
+
+
+def test_get_hcm_account_formats_date_fields(monkeypatch):
+    async def fake_fetch_records_async(*, table, filters):
+        assert table == "tblHcmAccount"
+        assert filters == {"Stage": "Admin", "IsSubmitted": "0"}
+        return [
+            {
+                "CustomerNum": "123",
+                "OnBoardDate": datetime(2026, 8, 3, 12, 30),
+                "EffectiveDate": date(2026, 8, 4),
+                "CustomerName": "Example account",
+            }
+        ]
+
+    monkeypatch.setattr(
+        hcm_account_service, "fetch_records_async", fake_fetch_records_async
+    )
+
+    result = asyncio.run(
+        hcm_account_service.get_hcm_account({"Stage": "Admin", "IsSubmitted": "0"})
+    )
+
+    assert result == [
+        {
+            "CustomerNum": "123",
+            "OnBoardDate": "08-03-2026",
+            "EffectiveDate": "08-04-2026",
+            "CustomerName": "Example account",
+        }
+    ]
 
 
 def test_upsert_hcm_account_uses_shared_date_normalization(monkeypatch):

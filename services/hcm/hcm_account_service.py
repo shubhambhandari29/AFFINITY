@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from core.date_utils import normalize_payload_dates
+from core.date_utils import format_records_dates, normalize_payload_dates
 from core.db_helpers import (
     fetch_records_async,
     insert_records_async,
@@ -37,7 +37,7 @@ async def get_hcm_account(query_params: dict[str, Any]):
     try:
         filters = sanitize_filters(query_params)
         records = await fetch_records_async(table=TABLE_NAME, filters=filters)
-        return records
+        return format_records_dates(records, fields=_DATE_FIELDS)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
     except Exception as e:
