@@ -3,59 +3,147 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from core.date_utils import format_records_dates, normalize_payload_dates
 from core.db_helpers import (
+    delete_records_async,
     fetch_records_async,
     insert_records_async,
-    merge_upsert_records_async,
+    run_raw_query_async,
     sanitize_filters,
 )
 
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblHcmAccountAssociations"
-PRIMARY_KEY = "PK_Number"
+ALLOWED_FILTERS = {"ParentAccount"}
 
 
-async def get_hcm_account_associations(query_params: dict[str, Any]):
+def _normalize_children(children: list[Any]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for child in children:
+        if child is None:
+            continue
+        child_value = str(child).strip()
+        if not child_value or child_value in seen:
+            continue
+        seen.add(child_value)
+        normalized.append(child_value)
+    return normalized
+
+
+async def add_associations(payload: dict[str, Any]):
     try:
-        filters = sanitize_filters(query_params)
-        records = await fetch_records_async(table=TABLE_NAME, filters=filters)
-        return format_records_dates(records)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
+        parent_account = payload.get("parent_account")
+        parent_account = str(parent_account).strip() if parent_account is not None else ""
+        if not parent_account:
+            raise HTTPException(status_code=400, detail={"error": "parent_account is required"})
+
+        child_accounts = payload.get("child_account")
+        if not isinstance(child_accounts, list):
+            raise HTTPException(status_code=400, detail={"error": "child_account must be a list"})
+
+        normalized_children = [
+            child for child in _normalize_children(child_accounts) if child != parent_account
+        ]
+        if not normalized_children:
+            return {"message": "No new associations to add", "count": 0}
+
+        parents_to_check = [parent_account, *normalized_children]
+        existing_pairs: set[tuple[str, str]] = set()
+        for parent in parents_to_check:
+            existing = await fetch_records_async(
+                table=TABLE_NAME, filters={"ParentAccount": parent}
+            )
+            for row in existing:
+                associated = row.get("AssociatedAccount")
+                associated = str(associated).strip() if associated is not None else ""
+                if associated:
+                    existing_pairs.add((parent, associated))
+
+        pairs: list[tuple[str, str]] = []
+        for child in normalized_children:
+            pairs.append((parent_account, child))
+            pairs.append((child, parent_account))
+
+        to_insert = [
+            {"ParentAccount": parent, "AssociatedAccount": child}
+            for parent, child in pairs
+            if (parent, child) not in existing_pairs
+        ]
+        if not to_insert:
+            return {"message": "No new associations to add", "count": 0}
+
+        return await insert_records_async(table=TABLE_NAME, records=to_insert)
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.warning(f"Error fetching HCM account associations - {str(e)}")
+        logger.warning(f"HCM account associations add failed - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
 
 
-async def upsert_hcm_account_associations(data_list: list[dict[str, Any]]):
+async def delete_associations(payload: dict[str, Any]):
     try:
-        normalized_records = [normalize_payload_dates(item) for item in data_list]
-        to_update: list[dict[str, Any]] = []
-        to_insert: list[dict[str, Any]] = []
+        parent_account = payload.get("parent_account")
+        parent_account = str(parent_account).strip() if parent_account is not None else ""
+        if not parent_account:
+            raise HTTPException(status_code=400, detail={"error": "parent_account is required"})
 
-        for record in normalized_records:
-            pk_value = record.get(PRIMARY_KEY)
-            if pk_value in (None, ""):
-                sanitized_record = {k: v for k, v in record.items() if k != PRIMARY_KEY}
-                if sanitized_record:
-                    to_insert.append(sanitized_record)
-            else:
-                to_update.append(record)
+        child_accounts = payload.get("child_account")
+        if not isinstance(child_accounts, list):
+            raise HTTPException(status_code=400, detail={"error": "child_account must be a list"})
 
-        if to_update:
-            await merge_upsert_records_async(
-                table=TABLE_NAME,
-                data_list=to_update,
-                key_columns=[PRIMARY_KEY],
-                exclude_key_columns_from_insert=True,
-            )
+        normalized_children = [
+            child for child in _normalize_children(child_accounts) if child != parent_account
+        ]
+        if not normalized_children:
+            return {"message": "No data provided for deletion", "count": 0}
 
-        if to_insert:
-            await insert_records_async(table=TABLE_NAME, records=to_insert)
+        pairs: list[tuple[str, str]] = []
+        for child in normalized_children:
+            pairs.append((parent_account, child))
+            pairs.append((child, parent_account))
 
-        return {"message": "Transaction successful", "count": len(data_list)}
+        data_list = [
+            {"ParentAccount": parent, "AssociatedAccount": child} for parent, child in pairs
+        ]
+        return await delete_records_async(
+            table=TABLE_NAME,
+            data_list=data_list,
+            key_columns=["ParentAccount", "AssociatedAccount"],
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.warning(f"HCM account associations upsert failed - {str(e)}")
+        logger.warning(f"HCM account associations delete failed - {str(e)}")
+        raise HTTPException(status_code=500, detail={"error": str(e)}) from e
+
+
+async def get_associations(query_params: dict[str, Any]):
+    try:
+        filters = sanitize_filters(query_params, ALLOWED_FILTERS)
+        parent_account = filters.get("ParentAccount")
+        if not parent_account:
+            raise HTTPException(status_code=400, detail={"error": "ParentAccount is required"})
+
+        query = """
+            SELECT
+                assoc.ParentAccount,
+                assoc.AssociatedAccount,
+                child.CustomerName AS AssociatedCustomerName,
+                child.AcctStatus AS AssociatedAcctStatus
+            FROM tblHcmAccountAssociations AS assoc
+            LEFT JOIN tblHcmAccount AS parent
+                ON assoc.ParentAccount = parent.CustomerNum
+            LEFT JOIN tblHcmAccount AS child
+                ON assoc.AssociatedAccount = child.CustomerNum
+            WHERE assoc.ParentAccount = ?
+            ORDER BY assoc.AssociatedAccount
+        """
+        return await run_raw_query_async(query, [parent_account])
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
+    except Exception as e:
+        logger.warning(f"HCM account associations fetch failed - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e

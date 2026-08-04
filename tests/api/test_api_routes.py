@@ -26,6 +26,15 @@ def test_sac_and_hcm_only_user_routes_are_registered():
     assert ("/hcm_only_users/upsert", frozenset({"POST"})) in routes
 
 
+def test_hcm_account_association_routes_match_sac_contract():
+    routes = {(route.path, frozenset(route.methods or [])) for route in app.routes}
+
+    assert ("/hcm_account_associations/", frozenset({"GET"})) in routes
+    assert ("/hcm_account_associations/add", frozenset({"POST"})) in routes
+    assert ("/hcm_account_associations/delete", frozenset({"POST"})) in routes
+    assert not any(path == "/hcm_account_associations/upsert" for path, _ in routes)
+
+
 GET_REQUEST_ENDPOINTS = [
     ("api.sac.claim_review_distribution", "get_distribution", "get_distribution_service"),
     ("api.sac.deduct_bill_distribution", "get_distribution", "get_distribution_service"),
@@ -36,7 +45,7 @@ GET_REQUEST_ENDPOINTS = [
     ("api.sac.hcm_users", "get_hcm_users", "get_hcm_users_service"),
     ("api.hcm.hcm_account", "get_hcm_account", "get_hcm_account_service"),
     ("api.hcm.hcm_users", "get_hcm_users", "get_hcm_users_service"),
-    ("api.hcm.hcm_account_associations", "get_hcm_account_associations", "get_hcm_account_associations_service"),
+    ("api.hcm.hcm_account_associations", "get_associations", "get_associations_service"),
     ("api.sac.sac_account", "get_sac_account", "get_sac_account_service"),
     ("api.sac.sac_account_associations", "get_associations", "get_associations_service"),
     ("api.sac.sac_affiliates", "get_affiliates", "get_affiliates_service"),
@@ -70,7 +79,6 @@ LIST_PAYLOAD_ENDPOINTS = [
     ("api.sac.loss_run_frequency", "upsert_frequency", "upsert_frequency_service"),
     ("api.sac.hcm_users", "upsert_hcm_users", "upsert_hcm_users_service"),
     ("api.hcm.hcm_users", "upsert_hcm_users", "upsert_hcm_users_service"),
-    ("api.hcm.hcm_account_associations", "upsert_hcm_account_associations", "upsert_hcm_account_associations_service"),
     ("api.sac.sac_affiliates", "upsert_affiliates", "upsert_affiliates_service"),
     ("api.affinity.claim_review_distribution", "upsert_distribution", "upsert_distribution_service"),
     ("api.affinity.claim_review_distribution", "delete_distribution", "delete_distribution_service"),
@@ -86,6 +94,8 @@ SINGLE_PAYLOAD_ENDPOINTS = [
     ("api.hcm.hcm_account", "upsert_hcm_account", "upsert_hcm_account_service"),
     ("api.sac.sac_account_associations", "add_associations", "add_associations_service"),
     ("api.sac.sac_account_associations", "delete_associations", "delete_associations_service"),
+    ("api.hcm.hcm_account_associations", "add_associations", "add_associations_service"),
+    ("api.hcm.hcm_account_associations", "delete_associations", "delete_associations_service"),
     ("api.sac.sac_policies", "upsert_sac_policies", "upsert_sac_policies_service"),
     ("api.sac.sac_policies", "update_field_for_all_policies", "update_field_for_all_policies_service"),
     ("api.affinity.affinity_program", "upsert_affinity_program", "upsert_affinity_program_service"),
