@@ -1,5 +1,48 @@
-{
-  "applicationId": "51e5ae1c-40a5-4bfe-b891-9ae228406519",
-  "displayName": "SACPlatformAPIPreprd",
-  "objectId": "bb8645bb-88c9-4a65-bb39-adf60bd93fd8"
-}
+2026-08-06T09:13:03.1253573Z Failed to generate loss-run reports
+2026-08-06T09:13:03.1253941Z Traceback (most recent call last):
+2026-08-06T09:13:03.1253978Z   File "/opt/python/3.13.13/lib/python3.13/site-packages/pandas/io/sql.py", line 2664, in execute
+2026-08-06T09:13:03.1254002Z     cur.execute(sql, *args)
+2026-08-06T09:13:03.1254026Z     ~~~~~~~~~~~^^^^^^^^^^^^
+2026-08-06T09:13:03.1254063Z pyodbc.OperationalError: ('08004', '[08004] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The server principal "51e5ae1c-40a5-4bfe-b891-9ae228406519@3ea62a99-e446-48ea-b404-0ac8d9c9b14a" is not able to access the database "CLM_LakeHouse" under the current security context. (916) (SQLExecDirectW)')
+2026-08-06T09:13:03.1254088Z
+2026-08-06T09:13:03.1254116Z The above exception was the direct cause of the following exception:
+2026-08-06T09:13:03.1254141Z
+2026-08-06T09:13:03.1254164Z Traceback (most recent call last):
+2026-08-06T09:13:03.1254192Z   File "/home/site/wwwroot/services/loss_run/loss_run_service.py", line 144, in generate_loss_runs
+2026-08-06T09:13:03.1254217Z     records = await run_raw_query_async("SELECT * FROM dbo.SAC_Loss_Run")
+2026-08-06T09:13:03.1254243Z               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-08-06T09:13:03.1254292Z   File "/home/site/wwwroot/core/db_helpers.py", line 347, in run_raw_query_async
+2026-08-06T09:13:03.1254321Z     return await run_in_threadpool(partial(run_raw_query, query=query, params=params or []))
+2026-08-06T09:13:03.1254346Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-08-06T09:13:03.1254375Z   File "/opt/python/3.13.13/lib/python3.13/site-packages/starlette/concurrency.py", line 38, in run_in_threadpool
+2026-08-06T09:13:03.1254401Z     return await anyio.to_thread.run_sync(func)
+2026-08-06T09:13:03.1254427Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-08-06T09:13:03.1254454Z   File "/opt/python/3.13.13/lib/python3.13/site-packages/anyio/to_thread.py", line 65, in run_sync
+2026-08-06T09:13:03.1254482Z     return await get_async_backend().run_sync_in_worker_thread(
+2026-08-06T09:13:03.1254509Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-08-06T09:13:03.1254537Z         func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+2026-08-06T09:13:03.1254565Z         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-08-06T09:13:03.125459Z     )
+2026-08-06T09:13:03.1254623Z     ^
+2026-08-06T09:13:03.1254654Z   File "/opt/python/3.13.13/lib/python3.13/site-packages/anyio/_backends/_asyncio.py", line 2641, in run_sync_in_worker_thread
+2026-08-06T09:13:03.1254679Z     return await future
+2026-08-06T09:13:03.1254705Z            ^^^^^^^^^^^^
+2026-08-06T09:13:03.1254734Z   File "/opt/python/3.13.13/lib/python3.13/site-packages/anyio/_backends/_asyncio.py", line 1033, in run
+2026-08-06T09:13:03.1254759Z     result = context.run(func, *args)
+2026-08-06T09:13:03.1254785Z   File "/home/site/wwwroot/core/db_helpers.py", line 144, in run_raw_query
+2026-08-06T09:13:03.1254815Z     df = pd.read_sql(query, conn, params=params or [])
+2026-08-06T09:13:03.125486Z   File "/opt/python/3.13.13/lib/python3.13/site-packages/pandas/io/sql.py", line 708, in read_sql
+2026-08-06T09:13:03.1254888Z     return pandas_sql.read_query(
+2026-08-06T09:13:03.1254925Z            ~~~~~~~~~~~~~~~~~~~~~^
+2026-08-06T09:13:03.1254949Z         sql,
+2026-08-06T09:13:03.1254974Z         ^^^^
+2026-08-06T09:13:03.1254999Z     ...<6 lines>...
+2026-08-06T09:13:03.1255024Z         dtype=dtype,
+2026-08-06T09:13:03.1255049Z         ^^^^^^^^^^^^
+2026-08-06T09:13:03.1255071Z     )
+2026-08-06T09:13:03.1255093Z     ^
+2026-08-06T09:13:03.1255121Z   File "/opt/python/3.13.13/lib/python3.13/site-packages/pandas/io/sql.py", line 2728, in read_query
+2026-08-06T09:13:03.1255146Z     cursor = self.execute(sql, params)
+2026-08-06T09:13:03.1255174Z   File "/opt/python/3.13.13/lib/python3.13/site-packages/pandas/io/sql.py", line 2676, in execute
+2026-08-06T09:13:03.1255197Z     raise ex from exc
+2026-08-06T09:13:03.1255238Z pandas.errors.DatabaseError: Execution failed on sql 'SELECT * FROM dbo.SAC_Loss_Run': ('08004', '[08004] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]The server principal "51e5ae1c-40a5-4bfe-b891-9ae228406519@3ea62a99-e446-48ea-b404-0ac8d9c9b14a" is not able to access the database "CLM_LakeHouse" under the current security context. (916) (SQLExecDirectW)')
