@@ -2,6 +2,8 @@ SET XACT_ABORT ON;
 
 BEGIN TRANSACTION;
 
+DECLARE @MigrationDateTime datetimeoffset(7) = SYSDATETIMEOFFSET();
+
 -- 1. tblHcmAccount
 -- Use the existing UpdateDateTime as the best available historical value
 -- before making InsertDateTime mandatory.
@@ -36,8 +38,8 @@ ADD
 -- rows receive the time at which this PRE-PROD migration is executed.
 UPDATE [dbo].[tblHcmAccountAssociations]
 SET
-	[InsertDateTime] = SYSDATETIMEOFFSET(),
-	[UpdateDateTime] = SYSDATETIMEOFFSET()
+	[InsertDateTime] = @MigrationDateTime,
+	[UpdateDateTime] = @MigrationDateTime
 WHERE [InsertDateTime] IS NULL
 	OR [UpdateDateTime] IS NULL;
 
