@@ -1,106 +1,83 @@
-CREATE TABLE [dbo].[tblHcmAccount](
-	[CustomerName] [varchar](255) NULL,
-	[CustomerNum] [varchar](50) NOT NULL,
-	[OnBoardDate] [datetime] NULL,
-	[DateCreated] [datetime] NULL,
-	[CreatedBy] [varchar](255) NULL,
-	[SAC_Contact1] [varchar](50) NULL,
-	[SAC_Contact2] [varchar](50) NULL,
-	[BranchName] [varchar](50) NULL,
-	[HCMAccess] [varchar](50) NULL,
-	[DiscDate] [varchar](50) NULL,
-	[AcctOwner] [varchar](50) NULL,
-	[OBMethod] [varchar](255) NULL,
-	[AcctStatus] [varchar](50) NULL,
-	[TermDate] [datetime] NULL,
-	[TermCode] [text] NULL,
-	[DateNotif] [datetime] NULL,
-	[RiskSolMgr] [varchar](50) NULL,
-	[RelatedEnt] [text] NULL,
-	[Stage] [varchar](50) NULL,
-	[IsSubmitted] [int] NULL,
-	[MarketSegmentation] [varchar](100) NULL,
-	[EffectiveDate] [date] NULL,
-	[InsertDateTime] [datetimeoffset](7) NOT NULL,
-	[UpdateDateTime] [datetimeoffset](7) NOT NULL,
-	[LossCtlRep1] [varchar](70) NULL,
-	[LossCtlRep2] [varchar](70) NULL,
-	[RetiredBy] [varchar](80) NULL,
-	[wcOnly] [int] NULL,
-	[multipleLobs] [int] NULL,
-	[totalPremium] [float] NULL,
-	CONSTRAINT [aaaaatblHCM_PK] PRIMARY KEY NONCLUSTERED
-	(
-		[CustomerNum] ASC
-	) WITH (
-		PAD_INDEX = OFF,
-		STATISTICS_NORECOMPUTE = OFF,
-		IGNORE_DUP_KEY = OFF,
-		ALLOW_ROW_LOCKS = ON,
-		ALLOW_PAGE_LOCKS = ON,
-		OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF
-	) ON [PRIMARY]
-) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY];
+SET XACT_ABORT ON;
 
-CREATE NONCLUSTERED INDEX [IX_tblHcmAccount_Stage_IsSubmitted]
-ON [dbo].[tblHcmAccount] ([Stage], [IsSubmitted])
-INCLUDE ([CustomerNum], [CustomerName], [OnBoardDate], [AcctStatus]);
+BEGIN TRANSACTION;
+
+-- 1. tblHcmAccount
+-- Use the existing UpdateDateTime as the best available historical value
+-- before making InsertDateTime mandatory.
+UPDATE [dbo].[tblHcmAccount]
+SET [InsertDateTime] = [UpdateDateTime]
+WHERE [InsertDateTime] IS NULL;
+
+ALTER TABLE [dbo].[tblHcmAccount]
+ALTER COLUMN [InsertDateTime] [datetimeoffset](7) NOT NULL;
+
+IF NOT EXISTS (
+	SELECT 1
+	FROM sys.indexes
+	WHERE [object_id] = OBJECT_ID(N'[dbo].[tblHcmAccount]')
+		AND [name] = N'IX_tblHcmAccount_Stage_IsSubmitted'
+)
+BEGIN
+	CREATE NONCLUSTERED INDEX [IX_tblHcmAccount_Stage_IsSubmitted]
+	ON [dbo].[tblHcmAccount] ([Stage], [IsSubmitted])
+	INCLUDE ([CustomerNum], [CustomerName], [OnBoardDate], [AcctStatus]);
+END;
 
 
-CREATE TABLE [dbo].[tblHcmAccountAssociations](
-	[PK_Number] [int] IDENTITY(1,1) NOT NULL,
-	[ParentAccount] [varchar](100) NOT NULL,
-	[AssociatedAccount] [varchar](100) NOT NULL,
-	[InsertDateTime] [datetimeoffset](7) NOT NULL,
-	[UpdateDateTime] [datetimeoffset](7) NOT NULL,
-	CONSTRAINT [PK_tblHcmAccountAssociations] PRIMARY KEY CLUSTERED
-	(
-		[PK_Number] ASC
-	) WITH (
-		PAD_INDEX = OFF,
-		STATISTICS_NORECOMPUTE = OFF,
-		IGNORE_DUP_KEY = OFF,
-		ALLOW_ROW_LOCKS = ON,
-		ALLOW_PAGE_LOCKS = ON,
-		OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF
-	) ON [PRIMARY]
-) ON [PRIMARY];
+-- 2. tblHcmAccountAssociations
+-- Add the columns as nullable first so the change works when rows already exist.
+ALTER TABLE [dbo].[tblHcmAccountAssociations]
+ADD
+	[InsertDateTime] [datetimeoffset](7) NULL,
+	[UpdateDateTime] [datetimeoffset](7) NULL;
 
-CREATE NONCLUSTERED INDEX [IX_tblHcmAccountAssociations_Parent_Associated]
-ON [dbo].[tblHcmAccountAssociations] ([ParentAccount], [AssociatedAccount]);
+-- There is no historical audit date in this table, so existing association
+-- rows receive the time at which this PRE-PROD migration is executed.
+UPDATE [dbo].[tblHcmAccountAssociations]
+SET
+	[InsertDateTime] = SYSDATETIMEOFFSET(),
+	[UpdateDateTime] = SYSDATETIMEOFFSET()
+WHERE [InsertDateTime] IS NULL
+	OR [UpdateDateTime] IS NULL;
+
+ALTER TABLE [dbo].[tblHcmAccountAssociations]
+ALTER COLUMN [InsertDateTime] [datetimeoffset](7) NOT NULL;
+
+ALTER TABLE [dbo].[tblHcmAccountAssociations]
+ALTER COLUMN [UpdateDateTime] [datetimeoffset](7) NOT NULL;
+
+IF NOT EXISTS (
+	SELECT 1
+	FROM sys.indexes
+	WHERE [object_id] = OBJECT_ID(N'[dbo].[tblHcmAccountAssociations]')
+		AND [name] = N'IX_tblHcmAccountAssociations_Parent_Associated'
+)
+BEGIN
+	CREATE NONCLUSTERED INDEX [IX_tblHcmAccountAssociations_Parent_Associated]
+	ON [dbo].[tblHcmAccountAssociations] ([ParentAccount], [AssociatedAccount]);
+END;
 
 
-CREATE TABLE [dbo].[tblHcmOnlyUsers](
-	[PK_Number] [int] IDENTITY(1,1) NOT NULL,
-	[UserTitle] [nvarchar](50) NULL,
-	[UserID] [nvarchar](50) NULL,
-	[UserName] [nvarchar](50) NULL,
-	[UserEmail] [nvarchar](50) NULL,
-	[TelNum] [nvarchar](50) NULL,
-	[TelExt] [nvarchar](50) NULL,
-	[UserAction] [nvarchar](50) NULL,
-	[CustNum] [varchar](50) NULL,
-	[LanID] [text] NULL,
-	[PROD_Password] [varchar](max) NULL,
-	[UAT_Password] [varchar](max) NULL,
-	[DateDeleted] [date] NULL,
-	[DateAdded] [date] NULL,
-	[ChangeDate] [date] NULL,
-	[InsertDateTime] [datetimeoffset](7) NOT NULL,
-	[UpdateDateTime] [datetimeoffset](7) NOT NULL,
-	CONSTRAINT [PK_tblHCMOnlyUsers] PRIMARY KEY CLUSTERED
-	(
-		[PK_Number] ASC
-	) WITH (
-		PAD_INDEX = OFF,
-		STATISTICS_NORECOMPUTE = OFF,
-		IGNORE_DUP_KEY = OFF,
-		ALLOW_ROW_LOCKS = ON,
-		ALLOW_PAGE_LOCKS = ON,
-		FILLFACTOR = 90,
-		OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF
-	) ON [PRIMARY]
-) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY];
+-- 3. tblHcmOnlyUsers
+-- Use the existing UpdateDateTime as the best available historical value
+-- before making InsertDateTime mandatory.
+UPDATE [dbo].[tblHcmOnlyUsers]
+SET [InsertDateTime] = [UpdateDateTime]
+WHERE [InsertDateTime] IS NULL;
 
-CREATE NONCLUSTERED INDEX [IX_tblHcmOnlyUsers_CustNum]
-ON [dbo].[tblHcmOnlyUsers] ([CustNum]);
+ALTER TABLE [dbo].[tblHcmOnlyUsers]
+ALTER COLUMN [InsertDateTime] [datetimeoffset](7) NOT NULL;
+
+IF NOT EXISTS (
+	SELECT 1
+	FROM sys.indexes
+	WHERE [object_id] = OBJECT_ID(N'[dbo].[tblHcmOnlyUsers]')
+		AND [name] = N'IX_tblHcmOnlyUsers_CustNum'
+)
+BEGIN
+	CREATE NONCLUSTERED INDEX [IX_tblHcmOnlyUsers_CustNum]
+	ON [dbo].[tblHcmOnlyUsers] ([CustNum]);
+END;
+
+COMMIT TRANSACTION;
