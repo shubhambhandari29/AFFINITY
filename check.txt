@@ -1,23 +1,104 @@
--- Confirm every HCM date-related column’s exact type
-SELECT
-    COLUMN_NAME,
-    DATA_TYPE,
-    DATETIME_PRECISION,
-    IS_NULLABLE,
-    COLUMN_DEFAULT
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = 'tblHcmAccount'
-  AND (
-      COLUMN_NAME LIKE '%Date%'
-      OR COLUMN_NAME LIKE '%Dt%'
-  )
-ORDER BY ORDINAL_POSITION;
+
+SAC Tables – 
+
+select top 10 * from tblHcmAccount – The INSERTDATETIME field must be NOT NULL as we have to report on data retention and require the date fields to be compulsorily populated. What will be the key and needs an index?
+select top 10 * from tblHcmAccountAssociations – We need a date field in here to show when the row was inserted. What will be the key and needs an index?
+select top 10 * from tblHcmOnlyUsers - The INSERTDATETIME field must be NOT NULL as we have to report on data retention and require the date fields to be compulsorily populated. What will be the key and needs an index?
 
 
 
--- Check triggers specific to HCM
-SELECT
-    tr.name AS TriggerName,
-    OBJECT_DEFINITION(tr.object_id) AS TriggerDefinition
-FROM sys.triggers tr
-WHERE tr.parent_id = OBJECT_ID('tblHcmAccount');
+Title: create 3 SQL tables in PROD env
+ELT Business Sponsor: Subhashini Baskaran
+Line of Business Most Impacted: Special Accounts
+Request Type: Data Science
+Problem Statement: We need to create 3 new tables as there is new requirement in SAC web application to add a new HCM only page. scripts to create table is as followed:
+
+server: clms-prd-sqlmanagedinstance.445cfa5e0fe5.database.windows.net
+database: CLMAA_SpecialAccounts
+
+
+
+1. table: tblHcmAccount : store the account details.
+script:
+
+CREATE TABLE [dbo].[tblHcmAccount](
+	[CustomerName] [varchar](255) NULL,
+	[CustomerNum] [varchar](50) NOT NULL,
+	[OnBoardDate] [datetime] NULL,
+	[DateCreated] [datetime] NULL,
+	[CreatedBy] [varchar](255) NULL,
+	[SAC_Contact1] [varchar](50) NULL,
+	[SAC_Contact2] [varchar](50) NULL,
+	[BranchName] [varchar](50) NULL,
+	[HCMAccess] [varchar](50) NULL,
+	[DiscDate] [varchar](50) NULL,
+	[AcctOwner] [varchar](50) NULL,
+	[OBMethod] [varchar](255) NULL,
+	[AcctStatus] [varchar](50) NULL,
+	[TermDate] [datetime] NULL,
+	[TermCode] [text] NULL,
+	[DateNotif] [datetime] NULL,
+	[RiskSolMgr] [varchar](50) NULL,
+	[RelatedEnt] [text] NULL,
+	[Stage] [varchar](50) NULL,
+	[IsSubmitted] [int] NULL,
+	[MarketSegmentation] [varchar](100) NULL,
+	[EffectiveDate] [date] NULL,
+	[InsertDateTime] [datetime] NULL,
+	[UpdateDateTime] [datetimeoffset](7) NOT NULL,
+	[LossCtlRep1] [varchar](70) NULL,
+	[LossCtlRep2] [varchar](70) NULL,
+	[RetiredBy] [varchar](80) NULL,
+	[wcOnly] [int] NULL,
+	[multipleLobs] [int] NULL,
+	[totalPremium] [float] NULL,
+ CONSTRAINT [aaaaatblHCM_PK] PRIMARY KEY NONCLUSTERED 
+(
+	[CustomerNum] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+
+
+2. table: tblHcmAccountAssociations :  maintain the parent-child association between accounts.
+
+script:
+
+CREATE TABLE [dbo].[tblHcmAccountAssociations](
+	[PK_Number] [int] IDENTITY(1,1) NOT NULL,
+	[ParentAccount] [varchar](100) NOT NULL,
+	[AssociatedAccount] [varchar](100) NOT NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[PK_Number] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+3. table: 
+
+script: tblHcmOnlyUsers : maintain the list of HCM users.
+
+CREATE TABLE [dbo].[tblHcmOnlyUsers](
+	[PK_Number] [int] IDENTITY(1,1) NOT NULL,
+	[UserTitle] [nvarchar](50) NULL,
+	[UserID] [nvarchar](50) NULL,
+	[UserName] [nvarchar](50) NULL,
+	[UserEmail] [nvarchar](50) NULL,
+	[TelNum] [nvarchar](50) NULL,
+	[TelExt] [nvarchar](50) NULL,
+	[UserAction] [nvarchar](50) NULL,
+	[CustNum] [varchar](50) NULL,
+	[LanID] [text] NULL,
+	[PROD_Password] [varchar](max) NULL,
+	[UAT_Password] [varchar](max) NULL,
+	[DateDeleted] [date] NULL,
+	[DateAdded] [date] NULL,
+	[ChangeDate] [date] NULL,
+	[InsertDateTime] [datetimeoffset](7) NULL,
+	[UpdateDateTime] [datetimeoffset](7) NOT NULL,
+ CONSTRAINT [PK_tblHCMOnlyUsers] PRIMARY KEY CLUSTERED 
+(
+	[PK_Number] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, FILLFACTOR = 90, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+KPI's: successful creation of 3 SQL tables.
+Provide CBA: new requirement was added in SAC app to include a HCM only web page, so these tables are required.
