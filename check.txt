@@ -44,7 +44,7 @@ CREATE TABLE [dbo].[tblHcmAccount](
 	[IsSubmitted] [int] NULL,
 	[MarketSegmentation] [varchar](100) NULL,
 	[EffectiveDate] [date] NULL,
-	[InsertDateTime] [datetime] NULL,
+	[InsertDateTime] [datetimeoffset](7) NOT NULL,
 	[UpdateDateTime] [datetimeoffset](7) NOT NULL,
 	[LossCtlRep1] [varchar](70) NULL,
 	[LossCtlRep2] [varchar](70) NULL,
@@ -67,6 +67,8 @@ CREATE TABLE [dbo].[tblHcmAccountAssociations](
 	[PK_Number] [int] IDENTITY(1,1) NOT NULL,
 	[ParentAccount] [varchar](100) NOT NULL,
 	[AssociatedAccount] [varchar](100) NOT NULL,
+    [InsertDateTime] [datetimeoffset](7) NOT NULL,
+	[UpdateDateTime] [datetimeoffset](7) NOT NULL,
 PRIMARY KEY CLUSTERED 
 (
 	[PK_Number] ASC
@@ -93,7 +95,7 @@ CREATE TABLE [dbo].[tblHcmOnlyUsers](
 	[DateDeleted] [date] NULL,
 	[DateAdded] [date] NULL,
 	[ChangeDate] [date] NULL,
-	[InsertDateTime] [datetimeoffset](7) NULL,
+	[InsertDateTime] [datetimeoffset](7) NOT NULL,
 	[UpdateDateTime] [datetimeoffset](7) NOT NULL,
  CONSTRAINT [PK_tblHCMOnlyUsers] PRIMARY KEY CLUSTERED 
 (
@@ -102,3 +104,147 @@ CREATE TABLE [dbo].[tblHcmOnlyUsers](
 ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
 KPI's: successful creation of 3 SQL tables.
 Provide CBA: new requirement was added in SAC app to include a HCM only web page, so these tables are required.
+
+
+Response to DB team
+-------------------
+
+1. tblHcmAccount
+   - InsertDateTime has been changed to datetimeoffset(7) NOT NULL so that every row has a compulsory insert timestamp for data-retention reporting.
+   - CustomerNum will remain the primary/business key. The primary key creates an index on CustomerNum.
+   - An additional index on Stage and IsSubmitted is included to support the HCM account search used by the application.
+
+2. tblHcmAccountAssociations
+   - InsertDateTime and UpdateDateTime have been added as datetimeoffset(7) NOT NULL. InsertDateTime records when the association row was created.
+   - PK_Number will remain the only primary key.
+   - A non-unique supporting index on ParentAccount and AssociatedAccount is included because the application retrieves associations by ParentAccount and deletes them using both account fields.
+
+3. tblHcmOnlyUsers
+   - InsertDateTime has been changed to datetimeoffset(7) NOT NULL so that every row has a compulsory insert timestamp for data-retention reporting.
+   - PK_Number will remain the primary key and already has a clustered primary-key index.
+   - An additional index on CustNum is included because the application retrieves HCM-only users by customer number.
+
+The application populates InsertDateTime only when a new row is inserted. UpdateDateTime is populated on insert and whenever an existing row is updated. UTC database defaults are also included to protect inserts performed directly in SQL or by another process.
+
+
+Final table creation queries
+----------------------------
+
+1. tblHcmAccount
+
+CREATE TABLE [dbo].[tblHcmAccount](
+	[CustomerName] [varchar](255) NULL,
+	[CustomerNum] [varchar](50) NOT NULL,
+	[OnBoardDate] [datetime] NULL,
+	[DateCreated] [datetime] NULL,
+	[CreatedBy] [varchar](255) NULL,
+	[SAC_Contact1] [varchar](50) NULL,
+	[SAC_Contact2] [varchar](50) NULL,
+	[BranchName] [varchar](50) NULL,
+	[HCMAccess] [varchar](50) NULL,
+	[DiscDate] [varchar](50) NULL,
+	[AcctOwner] [varchar](50) NULL,
+	[OBMethod] [varchar](255) NULL,
+	[AcctStatus] [varchar](50) NULL,
+	[TermDate] [datetime] NULL,
+	[TermCode] [text] NULL,
+	[DateNotif] [datetime] NULL,
+	[RiskSolMgr] [varchar](50) NULL,
+	[RelatedEnt] [text] NULL,
+	[Stage] [varchar](50) NULL,
+	[IsSubmitted] [int] NULL,
+	[MarketSegmentation] [varchar](100) NULL,
+	[EffectiveDate] [date] NULL,
+	[InsertDateTime] [datetimeoffset](7) NOT NULL
+		CONSTRAINT [DF_tblHcmAccount_InsertDateTime] DEFAULT SYSUTCDATETIME(),
+	[UpdateDateTime] [datetimeoffset](7) NOT NULL
+		CONSTRAINT [DF_tblHcmAccount_UpdateDateTime] DEFAULT SYSUTCDATETIME(),
+	[LossCtlRep1] [varchar](70) NULL,
+	[LossCtlRep2] [varchar](70) NULL,
+	[RetiredBy] [varchar](80) NULL,
+	[wcOnly] [int] NULL,
+	[multipleLobs] [int] NULL,
+	[totalPremium] [float] NULL,
+	CONSTRAINT [aaaaatblHCM_PK] PRIMARY KEY NONCLUSTERED
+	(
+		[CustomerNum] ASC
+	) WITH (
+		PAD_INDEX = OFF,
+		STATISTICS_NORECOMPUTE = OFF,
+		IGNORE_DUP_KEY = OFF,
+		ALLOW_ROW_LOCKS = ON,
+		ALLOW_PAGE_LOCKS = ON,
+		OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF
+	) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY];
+
+CREATE NONCLUSTERED INDEX [IX_tblHcmAccount_Stage_IsSubmitted]
+ON [dbo].[tblHcmAccount] ([Stage], [IsSubmitted])
+INCLUDE ([CustomerNum], [CustomerName], [OnBoardDate], [AcctStatus]);
+
+
+2. tblHcmAccountAssociations
+
+CREATE TABLE [dbo].[tblHcmAccountAssociations](
+	[PK_Number] [int] IDENTITY(1,1) NOT NULL,
+	[ParentAccount] [varchar](100) NOT NULL,
+	[AssociatedAccount] [varchar](100) NOT NULL,
+	[InsertDateTime] [datetimeoffset](7) NOT NULL
+		CONSTRAINT [DF_tblHcmAccountAssociations_InsertDateTime] DEFAULT SYSUTCDATETIME(),
+	[UpdateDateTime] [datetimeoffset](7) NOT NULL
+		CONSTRAINT [DF_tblHcmAccountAssociations_UpdateDateTime] DEFAULT SYSUTCDATETIME(),
+	CONSTRAINT [PK_tblHcmAccountAssociations] PRIMARY KEY CLUSTERED
+	(
+		[PK_Number] ASC
+	) WITH (
+		PAD_INDEX = OFF,
+		STATISTICS_NORECOMPUTE = OFF,
+		IGNORE_DUP_KEY = OFF,
+		ALLOW_ROW_LOCKS = ON,
+		ALLOW_PAGE_LOCKS = ON,
+		OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF
+	) ON [PRIMARY]
+) ON [PRIMARY];
+
+CREATE NONCLUSTERED INDEX [IX_tblHcmAccountAssociations_Parent_Associated]
+ON [dbo].[tblHcmAccountAssociations] ([ParentAccount], [AssociatedAccount]);
+
+
+3. tblHcmOnlyUsers
+
+CREATE TABLE [dbo].[tblHcmOnlyUsers](
+	[PK_Number] [int] IDENTITY(1,1) NOT NULL,
+	[UserTitle] [nvarchar](50) NULL,
+	[UserID] [nvarchar](50) NULL,
+	[UserName] [nvarchar](50) NULL,
+	[UserEmail] [nvarchar](50) NULL,
+	[TelNum] [nvarchar](50) NULL,
+	[TelExt] [nvarchar](50) NULL,
+	[UserAction] [nvarchar](50) NULL,
+	[CustNum] [varchar](50) NULL,
+	[LanID] [text] NULL,
+	[PROD_Password] [varchar](max) NULL,
+	[UAT_Password] [varchar](max) NULL,
+	[DateDeleted] [date] NULL,
+	[DateAdded] [date] NULL,
+	[ChangeDate] [date] NULL,
+	[InsertDateTime] [datetimeoffset](7) NOT NULL
+		CONSTRAINT [DF_tblHcmOnlyUsers_InsertDateTime] DEFAULT SYSUTCDATETIME(),
+	[UpdateDateTime] [datetimeoffset](7) NOT NULL
+		CONSTRAINT [DF_tblHcmOnlyUsers_UpdateDateTime] DEFAULT SYSUTCDATETIME(),
+	CONSTRAINT [PK_tblHCMOnlyUsers] PRIMARY KEY CLUSTERED
+	(
+		[PK_Number] ASC
+	) WITH (
+		PAD_INDEX = OFF,
+		STATISTICS_NORECOMPUTE = OFF,
+		IGNORE_DUP_KEY = OFF,
+		ALLOW_ROW_LOCKS = ON,
+		ALLOW_PAGE_LOCKS = ON,
+		FILLFACTOR = 90,
+		OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF
+	) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY];
+
+CREATE NONCLUSTERED INDEX [IX_tblHcmOnlyUsers_CustNum]
+ON [dbo].[tblHcmOnlyUsers] ([CustNum]);
