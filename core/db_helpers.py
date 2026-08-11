@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _UPDATE_DATETIME_COLUMN = "UpdateDateTime"
+_INSERT_DATETIME_COLUMN = "InsertDateTime"
 
 
 def _ensure_safe_identifier(identifier: str) -> None:
@@ -46,8 +47,14 @@ def add_update_datetime_if_supported(
     cursor: Any,
     table: str,
     records: list[dict[str, Any]],
+    *,
+    include_insert_datetime: bool = False,
 ) -> list[dict[str, Any]]:
-    """Copy records and add a server-owned UTC audit value when supported."""
+    """Copy records and add server-owned UTC audit values when supported.
+
+    Tables with UpdateDateTime are expected to also have InsertDateTime. The
+    latter is included only for write paths that can create a new row.
+    """
     copied_records = [dict(record) for record in records]
     if not copied_records or not _table_has_update_datetime(cursor, table):
         return copied_records
@@ -56,6 +63,8 @@ def add_update_datetime_if_supported(
     for record in copied_records:
         if record:
             record[_UPDATE_DATETIME_COLUMN] = timestamp
+            if include_insert_datetime:
+                record[_INSERT_DATETIME_COLUMN] = timestamp
     return copied_records
 
 
@@ -171,7 +180,12 @@ def merge_upsert_records(
     try:
         with _db_connection() as conn:
             cursor = conn.cursor()
-            data_list = add_update_datetime_if_supported(cursor, table, data_list)
+            data_list = add_update_datetime_if_supported(
+                cursor,
+                table,
+                data_list,
+                include_insert_datetime=True,
+            )
 
             for data in data_list:
                 columns = list(data.keys())
@@ -185,7 +199,11 @@ def merge_upsert_records(
                 for key in key_columns:
                     _ensure_safe_identifier(key)
 
-                update_cols = [col for col in columns if col not in key_columns]
+                update_cols = [
+                    col
+                    for col in columns
+                    if col not in key_columns and col != _INSERT_DATETIME_COLUMN
+                ]
                 update_set = (
                     ", ".join([f"{col} = source.{col}" for col in update_cols])
                     if update_cols
@@ -251,7 +269,12 @@ def insert_records(
     try:
         with _db_connection() as conn:
             cursor = conn.cursor()
-            records = add_update_datetime_if_supported(cursor, table, records)
+            records = add_update_datetime_if_supported(
+                cursor,
+                table,
+                records,
+                include_insert_datetime=True,
+            )
 
             for record in records:
                 if not record:

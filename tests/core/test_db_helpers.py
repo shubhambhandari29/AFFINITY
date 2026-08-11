@@ -87,7 +87,9 @@ def test_run_raw_query_uses_params(monkeypatch):
 def test_merge_upsert_records_builds_merge_query(monkeypatch):
     executed = []
     monkeypatch.setattr(
-        db_helpers, "add_update_datetime_if_supported", lambda cursor, table, rows: rows
+        db_helpers,
+        "add_update_datetime_if_supported",
+        lambda cursor, table, rows, **kwargs: rows,
     )
 
     class FakeCursor:
@@ -127,7 +129,9 @@ def test_merge_upsert_records_builds_merge_query(monkeypatch):
 def test_merge_upsert_records_excludes_key_columns_when_requested(monkeypatch):
     executed = []
     monkeypatch.setattr(
-        db_helpers, "add_update_datetime_if_supported", lambda cursor, table, rows: rows
+        db_helpers,
+        "add_update_datetime_if_supported",
+        lambda cursor, table, rows, **kwargs: rows,
     )
 
     class FakeCursor:
@@ -160,10 +164,64 @@ def test_merge_upsert_records_excludes_key_columns_when_requested(monkeypatch):
     assert "INSERT (name)" in query
 
 
+def test_merge_upsert_records_preserves_insert_datetime_on_update(monkeypatch):
+    executed = []
+    timestamp = "2026-05-08 19:58:00.4800450 +00:00"
+
+    def add_audit_fields(cursor, table, rows, **kwargs):
+        assert kwargs == {"include_insert_datetime": True}
+        return [
+            {
+                **row,
+                "UpdateDateTime": timestamp,
+                "InsertDateTime": timestamp,
+            }
+            for row in rows
+        ]
+
+    monkeypatch.setattr(
+        db_helpers, "add_update_datetime_if_supported", add_audit_fields
+    )
+
+    class FakeCursor:
+        def execute(self, query, values):
+            executed.append((query, values))
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            return None
+
+    @contextmanager
+    def fake_db_connection():
+        yield FakeConn()
+
+    import db
+
+    monkeypatch.setattr(db, "db_connection", fake_db_connection)
+
+    db_helpers.merge_upsert_records(
+        "MyTable",
+        data_list=[{"id": 1, "name": "Alice"}],
+        key_columns=["id"],
+    )
+
+    query, values = executed[0]
+    update_clause, insert_clause = query.split("WHEN NOT MATCHED THEN")
+    assert "UpdateDateTime = source.UpdateDateTime" in update_clause
+    assert "InsertDateTime = source.InsertDateTime" not in update_clause
+    assert "INSERT (id, name, UpdateDateTime, InsertDateTime)" in insert_clause
+    assert values == [1, "Alice", timestamp, timestamp]
+
+
 def test_insert_records_builds_insert_query(monkeypatch):
     executed = []
     monkeypatch.setattr(
-        db_helpers, "add_update_datetime_if_supported", lambda cursor, table, rows: rows
+        db_helpers,
+        "add_update_datetime_if_supported",
+        lambda cursor, table, rows, **kwargs: rows,
     )
 
     class FakeCursor:
@@ -212,6 +270,34 @@ def test_add_update_datetime_if_supported_adds_utc_timestamp(monkeypatch):
 
     assert result == [{"id": 1, "UpdateDateTime": "2026-05-08 19:58:00.4800450 +00:00"}]
     assert original == [{"id": 1, "UpdateDateTime": "client value"}]
+
+
+def test_add_update_datetime_if_supported_adds_insert_timestamp_when_requested(monkeypatch):
+    class FakeCursor:
+        def execute(self, query, values):
+            assert "sys.columns" in query
+            assert values == ["MyTable", "UpdateDateTime"]
+
+        def fetchone(self):
+            return (1,)
+
+    timestamp = "2026-05-08 19:58:00.4800450 +00:00"
+    monkeypatch.setattr(db_helpers, "_utc_datetimeoffset_string", lambda: timestamp)
+
+    result = db_helpers.add_update_datetime_if_supported(
+        FakeCursor(),
+        "MyTable",
+        [{"id": 1, "InsertDateTime": "client value"}],
+        include_insert_datetime=True,
+    )
+
+    assert result == [
+        {
+            "id": 1,
+            "UpdateDateTime": timestamp,
+            "InsertDateTime": timestamp,
+        }
+    ]
 
 
 def test_add_update_datetime_if_supported_leaves_rows_unchanged_without_column():

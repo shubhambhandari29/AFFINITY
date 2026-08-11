@@ -230,7 +230,7 @@ def test_merge_upsert_dropdown_records_executes_queries(monkeypatch):
     monkeypatch.setattr(
         dropdowns_service,
         "add_update_datetime_if_supported",
-        lambda cursor, table, rows: rows,
+        lambda cursor, table, rows, **kwargs: rows,
     )
 
     class FakeCursor:
@@ -270,7 +270,7 @@ def test_insert_and_delete_dropdown_records(monkeypatch):
     monkeypatch.setattr(
         dropdowns_service,
         "add_update_datetime_if_supported",
-        lambda cursor, table, rows: rows,
+        lambda cursor, table, rows, **kwargs: rows,
     )
 
     class FakeCursor:

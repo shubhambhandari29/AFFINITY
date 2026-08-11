@@ -275,7 +275,12 @@ def _merge_upsert_dropdown_records(
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
-            data_list = add_update_datetime_if_supported(cursor, table, data_list)
+            data_list = add_update_datetime_if_supported(
+                cursor,
+                table,
+                data_list,
+                include_insert_datetime=True,
+            )
 
             for data in data_list:
                 columns = list(data.keys())
@@ -290,7 +295,11 @@ def _merge_upsert_dropdown_records(
                     ]
                 )
 
-                update_cols = [col for col in columns if col not in key_columns]
+                update_cols = [
+                    col
+                    for col in columns
+                    if col not in key_columns and col != "InsertDateTime"
+                ]
                 update_set = (
                     ", ".join(
                         [
@@ -363,7 +372,12 @@ def _insert_dropdown_records(
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
-            records = add_update_datetime_if_supported(cursor, table, records)
+            records = add_update_datetime_if_supported(
+                cursor,
+                table,
+                records,
+                include_insert_datetime=True,
+            )
 
             for record in records:
                 if not record:
