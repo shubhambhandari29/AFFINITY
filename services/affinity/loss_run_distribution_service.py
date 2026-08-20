@@ -14,7 +14,7 @@ from core.db_helpers import (
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = "tblDist_LossRun_AFFIN"
-KEY_COLUMNS = ["ProgramName", "EMailAddress"]
+KEY_COLUMNS = ["ProgramName", "EMailAddress", "RecipCat"]
 IDENTITY_COLUMNS = {"PK_Number"}
 
 
@@ -61,7 +61,7 @@ async def delete_distribution(data_list: list[dict[str, Any]]):
     """
     Takes an array of maps as data.
     Deletes matching rows from tblDist_LossRun_AFFIN.
-    Matching is based on ProgramName + EMailAddress.
+    Matching is based on ProgramName + EMailAddress + RecipCat.
     """
 
     try:

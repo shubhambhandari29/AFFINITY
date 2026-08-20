@@ -79,7 +79,7 @@ def test_upsert_distribution_strips_identity_columns(monkeypatch):
 
     assert result == {"count": 1}
     assert captured["data_list"] == [{"CustomerNum": "123", "AttnTo": "A", "Other": "x"}]
-    assert captured["key_columns"] == ["CustomerNum", "AttnTo"]
+    assert captured["key_columns"] == ["CustomerNum", "AttnTo", "RecipCat"]
 
 
 def test_delete_distribution_calls_delete_records(monkeypatch):
@@ -100,4 +100,4 @@ def test_delete_distribution_calls_delete_records(monkeypatch):
 
     assert result == {"count": 1}
     assert captured["table"] == loss_run_distribution_service.TABLE_NAME
-    assert captured["key_columns"] == ["CustomerNum", "AttnTo"]
+    assert captured["key_columns"] == ["CustomerNum", "AttnTo", "RecipCat"]

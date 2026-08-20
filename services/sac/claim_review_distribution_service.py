@@ -39,7 +39,7 @@ async def upsert_distribution(data_list: list[dict[str, Any]]):
         return await merge_upsert_records_async(
             table=TABLE_NAME,
             data_list=sanitized_rows,
-            key_columns=["CustomerNum", "AttnTo"],
+            key_columns=["CustomerNum", "AttnTo", "RecipCat"],
         )
     except Exception as e:
         logger.warning(f"Upsert failed - {str(e)}")
@@ -51,7 +51,7 @@ async def delete_distribution(data_list: list[dict[str, Any]]):
         return await delete_records_async(
             table=TABLE_NAME,
             data_list=data_list,
-            key_columns=["CustomerNum", "AttnTo"],
+            key_columns=["CustomerNum", "AttnTo", "RecipCat"],
         )
     except Exception as e:
         logger.warning(f"Deletion failed - {str(e)}")
