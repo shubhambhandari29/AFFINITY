@@ -4,8 +4,8 @@ LOSS-RUN BACKGROUND JOB TABLES
 Database: CLMAA_SpecialAccounts
 
 Purpose:
-  - LossRunJob stores one row for each Generate All or Generate Selected request.
-  - LossRunJobAccount stores the accounts and result of each account in that job.
+  - tblLossRunJob stores one row for each Generate All or Generate Selected request.
+  - tblLossRunJobAccount stores the accounts and result of each account in that job.
   - Worker/lease columns allow an interrupted job to be recovered safely.
 
 This script is rerunnable. Existing tables and indexes are not recreated.
@@ -15,9 +15,9 @@ This script is rerunnable. Existing tables and indexes are not recreated.
 USE [CLMAA_SpecialAccounts];
 GO
 
-IF OBJECT_ID(N'dbo.LossRunJob', N'U') IS NULL
+IF OBJECT_ID(N'dbo.tblLossRunJob', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.LossRunJob
+    CREATE TABLE dbo.tblLossRunJob
     (
         JobId UNIQUEIDENTIFIER NOT NULL
             CONSTRAINT PK_LossRunJob PRIMARY KEY,
@@ -86,9 +86,9 @@ BEGIN
 END;
 GO
 
-IF OBJECT_ID(N'dbo.LossRunJobAccount', N'U') IS NULL
+IF OBJECT_ID(N'dbo.tblLossRunJobAccount', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.LossRunJobAccount
+    CREATE TABLE dbo.tblLossRunJobAccount
     (
         JobId UNIQUEIDENTIFIER NOT NULL,
         CustomerNumber VARCHAR(50) NOT NULL,
@@ -110,7 +110,7 @@ BEGIN
 
         CONSTRAINT FK_LossRunJobAccount_LossRunJob
             FOREIGN KEY (JobId)
-            REFERENCES dbo.LossRunJob(JobId),
+            REFERENCES dbo.tblLossRunJob(JobId),
 
         CONSTRAINT CK_LossRunJobAccount_Status
             CHECK
@@ -133,11 +133,11 @@ IF NOT EXISTS
     SELECT 1
     FROM sys.indexes
     WHERE name = N'IX_LossRunJob_WorkerQueue'
-      AND object_id = OBJECT_ID(N'dbo.LossRunJob')
+      AND object_id = OBJECT_ID(N'dbo.tblLossRunJob')
 )
 BEGIN
     CREATE INDEX IX_LossRunJob_WorkerQueue
-        ON dbo.LossRunJob (Status, LeaseUntil, CreatedAt)
+        ON dbo.tblLossRunJob (Status, LeaseUntil, CreatedAt)
         INCLUDE (JobType, AttemptCount, WorkerId);
 END;
 GO
@@ -148,11 +148,11 @@ IF NOT EXISTS
     SELECT 1
     FROM sys.indexes
     WHERE name = N'IX_LossRunJob_RequestedBy_CreatedAt'
-      AND object_id = OBJECT_ID(N'dbo.LossRunJob')
+      AND object_id = OBJECT_ID(N'dbo.tblLossRunJob')
 )
 BEGIN
     CREATE INDEX IX_LossRunJob_RequestedBy_CreatedAt
-        ON dbo.LossRunJob (RequestedBy, CreatedAt DESC);
+        ON dbo.tblLossRunJob (RequestedBy, CreatedAt DESC);
 END;
 GO
 
@@ -162,11 +162,11 @@ IF NOT EXISTS
     SELECT 1
     FROM sys.indexes
     WHERE name = N'IX_LossRunJobAccount_JobId_Status'
-      AND object_id = OBJECT_ID(N'dbo.LossRunJobAccount')
+      AND object_id = OBJECT_ID(N'dbo.tblLossRunJobAccount')
 )
 BEGIN
     CREATE INDEX IX_LossRunJobAccount_JobId_Status
-        ON dbo.LossRunJobAccount (JobId, Status)
+        ON dbo.tblLossRunJobAccount (JobId, Status)
         INCLUDE (CustomerNumber, FailureReason, OutputPath);
 END;
 GO
@@ -180,7 +180,7 @@ FROM sys.tables AS t
 INNER JOIN sys.schemas AS s
     ON s.schema_id = t.schema_id
 WHERE s.name = N'dbo'
-  AND t.name IN (N'LossRunJob', N'LossRunJobAccount')
+  AND t.name IN (N'tblLossRunJob', N'tblLossRunJobAccount')
 ORDER BY t.name;
 GO
 
@@ -193,8 +193,8 @@ SELECT
 FROM sys.indexes AS i
 WHERE i.object_id IN
 (
-    OBJECT_ID(N'dbo.LossRunJob'),
-    OBJECT_ID(N'dbo.LossRunJobAccount')
+    OBJECT_ID(N'dbo.tblLossRunJob'),
+    OBJECT_ID(N'dbo.tblLossRunJobAccount')
 )
 AND i.name IS NOT NULL
 ORDER BY TableName, IndexName;

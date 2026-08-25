@@ -68,6 +68,15 @@ Each route validates input with a Pydantic schema, enforces authentication where
    ```
    Interactive docs are available at `http://localhost:8000/docs`.
 
+5. **Run the local loss-run worker when testing background jobs**
+   ```bash
+   python -m services.loss_run.loss_run_worker
+   ```
+   Keep this in a separate terminal from Uvicorn. The API does not automatically
+   claim SQL-backed loss-run jobs when `ENVIRONMENT=local`, which prevents a local
+   developer process from accidentally claiming jobs belonging to a shared Azure
+   environment.
+
 ## Authentication
 - `POST /auth/login` authenticates against `tblUsers` using `email` and `password`.
 - `POST /auth/F5_login` accepts a payload like `{"user": "<UserID>", "groups": [...]}` from F5.

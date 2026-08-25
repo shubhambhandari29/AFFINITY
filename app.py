@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -22,13 +24,13 @@ from api.affinity.search_affinity_program import (
 )
 from api.auth import router as auth_router
 from api.dropdowns import router as dropdowns_router
+from api.loss_run.loss_run import router as loss_run_router
 from api.outlook_compose import router as outlook_compose_router
 from api.sac.claim_review_distribution import router as claim_review_distribution_router
 from api.sac.claim_review_frequency import router as claim_review_frequency_router
 from api.sac.deduct_bill_distribution import router as deduct_bill_distribution_router
 from api.sac.deduct_bill_frequency import router as deduct_bill_frequency_router
 from api.sac.hcm_users import router as hcm_users_router
-from api.loss_run.loss_run import router as loss_run_router
 from api.sac.loss_run_distribution import router as loss_run_distribution_router
 from api.sac.loss_run_frequency import router as loss_run_frequency_router
 from api.sac.sac_account import router as sac_account_router
@@ -37,8 +39,23 @@ from api.sac.sac_affiliates import router as sac_affiliates_router
 from api.sac.sac_policies import router as sac_policies_router
 from api.sac.search_sac_account import router as search_sac_account_router
 from core.config import settings
+from services.loss_run.loss_run_worker import LossRunWorker
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    worker = None
+    if settings.ENVIRONMENT.strip().lower() != "local":
+        worker = LossRunWorker()
+        worker.start()
+
+    yield
+
+    if worker:
+        await worker.stop()
+
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,

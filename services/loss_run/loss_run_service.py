@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from io import BytesIO
 
@@ -14,6 +15,13 @@ from core.db_helpers import run_raw_query_async
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
 
 logger = logging.getLogger(__name__)
+
+PhaseCallback = Callable[[str], Awaitable[None]]
+CustomersCallback = Callable[[list[dict]], Awaitable[None]]
+ResultCallback = Callable[
+    [str, bool, str | None, str | None],
+    Awaitable[None],
+]
 
 RECORD_ONLY_EXCLUDED_COLUMNS = [
     "Claims above 50K",
@@ -120,8 +128,16 @@ def _create_workbook(
         workbook.close()
 
 
-async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
+async def generate_loss_runs(
+    customer_nums: list[str] | None = None,
+    *,
+    on_phase: PhaseCallback | None = None,
+    on_customers: CustomersCallback | None = None,
+    on_result: ResultCallback | None = None,
+) -> dict:
     try:
+        if on_phase:
+            await on_phase("downloading_template")
         storage = DatabricksLossRunStorage()
         template_bytes = await run_in_threadpool(storage.download_template)
 
@@ -140,8 +156,6 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
                     str(customer["CustomerNum"]).strip() for customer in customers
                 )
             )
-
-            records = await run_raw_query_async("SELECT * FROM dbo.SAC_Loss_Run")
         else:
             requested_numbers = list(
                 dict.fromkeys(
@@ -166,6 +180,15 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
                 requested_numbers,
             )
 
+        if on_customers:
+            await on_customers(customers)
+
+        if on_phase:
+            await on_phase("querying_loss_run_data")
+
+        if customer_nums is None:
+            records = await run_raw_query_async("SELECT * FROM dbo.SAC_Loss_Run")
+        else:
             records = await run_raw_query_async(
                 f"""
                 SELECT *
@@ -174,6 +197,9 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
                 """,
                 requested_numbers,
             )
+
+        if on_phase:
+            await on_phase("generating_reports")
 
         customer_names = {
             str(customer["CustomerNum"]).strip(): str(
@@ -194,17 +220,21 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
             customer_records = records_by_customer.get(customer_num)
 
             if customer_name is None:
-                failures.append(
-                    {"customerNumber": customer_num, "reason": "Customer not found"}
-                )
+                reason = "Customer not found"
+                failures.append({"customerNumber": customer_num, "reason": reason})
+                if on_result:
+                    await on_result(customer_num, False, reason, None)
                 continue
             if not customer_records:
+                reason = "No loss-run records found"
                 failures.append(
                     {
                         "customerNumber": customer_num,
-                        "reason": "No loss-run records found",
+                        "reason": reason,
                     }
                 )
+                if on_result:
+                    await on_result(customer_num, False, reason, None)
                 continue
 
             safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", customer_name).strip(" .")
@@ -218,19 +248,25 @@ async def generate_loss_runs(customer_nums: list[str] | None = None) -> dict:
                     customer_name,
                     template_bytes,
                 )
-                await run_in_threadpool(storage.upload_report, filename, workbook_bytes)
-                generated_count += 1
+                output_path = await run_in_threadpool(
+                    storage.upload_report,
+                    filename,
+                    workbook_bytes,
+                )
             except Exception:
                 logger.exception(
                     "Failed to generate or upload loss-run workbook for customer %s",
                     customer_num,
                 )
-                failures.append(
-                    {
-                        "customerNumber": customer_num,
-                        "reason": "Failed to generate or upload workbook",
-                    }
-                )
+                reason = "Failed to generate or upload workbook"
+                failures.append({"customerNumber": customer_num, "reason": reason})
+                if on_result:
+                    await on_result(customer_num, False, reason, None)
+                continue
+
+            generated_count += 1
+            if on_result:
+                await on_result(customer_num, True, None, output_path)
 
         return {
             "requestedCount": len(requested_numbers),
