@@ -1,11 +1,201 @@
-USE [CLM_LakeHouse];
+/*
+===============================================================================
+LOSS-RUN BACKGROUND JOB TABLES
+Database: CLMAA_SpecialAccounts
+
+Purpose:
+  - LossRunJob stores one row for each Generate All or Generate Selected request.
+  - LossRunJobAccount stores the accounts and result of each account in that job.
+  - Worker/lease columns allow an interrupted job to be recovered safely.
+
+This script is rerunnable. Existing tables and indexes are not recreated.
+===============================================================================
+*/
+
+USE [CLMAA_SpecialAccounts];
 GO
 
-CREATE USER [SACPlatformAPI_PreProd_MI]
-FROM EXTERNAL PROVIDER
-WITH OBJECT_ID = 'bb8645bb-88c9-4a65-bb39-adf60bd93fd8';
+IF OBJECT_ID(N'dbo.LossRunJob', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.LossRunJob
+    (
+        JobId UNIQUEIDENTIFIER NOT NULL
+            CONSTRAINT PK_LossRunJob PRIMARY KEY,
+
+        JobType VARCHAR(20) NOT NULL,
+        Status VARCHAR(30) NOT NULL
+            CONSTRAINT DF_LossRunJob_Status DEFAULT ('queued'),
+        Phase VARCHAR(50) NULL,
+
+        RequestedCount INT NULL,
+        ProcessedCount INT NOT NULL
+            CONSTRAINT DF_LossRunJob_ProcessedCount DEFAULT (0),
+        GeneratedCount INT NOT NULL
+            CONSTRAINT DF_LossRunJob_GeneratedCount DEFAULT (0),
+        FailedCount INT NOT NULL
+            CONSTRAINT DF_LossRunJob_FailedCount DEFAULT (0),
+
+        RequestedBy NVARCHAR(255) NOT NULL,
+
+        CreatedAt DATETIME2(7) NOT NULL
+            CONSTRAINT DF_LossRunJob_CreatedAt DEFAULT (SYSUTCDATETIME()),
+        UpdatedAt DATETIME2(7) NOT NULL
+            CONSTRAINT DF_LossRunJob_UpdatedAt DEFAULT (SYSUTCDATETIME()),
+        StartedAt DATETIME2(7) NULL,
+        CompletedAt DATETIME2(7) NULL,
+
+        WorkerId VARCHAR(100) NULL,
+        LeaseUntil DATETIME2(7) NULL,
+        LastHeartbeatAt DATETIME2(7) NULL,
+        AttemptCount INT NOT NULL
+            CONSTRAINT DF_LossRunJob_AttemptCount DEFAULT (0),
+
+        ErrorMessage NVARCHAR(2000) NULL,
+        RowVersion ROWVERSION NOT NULL,
+
+        CONSTRAINT CK_LossRunJob_JobType
+            CHECK (JobType IN ('all', 'selected')),
+
+        CONSTRAINT CK_LossRunJob_Status
+            CHECK
+            (
+                Status IN
+                (
+                    'queued',
+                    'processing',
+                    'completed',
+                    'partially_completed',
+                    'failed'
+                )
+            ),
+
+        CONSTRAINT CK_LossRunJob_Counts
+            CHECK
+            (
+                (RequestedCount IS NULL OR RequestedCount >= 0)
+                AND ProcessedCount >= 0
+                AND GeneratedCount >= 0
+                AND FailedCount >= 0
+                AND ProcessedCount = GeneratedCount + FailedCount
+                AND (RequestedCount IS NULL OR ProcessedCount <= RequestedCount)
+            ),
+
+        CONSTRAINT CK_LossRunJob_AttemptCount
+            CHECK (AttemptCount >= 0)
+    );
+END;
 GO
 
-ALTER ROLE [db_datareader]
-ADD MEMBER [SACPlatformAPI_PreProd_MI];
+IF OBJECT_ID(N'dbo.LossRunJobAccount', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.LossRunJobAccount
+    (
+        JobId UNIQUEIDENTIFIER NOT NULL,
+        CustomerNumber VARCHAR(50) NOT NULL,
+        CustomerName NVARCHAR(300) NULL,
+
+        Status VARCHAR(30) NOT NULL
+            CONSTRAINT DF_LossRunJobAccount_Status DEFAULT ('queued'),
+        FailureReason NVARCHAR(1000) NULL,
+        OutputPath NVARCHAR(2000) NULL,
+
+        StartedAt DATETIME2(7) NULL,
+        CompletedAt DATETIME2(7) NULL,
+        UpdatedAt DATETIME2(7) NOT NULL
+            CONSTRAINT DF_LossRunJobAccount_UpdatedAt DEFAULT (SYSUTCDATETIME()),
+        RowVersion ROWVERSION NOT NULL,
+
+        CONSTRAINT PK_LossRunJobAccount
+            PRIMARY KEY (JobId, CustomerNumber),
+
+        CONSTRAINT FK_LossRunJobAccount_LossRunJob
+            FOREIGN KEY (JobId)
+            REFERENCES dbo.LossRunJob(JobId),
+
+        CONSTRAINT CK_LossRunJobAccount_Status
+            CHECK
+            (
+                Status IN
+                (
+                    'queued',
+                    'processing',
+                    'completed',
+                    'failed'
+                )
+            )
+    );
+END;
+GO
+
+/* Helps the worker quickly find the next queued or expired job. */
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_LossRunJob_WorkerQueue'
+      AND object_id = OBJECT_ID(N'dbo.LossRunJob')
+)
+BEGIN
+    CREATE INDEX IX_LossRunJob_WorkerQueue
+        ON dbo.LossRunJob (Status, LeaseUntil, CreatedAt)
+        INCLUDE (JobType, AttemptCount, WorkerId);
+END;
+GO
+
+/* Helps job-history screens find a user's most recent jobs. */
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_LossRunJob_RequestedBy_CreatedAt'
+      AND object_id = OBJECT_ID(N'dbo.LossRunJob')
+)
+BEGIN
+    CREATE INDEX IX_LossRunJob_RequestedBy_CreatedAt
+        ON dbo.LossRunJob (RequestedBy, CreatedAt DESC);
+END;
+GO
+
+/* Helps the status API return failed accounts without scanning the whole table. */
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_LossRunJobAccount_JobId_Status'
+      AND object_id = OBJECT_ID(N'dbo.LossRunJobAccount')
+)
+BEGIN
+    CREATE INDEX IX_LossRunJobAccount_JobId_Status
+        ON dbo.LossRunJobAccount (JobId, Status)
+        INCLUDE (CustomerNumber, FailureReason, OutputPath);
+END;
+GO
+
+/* Verification: both rows should be returned after successful creation. */
+SELECT
+    s.name AS SchemaName,
+    t.name AS TableName,
+    t.create_date AS CreatedAt
+FROM sys.tables AS t
+INNER JOIN sys.schemas AS s
+    ON s.schema_id = t.schema_id
+WHERE s.name = N'dbo'
+  AND t.name IN (N'LossRunJob', N'LossRunJobAccount')
+ORDER BY t.name;
+GO
+
+/* Verification: shows the indexes created for the two tables. */
+SELECT
+    OBJECT_SCHEMA_NAME(i.object_id) AS SchemaName,
+    OBJECT_NAME(i.object_id) AS TableName,
+    i.name AS IndexName,
+    i.type_desc AS IndexType
+FROM sys.indexes AS i
+WHERE i.object_id IN
+(
+    OBJECT_ID(N'dbo.LossRunJob'),
+    OBJECT_ID(N'dbo.LossRunJobAccount')
+)
+AND i.name IS NOT NULL
+ORDER BY TableName, IndexName;
 GO
