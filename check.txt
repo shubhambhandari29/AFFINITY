@@ -1,2 +1,19 @@
 PS C:\Users\sxb640> databricks auth login --host host=https://adb-8608532567795739.19.azuredatabricks.net --profile claims-preprod
 Error: --profile "claims-preprod" has host "https://adb-8608532567795739.19.azuredatabricks.net", which conflicts with --host "host=https://adb-8608532567795739.19.azuredatabricks.net". Use --profile only to select a profile
+USE [CLMAA_SpecialAccounts];
+GO
+
+SELECT
+    referenced_server_name AS ReferencedServer,
+    referenced_database_name AS ReferencedDatabase,
+    referenced_schema_name AS ReferencedSchema,
+    referenced_entity_name AS ReferencedObject,
+    referenced_minor_name AS ReferencedColumn
+FROM sys.sql_expression_dependencies
+WHERE referencing_id = OBJECT_ID(N'dbo.SAC_Loss_Run')
+ORDER BY
+    referenced_database_name,
+    referenced_schema_name,
+    referenced_entity_name,
+    referenced_minor_name;
+GO
