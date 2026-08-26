@@ -23,20 +23,18 @@ def _create_job(
     with db_connection() as connection:
         cursor = connection.cursor()
 
-        if job_type == "all":
-            cursor.execute(
-                f"""
-                SELECT TOP (1) JobId
-                FROM {JOB_TABLE} WITH (UPDLOCK, HOLDLOCK)
-                WHERE JobType = 'all'
-                  AND Status IN ('queued', 'processing')
-                ORDER BY CreatedAt DESC
-                """
-            )
-            existing = cursor.fetchone()
-            if existing:
-                connection.commit()
-                return UUID(str(existing[0])), False
+        cursor.execute(
+            f"""
+            SELECT TOP (1) JobId
+            FROM {JOB_TABLE} WITH (UPDLOCK, HOLDLOCK)
+            WHERE Status IN ('queued', 'processing')
+            ORDER BY CreatedAt DESC
+            """
+        )
+        existing = cursor.fetchone()
+        if existing:
+            connection.commit()
+            return UUID(str(existing[0])), False
 
         requested_count = (
             len(customer_numbers) if customer_numbers is not None else None

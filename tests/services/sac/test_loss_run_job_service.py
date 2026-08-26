@@ -51,6 +51,35 @@ def test_create_selected_job_rejects_empty_accounts():
     assert error.value.status_code == 400
 
 
+def test_create_job_returns_existing_active_job(monkeypatch):
+    active_job_id = uuid4()
+
+    async def fake_create(job_type, requested_by, customer_numbers):
+        assert job_type == "selected"
+        return active_job_id, False
+
+    async def fake_get(job_id):
+        assert job_id == active_job_id
+        return {"Status": "processing"}
+
+    monkeypatch.setattr(loss_run_job_service, "create_job", fake_create)
+    monkeypatch.setattr(loss_run_job_service, "get_job", fake_get)
+
+    result = asyncio.run(
+        loss_run_job_service.create_loss_run_job(
+            "selected",
+            {"user": {"email": "user@example.com"}},
+            ["00123"],
+        )
+    )
+
+    assert result == {
+        "jobId": active_job_id,
+        "status": "processing",
+        "message": "A loss-run job is already queued or running",
+    }
+
+
 def test_get_job_returns_failures_only_when_present(monkeypatch):
     job_id = uuid4()
     now = datetime.now(UTC)
@@ -88,9 +117,10 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
     result = asyncio.run(loss_run_job_service.get_loss_run_job(job_id))
 
     assert result["generatedCount"] == 1
-    assert result["createdAt"] == now.strftime("%m-%d-%Y")
-    assert result["startedAt"] == now.strftime("%m-%d-%Y")
-    assert result["completedAt"] == now.strftime("%m-%d-%Y")
+    expected_datetime = now.strftime("%m-%d-%Y %I:%M:%S %p")
+    assert result["createdAt"] == expected_datetime
+    assert result["startedAt"] == expected_datetime
+    assert result["completedAt"] == expected_datetime
     assert result["failures"] == [
         {
             "customerNumber": "00456",
@@ -142,7 +172,8 @@ def test_get_all_jobs_returns_newest_jobs_with_grouped_failures(monkeypatch):
     result = asyncio.run(loss_run_job_service.get_loss_run_jobs())
 
     assert [item["jobId"] for item in result] == [first_job_id, second_job_id]
-    assert all(item["createdAt"] == now.strftime("%m-%d-%Y") for item in result)
+    expected_datetime = now.strftime("%m-%d-%Y %I:%M:%S %p")
+    assert all(item["createdAt"] == expected_datetime for item in result)
     assert result[0]["failures"] == [
         {
             "customerNumber": "00456",

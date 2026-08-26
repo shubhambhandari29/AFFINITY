@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import Any
 
 DATE_OUTPUT_FORMAT = "%m-%d-%Y"
+DATETIME_OUTPUT_FORMAT = "%m-%d-%Y %I:%M:%S %p"
 _DEFAULT_INPUT_FORMATS: tuple[str, ...] = (
     "%Y-%m-%d",
     "%Y/%m/%d",
@@ -107,11 +108,30 @@ def format_date_value(value: Any) -> Any:
     return value
 
 
+def format_datetime_value(value: Any) -> Any:
+    if value in (None, ""):
+        return value
+
+    parsed = value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return value
+        parsed = _try_parse_datetime(text)
+
+    if isinstance(parsed, datetime | date):
+        if _is_sentinel_date(parsed):
+            return None
+        return parsed.strftime(DATETIME_OUTPUT_FORMAT)
+
+    return value
+
+
 def parse_date_input(value: Any) -> Any:
     if value is None:
         return None
 
-    if isinstance(value, (datetime, date)):
+    if isinstance(value, datetime | date):
         if _is_sentinel_date(value):
             return None
         return value
