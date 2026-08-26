@@ -1,16 +1,5 @@
-USE [CLMAA_SpecialAccounts];
-GO
+DECLARE @CustomerNumber VARCHAR(50) = '1514748014';
 
-SELECT
-    column_ordinal,
-    name AS ColumnName,
-    system_type_name AS DataType,
-    is_nullable
-FROM sys.dm_exec_describe_first_result_set
-(
-    N'SELECT * FROM dbo.SAC_Loss_Run',
-    NULL,
-    0
-)
-ORDER BY column_ordinal;
-GO
+SELECT *
+FROM dbo.SAC_Loss_Run
+WHERE [Customer Number] = @CustomerNumber;
