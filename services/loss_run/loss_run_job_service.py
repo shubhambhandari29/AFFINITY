@@ -4,8 +4,10 @@ from fastapi import HTTPException
 
 from services.loss_run.loss_run_job_repository import (
     create_job,
+    get_all_failures,
     get_failures,
     get_job,
+    get_jobs,
 )
 
 
@@ -74,6 +76,29 @@ async def get_loss_run_job(job_id: UUID) -> dict:
             for row in failure_rows
         ]
 
+    return _format_job(job, failures)
+
+
+async def get_loss_run_jobs() -> list[dict]:
+    jobs = await get_jobs()
+    if not jobs:
+        return []
+
+    failures_by_job: dict[str, list[dict]] = {}
+    for row in await get_all_failures():
+        failures_by_job.setdefault(str(row["JobId"]), []).append(
+            {
+                "customerNumber": row["CustomerNumber"],
+                "reason": row["FailureReason"] or "Report generation failed",
+            }
+        )
+
+    return [
+        _format_job(job, failures_by_job.get(str(job["JobId"]), [])) for job in jobs
+    ]
+
+
+def _format_job(job: dict, failures: list[dict]) -> dict:
     return {
         "jobId": job["JobId"],
         "jobType": job["JobType"],

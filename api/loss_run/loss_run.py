@@ -9,6 +9,7 @@ from services.auth_service import get_current_user_from_token
 from services.loss_run.loss_run_job_service import (
     create_loss_run_job,
     get_loss_run_job,
+    get_loss_run_jobs,
 )
 
 router = APIRouter()
@@ -39,6 +40,16 @@ async def generate_selected_loss_runs(
         current_user,
         payload.customerNumbers,
     )
+
+
+@router.get(
+    "/jobs",
+    response_model=list[LossRunJobResponse],
+)
+async def get_all_loss_run_jobs(
+    _current_user: Annotated[dict, Depends(get_current_user_from_token)],
+):
+    return await get_loss_run_jobs()
 
 
 @router.get(

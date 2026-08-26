@@ -123,6 +123,36 @@ async def get_job(job_id: UUID) -> dict | None:
     return await run_in_threadpool(_get_job, job_id)
 
 
+def _get_jobs() -> list[dict]:
+    with db_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            f"""
+            SELECT
+                JobId,
+                JobType,
+                Status,
+                Phase,
+                RequestedCount,
+                ProcessedCount,
+                GeneratedCount,
+                FailedCount,
+                RequestedBy,
+                CreatedAt,
+                StartedAt,
+                CompletedAt,
+                ErrorMessage
+            FROM {JOB_TABLE}
+            ORDER BY CreatedAt DESC
+            """
+        )
+        return _rows_to_dicts(cursor)
+
+
+async def get_jobs() -> list[dict]:
+    return await run_in_threadpool(_get_jobs)
+
+
 def _get_failures(job_id: UUID) -> list[dict]:
     with db_connection() as connection:
         cursor = connection.cursor()
@@ -141,6 +171,24 @@ def _get_failures(job_id: UUID) -> list[dict]:
 
 async def get_failures(job_id: UUID) -> list[dict]:
     return await run_in_threadpool(_get_failures, job_id)
+
+
+def _get_all_failures() -> list[dict]:
+    with db_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            f"""
+            SELECT JobId, CustomerNumber, FailureReason
+            FROM {ACCOUNT_TABLE}
+            WHERE Status = 'failed'
+            ORDER BY JobId, CustomerNumber
+            """
+        )
+        return _rows_to_dicts(cursor)
+
+
+async def get_all_failures() -> list[dict]:
+    return await run_in_threadpool(_get_all_failures)
 
 
 def _get_account_numbers(job_id: UUID) -> list[str]:

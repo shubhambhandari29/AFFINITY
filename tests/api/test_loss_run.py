@@ -53,3 +53,16 @@ def test_get_loss_run_job_status_calls_service(monkeypatch):
     result = asyncio.run(loss_run.get_loss_run_job_status(job_id, CURRENT_USER))
 
     assert result["status"] == "processing"
+
+
+def test_get_all_loss_run_jobs_calls_service(monkeypatch):
+    job_id = uuid4()
+
+    async def fake_get_all():
+        return [{"jobId": job_id, "status": "completed"}]
+
+    monkeypatch.setattr(loss_run, "get_loss_run_jobs", fake_get_all)
+
+    result = asyncio.run(loss_run.get_all_loss_run_jobs(CURRENT_USER))
+
+    assert result == [{"jobId": job_id, "status": "completed"}]

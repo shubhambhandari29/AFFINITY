@@ -94,3 +94,55 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
             "reason": "No loss-run records found",
         }
     ]
+
+
+def test_get_all_jobs_returns_newest_jobs_with_grouped_failures(monkeypatch):
+    first_job_id = uuid4()
+    second_job_id = uuid4()
+    now = datetime.now(UTC)
+
+    def job(job_id, status, failed_count):
+        return {
+            "JobId": job_id,
+            "JobType": "selected",
+            "Status": status,
+            "Phase": "finished",
+            "RequestedCount": 1,
+            "ProcessedCount": 1,
+            "GeneratedCount": 1 - failed_count,
+            "FailedCount": failed_count,
+            "RequestedBy": "user@example.com",
+            "CreatedAt": now,
+            "StartedAt": now,
+            "CompletedAt": now,
+            "ErrorMessage": None,
+        }
+
+    async def fake_jobs():
+        return [
+            job(first_job_id, "partially_completed", 1),
+            job(second_job_id, "completed", 0),
+        ]
+
+    async def fake_all_failures():
+        return [
+            {
+                "JobId": first_job_id,
+                "CustomerNumber": "00456",
+                "FailureReason": "No loss-run records found",
+            }
+        ]
+
+    monkeypatch.setattr(loss_run_job_service, "get_jobs", fake_jobs)
+    monkeypatch.setattr(loss_run_job_service, "get_all_failures", fake_all_failures)
+
+    result = asyncio.run(loss_run_job_service.get_loss_run_jobs())
+
+    assert [item["jobId"] for item in result] == [first_job_id, second_job_id]
+    assert result[0]["failures"] == [
+        {
+            "customerNumber": "00456",
+            "reason": "No loss-run records found",
+        }
+    ]
+    assert result[1]["failures"] == []
