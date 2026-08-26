@@ -1,5 +1,93 @@
-DECLARE @CustomerNumber VARCHAR(50) = '1514748014';
+USE [CLM_LakeHouse];
+GO
 
-SELECT *
-FROM dbo.SAC_Loss_Run
-WHERE [Customer Number] = @CustomerNumber;
+SELECT
+    schema_name = schemaInfo.name,
+    table_name = tableInfo.name,
+    index_name = indexInfo.name,
+    index_type = indexInfo.type_desc,
+    indexInfo.is_unique,
+    indexInfo.is_primary_key,
+    column_name = columnInfo.name,
+    indexColumn.key_ordinal,
+    indexColumn.is_included_column
+FROM sys.tables AS tableInfo
+INNER JOIN sys.schemas AS schemaInfo
+    ON schemaInfo.schema_id = tableInfo.schema_id
+INNER JOIN sys.indexes AS indexInfo
+    ON indexInfo.object_id = tableInfo.object_id
+INNER JOIN sys.index_columns AS indexColumn
+    ON indexColumn.object_id = indexInfo.object_id
+   AND indexColumn.index_id = indexInfo.index_id
+INNER JOIN sys.columns AS columnInfo
+    ON columnInfo.object_id = indexColumn.object_id
+   AND columnInfo.column_id = indexColumn.column_id
+WHERE tableInfo.name IN
+(
+    'DW_CLMS_CLM_DIMNSN',
+    'DW_POL_DIMNSN',
+    'DW_CLMS_FTR_DIMNSN',
+    'DW_CLMS_CLM_CNTCT_DIMNSN',
+    'DW_CLMS_CLMNT_DIMNSN',
+    'DW_CLMS_VEH_DIMNSN',
+    'DW_CLMS_LGL_FACT',
+    'DW_CLMS_LGL_DIMNSN',
+    'DW_CLMS_DRVR_DIMNSN',
+    'DW_REF_MAJ_PERIL',
+    'DM_RETNTN_PRDCNG_AGNT_HR_D'
+)
+AND indexInfo.index_id > 0
+ORDER BY
+    tableInfo.name,
+    indexInfo.name,
+    indexColumn.key_ordinal,
+    indexColumn.index_column_id;
+GO
+
+
+
+
+
+
+
+----
+
+
+
+USE [CLMAA_SpecialAccounts];
+GO
+
+SELECT
+    schema_name = schemaInfo.name,
+    table_name = tableInfo.name,
+    index_name = indexInfo.name,
+    index_type = indexInfo.type_desc,
+    indexInfo.is_unique,
+    indexInfo.is_primary_key,
+    column_name = columnInfo.name,
+    indexColumn.key_ordinal,
+    indexColumn.is_included_column
+FROM sys.tables AS tableInfo
+INNER JOIN sys.schemas AS schemaInfo
+    ON schemaInfo.schema_id = tableInfo.schema_id
+INNER JOIN sys.indexes AS indexInfo
+    ON indexInfo.object_id = tableInfo.object_id
+INNER JOIN sys.index_columns AS indexColumn
+    ON indexColumn.object_id = indexInfo.object_id
+   AND indexColumn.index_id = indexInfo.index_id
+INNER JOIN sys.columns AS columnInfo
+    ON columnInfo.object_id = indexColumn.object_id
+   AND columnInfo.column_id = indexColumn.column_id
+WHERE tableInfo.name IN
+(
+    'tblAcctSpecial',
+    'DW_FINCL_LOSS_TXN_SS_F_FILTERED',
+    'DW_FINCL_LOSS_FTR_SS_F_FILTERED'
+)
+AND indexInfo.index_id > 0
+ORDER BY
+    tableInfo.name,
+    indexInfo.name,
+    indexColumn.key_ordinal,
+    indexColumn.index_column_id;
+GO
