@@ -7,7 +7,7 @@ GO
 
 DECLARE @CustomerNumber VARCHAR(50) = '1514748014';
 
-SELECT *
+SELECT COUNT_BIG(*) AS SelectedRowCount
 FROM dbo.SAC_Loss_Run
 WHERE [Customer Number] = @CustomerNumber;
 GO
