@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -34,8 +33,8 @@ class LossRunJobResponse(BaseModel):
     generatedCount: int
     failedCount: int
     requestedBy: str
-    createdAt: datetime
-    startedAt: datetime | None
-    completedAt: datetime | None
+    createdAt: str
+    startedAt: str | None
+    completedAt: str | None
     errorMessage: str | None
     failures: list[LossRunFailure]

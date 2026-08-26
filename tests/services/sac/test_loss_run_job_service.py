@@ -88,6 +88,9 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
     result = asyncio.run(loss_run_job_service.get_loss_run_job(job_id))
 
     assert result["generatedCount"] == 1
+    assert result["createdAt"] == now.strftime("%m-%d-%Y")
+    assert result["startedAt"] == now.strftime("%m-%d-%Y")
+    assert result["completedAt"] == now.strftime("%m-%d-%Y")
     assert result["failures"] == [
         {
             "customerNumber": "00456",
@@ -139,6 +142,7 @@ def test_get_all_jobs_returns_newest_jobs_with_grouped_failures(monkeypatch):
     result = asyncio.run(loss_run_job_service.get_loss_run_jobs())
 
     assert [item["jobId"] for item in result] == [first_job_id, second_job_id]
+    assert all(item["createdAt"] == now.strftime("%m-%d-%Y") for item in result)
     assert result[0]["failures"] == [
         {
             "customerNumber": "00456",
