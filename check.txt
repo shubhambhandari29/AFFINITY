@@ -359,8 +359,69 @@ function CustomFooter({ manualRefresh, loading }) {
 export default function LossRunJobs() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [downloadingJobId, setDownloadingJobId] = useState("");
   const theme = useTheme();
   const [openJob, setOpenJob] = useState("");
+
+  const handleDownload = async (job) => {
+    setDownloadingJobId(job.jobId);
+
+    try {
+      const response = await api.get(
+        `/loss_run/jobs/${job.jobId}/download`,
+        {
+          responseType: "blob",
+        },
+      );
+
+      const contentDisposition = response.headers["content-disposition"];
+      const filenameMatch = contentDisposition?.match(
+        /filename\*?=(?:UTF-8''|")?([^";]+)/i,
+      );
+
+      let filename =
+        job.generatedCount === 1
+          ? `loss_run_${job.jobId}.xlsx`
+          : `loss_run_${job.jobId}.zip`;
+
+      if (filenameMatch?.[1]) {
+        filename = decodeURIComponent(filenameMatch[1].replace(/"/g, ""));
+      }
+
+      const downloadUrl = window.URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error(error);
+
+      let message = "Unable to download the generated loss-run file.";
+      if (error.response?.status === 409) {
+        message = "This loss-run job is still being processed.";
+      } else if (error.response?.status === 404) {
+        message = "No generated files were found for this job.";
+      }
+
+      Swal.fire({
+        title: "Download Failed",
+        text: message,
+        icon: "error",
+        confirmButtonText: "OK",
+        iconColor: theme.palette.error.main,
+        customClass: {
+          confirmButton: "swal-confirm-button",
+          cancelButton: "swal-cancel-button",
+        },
+        buttonsStyling: false,
+      });
+    } finally {
+      setDownloadingJobId("");
+    }
+  };
 
   // --- Columns Definition ---
   const columns = [
@@ -424,6 +485,33 @@ export default function LossRunJobs() {
       field: "completedAt",
       headerName: "Completed At",
       flex: 1,
+    },
+    {
+      field: "download",
+      headerName: "Download",
+      width: 130,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => {
+        const downloadable = ["completed", "partially_completed"].includes(
+          params.row.status,
+        );
+        const isDownloading = downloadingJobId === params.row.jobId;
+
+        return (
+          <Button
+            variant="contained"
+            size="small"
+            disabled={!downloadable || isDownloading}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDownload(params.row);
+            }}
+          >
+            {isDownloading ? "Downloading..." : "Download"}
+          </Button>
+        );
+      },
     },
   ];
 
