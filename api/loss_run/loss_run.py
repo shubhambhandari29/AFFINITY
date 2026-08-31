@@ -1,11 +1,15 @@
+import os
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
+from starlette.background import BackgroundTask
+from starlette.responses import FileResponse
 
 from core.models.loss_run.loss_run import LossRunSelection
 from core.models.loss_run.loss_run_job import LossRunJobCreated, LossRunJobResponse
 from services.auth_service import get_current_user_from_token
+from services.loss_run.loss_run_download_service import prepare_loss_run_download
 from services.loss_run.loss_run_job_service import (
     create_loss_run_job,
     get_loss_run_job,
@@ -61,3 +65,17 @@ async def get_loss_run_job_status(
     _current_user: Annotated[dict, Depends(get_current_user_from_token)],
 ):
     return await get_loss_run_job(job_id)
+
+
+@router.get("/jobs/{job_id}/download", response_class=FileResponse)
+async def download_loss_run_job(
+    job_id: UUID,
+    _current_user: Annotated[dict, Depends(get_current_user_from_token)],
+):
+    download = await prepare_loss_run_download(job_id)
+    return FileResponse(
+        path=download.path,
+        filename=download.filename,
+        media_type=download.media_type,
+        background=BackgroundTask(os.remove, download.path),
+    )

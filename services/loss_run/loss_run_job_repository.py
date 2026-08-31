@@ -208,6 +208,27 @@ async def get_account_numbers(job_id: UUID) -> list[str]:
     return await run_in_threadpool(_get_account_numbers, job_id)
 
 
+def _get_completed_outputs(job_id: UUID) -> list[dict]:
+    with db_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            f"""
+            SELECT CustomerNumber, OutputPath
+            FROM {ACCOUNT_TABLE}
+            WHERE JobId = ?
+              AND Status = 'completed'
+              AND OutputPath IS NOT NULL
+            ORDER BY CustomerNumber
+            """,
+            str(job_id),
+        )
+        return _rows_to_dicts(cursor)
+
+
+async def get_completed_outputs(job_id: UUID) -> list[dict]:
+    return await run_in_threadpool(_get_completed_outputs, job_id)
+
+
 def _claim_next_job(worker_id: str) -> dict | None:
     with db_connection() as connection:
         cursor = connection.cursor()

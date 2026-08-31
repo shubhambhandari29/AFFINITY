@@ -29,7 +29,8 @@ def test_local_storage_uses_oauth_profile_for_download_and_upload(monkeypatch):
     captured = {}
 
     class Download:
-        contents = BytesIO(b"template")
+        def __init__(self):
+            self.contents = BytesIO(b"template")
 
     class Files:
         @staticmethod
@@ -65,6 +66,10 @@ def test_local_storage_uses_oauth_profile_for_download_and_upload(monkeypatch):
     assert captured["upload_bytes"] == b"report"
     assert captured["overwrite"] is True
 
+    destination = BytesIO()
+    storage.download_report_to(output_path, destination)
+    assert destination.getvalue() == b"template"
+
 
 def test_azure_storage_uses_managed_identity_and_files_api(monkeypatch):
     _configure(monkeypatch, environment="preprod")
@@ -83,11 +88,21 @@ def test_azure_storage_uses_managed_identity_and_files_api(monkeypatch):
             self.ok = status_code < 400
             self.text = ""
 
-    def fake_get(url, *, headers, timeout):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def iter_content(self, chunk_size):
+            assert chunk_size == 1024 * 1024
+            yield self.content
+
+    def fake_get(url, *, headers, timeout, stream=False):
         requests_made.append(("GET", url))
         assert headers == {"Authorization": "Bearer managed-identity-token"}
         assert timeout == 60
-        return Response(b"template")
+        return Response(b"report" if stream else b"template")
 
     def fake_put(url, *, headers, params, data, timeout):
         requests_made.append(("PUT", url))
@@ -109,8 +124,11 @@ def test_azure_storage_uses_managed_identity_and_files_api(monkeypatch):
     storage = databricks_storage_service.DatabricksLossRunStorage()
     assert storage.download_template() == b"template"
     storage.upload_report("Customer.xlsx", b"report")
+    destination = BytesIO()
+    storage.download_report_to("/Volumes/Customer.xlsx", destination)
+    assert destination.getvalue() == b"report"
 
-    assert [method for method, _ in requests_made] == ["GET", "PUT"]
+    assert [method for method, _ in requests_made] == ["GET", "PUT", "GET"]
     assert all("/api/2.0/fs/files/Volumes/" in url for _, url in requests_made)
 
 

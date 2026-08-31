@@ -1,4 +1,6 @@
 from io import BytesIO
+from shutil import copyfileobj
+from typing import BinaryIO
 from urllib.parse import quote
 
 import requests
@@ -77,6 +79,24 @@ class DatabricksLossRunStorage:
         )
         self._raise_for_databricks_error(response, "report upload")
         return output_path
+
+    def download_report_to(self, path: str, destination: BinaryIO) -> None:
+        if self.client:
+            download = self.client.files.download(path)
+            with download.contents as stream:
+                copyfileobj(stream, destination)
+            return
+
+        with requests.get(
+            self._files_api_url(path),
+            headers=self._authorization_header(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
+            stream=True,
+        ) as response:
+            self._raise_for_databricks_error(response, "report download")
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    destination.write(chunk)
 
     def _authorization_header(self) -> dict[str, str]:
         access_token = self.credential.get_token(DATABRICKS_TOKEN_SCOPE)
