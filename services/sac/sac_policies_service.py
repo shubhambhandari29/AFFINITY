@@ -214,7 +214,6 @@ async def get_premium(query_params: dict[str, Any]):
         query = "SELECT COALESCE(SUM(PremiumAmt), 0) AS Premium FROM tblPolicies"
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
-        print("QUERYY", query)
         rows = await run_raw_query_async(query, params)
         premium_value = rows[0]["Premium"] if rows else 0
         return premium_value
