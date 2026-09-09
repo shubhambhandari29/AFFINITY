@@ -24,9 +24,13 @@ def _parse_origins(value: str | None) -> list[str]:
 
 
 class Settings:
-
     # Feature flags / environment toggles
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "local")
+
+    # Databricks loss-run storage
+    DATABRICKS_HOST: str | None = os.getenv("DATABRICKS_HOST")
+    LOSS_RUN_DATABRICKS_CATALOG: str | None = os.getenv("LOSS_RUN_DATABRICKS_CATALOG")
+    DATABRICKS_PROFILE: str = os.getenv("DATABRICKS_PROFILE", "claims-preprod")
 
     # Database configuration
     DB_SERVER: str | None = os.getenv("DB_SERVER")
@@ -45,7 +49,9 @@ class Settings:
     REFRESH_TOKEN_VALIDITY: int = int(os.getenv("REFRESH_TOKEN_VALIDITY", "10080"))
 
     # CORS settings
-    ALLOWED_ORIGINS: list[str] = list(dict.fromkeys(_parse_origins(os.getenv("FRONTEND_URL"))))
+    ALLOWED_ORIGINS: list[str] = list(
+        dict.fromkeys(_parse_origins(os.getenv("FRONTEND_URL")))
+    )
 
     # Cookie settings
     SECURE_COOKIE: bool = _as_bool(os.getenv("SECURE_COOKIE"))

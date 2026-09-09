@@ -21,6 +21,19 @@ def test_format_date_value_formats_and_handles_sentinel():
     assert date_utils.format_date_value("   ") == "   "
 
 
+def test_format_datetime_value_includes_time_and_handles_sentinel():
+    assert date_utils.format_datetime_value(datetime(1900, 1, 1, 12, 0, 0)) is None
+    assert (
+        date_utils.format_datetime_value(datetime(2024, 1, 2, 20, 30, 45))
+        == "01-02-2024 08:30:45 PM"
+    )
+    assert (
+        date_utils.format_datetime_value("2024-01-02T08:30:45")
+        == "01-02-2024 08:30:45 AM"
+    )
+    assert date_utils.format_datetime_value(None) is None
+
+
 def test_parse_date_input_handles_formats_and_sentinel():
     assert date_utils.parse_date_input("2024-01-02") == date(2024, 1, 2)
     parsed = date_utils.parse_date_input("2024-01-02T08:30:00Z")

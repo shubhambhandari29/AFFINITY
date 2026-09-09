@@ -1,3 +1,4 @@
+-- HCM migration
 SET XACT_ABORT ON;
 
 BEGIN TRANSACTION;
@@ -83,3 +84,42 @@ BEGIN
 END;
 
 COMMIT TRANSACTION;
+
+GO
+
+-- Loss run diagnostic queries
+SELECT
+    JobId,
+    CustomerNumber,
+    Status,
+    FailureReason
+FROM dbo.tblLossRunJobAccount
+WHERE JobId = 'YOUR-SELECTED-JOB-ID'
+ORDER BY CustomerNumber;
+
+
+DECLARE @CustomerNumber VARCHAR(50) = 'FAILED-CUSTOMER-NUMBER';
+
+SELECT COUNT(*) AS RecordCount
+FROM dbo.SAC_Loss_Run
+WHERE [Customer Number] = @CustomerNumber;
+
+
+DECLARE @CustomerNumber NVARCHAR(50) = N'FAILED-CUSTOMER-NUMBER';
+
+SELECT
+    [Customer Number],
+    LEN([Customer Number]) AS CharacterLength,
+    DATALENGTH([Customer Number]) AS StoredLength,
+    COUNT(*) AS RecordCount
+FROM dbo.SAC_Loss_Run
+WHERE [Customer Number] = @CustomerNumber
+GROUP BY
+    [Customer Number],
+    LEN([Customer Number]),
+    DATALENGTH([Customer Number]);
+
+
+
+EXEC sys.sp_describe_first_result_set
+    @tsql = N'SELECT * FROM dbo.SAC_Loss_Run';

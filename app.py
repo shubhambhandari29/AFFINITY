@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -26,6 +28,7 @@ from api.hcm.hcm_account import router as hcm_account_router
 from api.hcm.hcm_account_associations import router as hcm_account_associations_router
 from api.hcm.hcm_users import router as hcm_only_users_router
 from api.hcm.search_hcm_account import router as search_hcm_account_router
+from api.loss_run.loss_run import router as loss_run_router
 from api.outlook_compose import router as outlook_compose_router
 from api.sac.claim_review_distribution import router as claim_review_distribution_router
 from api.sac.claim_review_frequency import router as claim_review_frequency_router
@@ -40,14 +43,30 @@ from api.sac.sac_affiliates import router as sac_affiliates_router
 from api.sac.sac_policies import router as sac_policies_router
 from api.sac.search_sac_account import router as search_sac_account_router
 from core.config import settings
+from services.loss_run.loss_run_worker import LossRunWorker
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    worker = None
+    if settings.ENVIRONMENT.strip().lower() != "local":
+        worker = LossRunWorker()
+        worker.start()
+
+    yield
+
+    if worker:
+        await worker.stop()
+
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 
@@ -107,6 +126,7 @@ app.include_router(
 app.include_router(
     loss_run_frequency_router, prefix="/loss_run_frequency", tags=["loss_run_frequency"]
 )
+app.include_router(loss_run_router, prefix="/loss_run", tags=["loss_run"])
 app.include_router(
     claim_review_frequency_router, prefix="/claim_review_frequency", tags=["claim_review_frequency"]
 )

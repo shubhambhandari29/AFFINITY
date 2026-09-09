@@ -229,6 +229,32 @@ def test_get_underwriter_details_only_queries_active_policies(monkeypatch):
         sac_policies_service.get_underwriter_details({"CustomerNum": "123"})
     )
 
-    assert result == {}
+    assert result and all(value == [] for value in result.values())
     assert "p.PolicyStatus = 'Active'" in captured["query"]
     assert captured["params"] == ["123"]
+
+
+def test_get_underwriter_details_returns_empty_arrays_when_no_records(monkeypatch):
+    async def fake_run_raw_query_async(query, params):
+        return []
+
+    monkeypatch.setattr(sac_policies_service, "run_raw_query_async", fake_run_raw_query_async)
+    monkeypatch.setattr(
+        sac_policies_service,
+        "sanitize_filters",
+        lambda filters_input, allowed: filters_input,
+    )
+
+    result = asyncio.run(
+        sac_policies_service.get_underwriter_details({"CustomerNum": "1"})
+    )
+
+    assert result == {
+        "AcctOwnerEmail": [],
+        "UnderwriterNames": [],
+        "UnderwriterEmails": [],
+        "UWMgrNames": [],
+        "UWMgrEmails": [],
+        "MissingUnderwriters": [],
+        "MissingUWManagers": [],
+    }
