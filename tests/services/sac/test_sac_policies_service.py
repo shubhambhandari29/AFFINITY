@@ -60,6 +60,7 @@ def test_upsert_sac_policies_inserts_without_pk(monkeypatch):
         lambda payload: {"CustomerNum": "1", "PolicyNum": "P1", "PolMod": "1"},
     )
     monkeypatch.setattr(sac_policies_service, "insert_records_async", fake_insert_records_async)
+
     async def fake_lookup(record):
         return 101
 
@@ -83,6 +84,7 @@ def test_upsert_sac_policies_inserts_when_mod_changes(monkeypatch):
     )
     monkeypatch.setattr(sac_policies_service, "fetch_records_async", fake_fetch_records_async)
     monkeypatch.setattr(sac_policies_service, "insert_records_async", fake_insert_records_async)
+
     async def fake_lookup(record):
         return 202
 
@@ -119,9 +121,7 @@ def test_update_field_for_all_policies_validation_errors():
 
     with pytest.raises(HTTPException):
         asyncio.run(
-            sac_policies_service.update_field_for_all_policies(
-                {"fieldName": "A", "updateVia": "B"}
-            )
+            sac_policies_service.update_field_for_all_policies({"fieldName": "A", "updateVia": "B"})
         )
 
     with pytest.raises(HTTPException):
@@ -156,12 +156,10 @@ def test_update_field_for_all_policies_success(monkeypatch):
     def fake_db_connection():
         yield FakeConn()
 
-    async def fake_run_in_threadpool(func):
-        return func()
-
     monkeypatch.setattr(sac_policies_service, "parse_date_input", fake_parse_date_input)
-    monkeypatch.setattr(sac_policies_service, "db_connection", fake_db_connection)
-    monkeypatch.setattr(sac_policies_service, "run_in_threadpool", fake_run_in_threadpool)
+    import db
+
+    monkeypatch.setattr(db, "db_connection", fake_db_connection)
 
     result = asyncio.run(
         sac_policies_service.update_field_for_all_policies(
@@ -225,9 +223,7 @@ def test_get_underwriter_details_only_queries_active_policies(monkeypatch):
         fake_run_raw_query_async,
     )
 
-    result = asyncio.run(
-        sac_policies_service.get_underwriter_details({"CustomerNum": "123"})
-    )
+    result = asyncio.run(sac_policies_service.get_underwriter_details({"CustomerNum": "123"}))
 
     assert result and all(value == [] for value in result.values())
     assert "p.PolicyStatus = 'Active'" in captured["query"]
@@ -245,9 +241,7 @@ def test_get_underwriter_details_returns_empty_arrays_when_no_records(monkeypatc
         lambda filters_input, allowed: filters_input,
     )
 
-    result = asyncio.run(
-        sac_policies_service.get_underwriter_details({"CustomerNum": "1"})
-    )
+    result = asyncio.run(sac_policies_service.get_underwriter_details({"CustomerNum": "1"}))
 
     assert result == {
         "AcctOwnerEmail": [],

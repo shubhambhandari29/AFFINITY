@@ -1,5 +1,8 @@
 import asyncio
+from unittest.mock import AsyncMock
 from uuid import uuid4
+
+import pytest
 
 from services.loss_run import loss_run_worker
 
@@ -15,9 +18,7 @@ def test_worker_processes_selected_job_and_records_progress(monkeypatch):
     async def fake_generate(customer_numbers, *, on_phase, on_customers, on_result):
         assert customer_numbers == ["00123"]
         await on_phase("querying_loss_run_data")
-        await on_customers(
-            [{"CustomerNum": "00123", "CustomerName": "Example Customer"}]
-        )
+        await on_customers([{"CustomerNum": "00123", "CustomerName": "Example Customer"}])
         await on_result("00123", True, None, "/Volumes/report.xlsx")
 
     async def fake_phase(received_job_id, worker_id, phase):
@@ -107,6 +108,92 @@ def test_worker_marks_job_failed_when_generation_fails(monkeypatch):
     )
 
     assert failed[0][0] == job_id
-    assert failed[0][2] == (
-        "Loss-run generation failed. Check application logs for details."
-    )
+    assert failed[0][2] == ("Loss-run generation failed. Check application logs for details.")
+
+
+def test_worker_start_is_idempotent_and_stop_cancels_polling(monkeypatch):
+
+    async def scenario():
+        entered = asyncio.Event()
+
+        async def claim(_worker):
+            entered.set()
+            await asyncio.Event().wait()
+
+        monkeypatch.setattr(loss_run_worker, "claim_next_job", claim)
+        worker = loss_run_worker.LossRunWorker()
+        worker.start()
+        original = worker._task
+        worker.start()
+        assert worker._task is original
+        await entered.wait()
+        await worker.stop()
+        assert original.cancelled()
+        assert worker._stop_event.is_set()
+
+    asyncio.run(scenario())
+
+
+def test_polling_recovers_after_error_and_processes_next_job(monkeypatch):
+
+    async def scenario():
+        worker = loss_run_worker.LossRunWorker()
+        job = {"JobId": uuid4()}
+        claim = AsyncMock(side_effect=[RuntimeError("temporary outage"), None, job])
+
+        async def process(received):
+            assert received == job
+            worker._stop_event.set()
+
+        monkeypatch.setattr(loss_run_worker, "POLL_INTERVAL_SECONDS", 0)
+        monkeypatch.setattr(loss_run_worker, "claim_next_job", claim)
+        monkeypatch.setattr(worker, "_process_job", process)
+        await worker._run()
+        assert claim.await_count == 3
+
+    asyncio.run(scenario())
+
+
+def test_all_job_skips_account_lookup(monkeypatch):
+
+    generate = AsyncMock()
+    accounts = AsyncMock()
+    complete = AsyncMock()
+    monkeypatch.setattr(loss_run_worker, "generate_loss_runs", generate)
+    monkeypatch.setattr(loss_run_worker, "get_account_numbers", accounts)
+    monkeypatch.setattr(loss_run_worker, "complete_job", complete)
+    worker = loss_run_worker.LossRunWorker()
+    job_id = uuid4()
+    asyncio.run(worker._process_job({"JobId": job_id, "JobType": "all"}))
+    assert generate.await_args.args == (None,)
+    accounts.assert_not_awaited()
+    complete.assert_awaited_once_with(job_id, worker.worker_id)
+
+
+def test_cancelled_job_is_not_marked_failed_or_completed(monkeypatch):
+
+    generate = AsyncMock(side_effect=asyncio.CancelledError)
+    fail = AsyncMock()
+    complete = AsyncMock()
+    monkeypatch.setattr(loss_run_worker, "generate_loss_runs", generate)
+    monkeypatch.setattr(loss_run_worker, "fail_job", fail)
+    monkeypatch.setattr(loss_run_worker, "complete_job", complete)
+    worker = loss_run_worker.LossRunWorker()
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(worker._process_job({"JobId": uuid4(), "JobType": "all"}))
+    fail.assert_not_awaited()
+    complete.assert_not_awaited()
+
+
+def test_heartbeat_retries_after_transient_failure(monkeypatch):
+
+    sleep = AsyncMock(side_effect=[None, None, asyncio.CancelledError])
+    heartbeat = AsyncMock(side_effect=[RuntimeError("temporary outage"), None])
+    monkeypatch.setattr(loss_run_worker.asyncio, "sleep", sleep)
+    monkeypatch.setattr(loss_run_worker, "update_heartbeat", heartbeat)
+    worker = loss_run_worker.LossRunWorker()
+    job_id = uuid4()
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(worker._heartbeat(job_id))
+    assert heartbeat.await_count == 2
+    heartbeat.assert_awaited_with(job_id, worker.worker_id)
