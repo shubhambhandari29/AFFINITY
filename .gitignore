@@ -10,6 +10,8 @@ venv/
 .venv/
 .env*
 
+services/loss_run/Reports
+
 # Dependency / build
 *.egg-info/
 *.egg
@@ -41,4 +43,3 @@ htmlcov/
 
 .API_CHECKS.txt
 API_CHECKS.txt
-
