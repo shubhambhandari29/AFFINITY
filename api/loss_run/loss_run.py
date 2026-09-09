@@ -15,8 +15,16 @@ from services.loss_run.loss_run_job_service import (
     get_loss_run_job,
     get_loss_run_jobs,
 )
+from services.loss_run.loss_run_service import get_loss_run_accounts
 
 router = APIRouter()
+
+
+@router.get("/accounts", response_model=list[dict])
+async def list_loss_run_accounts(
+    _current_user: Annotated[dict, Depends(get_current_user_from_token)],
+):
+    return await get_loss_run_accounts()
 
 
 @router.post(

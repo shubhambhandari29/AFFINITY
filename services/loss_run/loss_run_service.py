@@ -11,6 +11,7 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import TableColumn
 
+from core.date_utils import format_records_dates
 from core.db_helpers import run_raw_query_async
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
 
@@ -39,6 +40,32 @@ RECORD_ONLY_EXCLUDED_COLUMNS = [
     "Litigation Status",
     "Outstanding Loss Reserve",
 ]
+
+
+async def get_loss_run_accounts() -> list[dict]:
+    try:
+        records = await run_raw_query_async(
+            """
+            SELECT
+                CustomerNum AS [Customer Number],
+                CustomerName AS [Customer Name],
+                OnBoardDate AS [On Board Date],
+                AcctStatus AS [Account Status],
+                LossRunDistFreq AS [Loss Run Frequency]
+            FROM dbo.tblAcctSpecial
+            WHERE AcctStatus = 'Active'
+              AND LossRunDistFreq <> 'Not Needed'
+              AND LossRunDistFreq <> ''
+            ORDER BY CustomerName, CustomerNum
+            """
+        )
+        return format_records_dates(records, fields={"On Board Date"})
+    except Exception as exc:
+        logger.exception("Failed to retrieve eligible loss-run accounts")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Failed to retrieve eligible loss-run accounts"},
+        ) from exc
 
 
 def _write_excel_table(worksheet, table_name: str, dataframe: pd.DataFrame) -> None:
