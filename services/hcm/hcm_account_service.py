@@ -22,7 +22,6 @@ _DATE_FIELDS = {
     "DiscDate",
     "TermDate",
     "DateNotif",
-    "RenewLetterDt",
     "EffectiveDate",
     "InsertDateTime",
     "UpdateDateTime",

@@ -51,3 +51,4 @@ async def search_hcm_account_records(search_by: str):
     except Exception as e:
         logger.warning(f"HCM account search failed - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
+    
