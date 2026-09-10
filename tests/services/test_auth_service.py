@@ -172,6 +172,9 @@ def test_f5_login_user_not_authorized_when_no_sac_groups():
 
 
 def test_f5_login_user_role_priority_and_cookie_flow(monkeypatch):
+    monkeypatch.setattr(
+        auth_service, "get_branch_name_by_user_identifier", lambda user_id: None
+    )
     captured = {"access": None, "refresh": None}
 
     monkeypatch.setattr(
@@ -221,6 +224,9 @@ def test_f5_login_user_role_priority_and_cookie_flow(monkeypatch):
 
 
 def test_f5_login_user_keeps_underwriter_for_mbond_with_all_three_groups(monkeypatch):
+    monkeypatch.setattr(
+        auth_service, "get_branch_name_by_user_identifier", lambda user_id: None
+    )
     monkeypatch.setattr(auth_service, "create_access_token", lambda user_id, role: "token")
     monkeypatch.setattr(
         auth_service,
@@ -394,6 +400,9 @@ def test_get_current_user_from_token_success_db_path(monkeypatch):
 
 def test_get_current_user_from_token_success_f5_path(monkeypatch):
     monkeypatch.setattr(
+        auth_service, "get_branch_name_by_user_identifier", lambda user_id: None
+    )
+    monkeypatch.setattr(
         auth_service,
         "decode_access_token",
         lambda token: {"sub": "MRM468", "role": "Admin,Director,Underwriter"},
@@ -415,6 +424,9 @@ def test_get_current_user_from_token_success_f5_path(monkeypatch):
 
 
 def test_get_current_user_from_token_keeps_underwriter_for_mbond(monkeypatch):
+    monkeypatch.setattr(
+        auth_service, "get_branch_name_by_user_identifier", lambda user_id: None
+    )
     monkeypatch.setattr(
         auth_service,
         "decode_access_token",

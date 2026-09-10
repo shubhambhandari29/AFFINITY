@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 TABLE_NAME = "tblAffinityPolicyType"
 AGENTS_TABLE = "tblAffinityAgents"
 NOT_RETIRED_CONDITION = (
-    f"({TABLE_NAME}.Stage IS NULL OR LOWER(LTRIM(RTRIM({TABLE_NAME}.Stage))) <> 'Retired')"
+    f"({TABLE_NAME}.Stage IS NULL OR LOWER(LTRIM(RTRIM({TABLE_NAME}.Stage))) <> 'retired')"
 )
 
 

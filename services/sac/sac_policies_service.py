@@ -250,6 +250,7 @@ async def get_underwriter_details(query_params: dict[str, Any]):
 
             LEFT JOIN tblPolicies p
                 ON a.CustomerNum = p.CustomerNum
+               AND p.PolicyStatus = 'Active'
 
             LEFT JOIN tblUnderwriters uw
                 ON UPPER(LTRIM(RTRIM(p.UnderwriterName)))
