@@ -1,10 +1,22 @@
-Msg 229, Level 14, State 5, Procedure dbo.usp_SAC_Loss_Run, Line 1 [Batch Start Line 4]
-The EXECUTE permission was denied on the object 'usp_SAC_Loss_Run', database 'CLMAA_SpecialAccounts', schema 'dbo'.
+USE [CLMAA_SpecialAccounts];
+GO
 
- SQL Server Execution Times:
-   CPU time = 0 ms,  elapsed time = 1 ms.
+SELECT
+    ORIGINAL_LOGIN() AS LoginName,
+    USER_NAME() AS DatabaseUser;
 
- SQL Server Execution Times:
-   CPU time = 0 ms,  elapsed time = 0 ms.
 
-Completion time: 2026-09-11T14:26:26.4468106+05:30
+
+    Hi team, we’ve created dbo.usp_SAC_Loss_Run in the PREPROD CLMAA_SpecialAccounts database for extended-history loss runs and account-filtering improvements.
+When executing it from SSMS, I receive: “The EXECUTE permission was denied on the object 'usp_SAC_Loss_Run'.”
+Could you please grant EXECUTE on this specific procedure to:
+- My existing database user/Entra group, for testing.
+- The Azure app’s existing managed-identity database user, for API integration. Its Object/Principal ID is bb8645bb-88c9-4a65-bb39-adf60bd93fd8.
+USE [CLMAA_SpecialAccounts];
+
+GRANT EXECUTE ON OBJECT::dbo.usp_SAC_Loss_Run
+TO [existing_user_or_group_name];
+
+GRANT EXECUTE ON OBJECT::dbo.usp_SAC_Loss_Run
+TO [existing_app_managed_identity_user_name];
+Please use the existing database principal names for the grants. We only need access to this procedure, not all procedures in the database. Thanks!
