@@ -1,1 +1,29 @@
-Based on the examples, we understand the Review report should show all claims, summarized by claim number, and flag claims whose total incurred exceeds $25,000, excluding expenses. Please confirm this calculation matches your current process.
+USE [CLMAA_SpecialAccounts];
+GO
+
+SET STATISTICS IO ON;
+SET STATISTICS TIME ON;
+
+EXEC dbo.usp_SAC_Loss_Run
+    @CustomerNumbersJson = N'["1514748014"]';
+
+SET STATISTICS IO OFF;
+SET STATISTICS TIME OFF;
+
+
+
+USE [CLMAA_SpecialAccounts];
+GO
+
+EXEC dbo.usp_SAC_Loss_Run
+    @CustomerNumbersJson = N'["1514748014"]',
+    @PolicyEffectiveDateFrom = '20040101';
+
+
+EXEC dbo.usp_SAC_Loss_Run
+    @CustomerNumbersJson = N'["1514748014", "0033165294"]',
+    @PolicyEffectiveDateFrom = '20040101';
+
+
+-- All eligible accounts, default history
+EXEC dbo.usp_SAC_Loss_Run;
