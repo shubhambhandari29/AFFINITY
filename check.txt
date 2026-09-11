@@ -1,9 +1,12 @@
-I have attached documents that should illustrate what we need for Extended History Loss Run function.  One is the output document with extended history for one of the accounts we do this for each month.  The word document has screenshots that show the dashboard that we used in the OBIEE program get the Extend History loss runs.
-
-I also included an example of the loss run that is burst on the 20th of the month.  These loss runs are used internally, for us to ID claims over a certain dollar amount for further review.  So I am not sure the best way to handle this; should I just create a template I can drop the data into, or have a dedicated loss run?
-
-Please let me know if you have any questions about these things.
-
-Thank you!
-
-Walt
+Hi Walt,
+Thank you for sharing the documents and examples.
+For Extended History loss runs, we will retain the standard report layout and provide an optional calendar field to select the Policy Effective Date cutoff for the selected accounts. If no date is selected, the existing six-year rule will apply. The cover page will reflect the date range used.
+For the 20th-of-the-month Claim Review report, we recommend a dedicated report within the application using a separate Excel template. We can adapt the attached example using the Review columns shown in your Word document. The application would populate it automatically, avoiding manual data copying.
+Reports will continue to be stored and made available for download through the application.
+To finalize the Claim Review report, please confirm:
+- The example shows “Claims Above 25K.” Should the threshold be $25,000, and should it be fixed or user-selectable?
+- Should the threshold use total incurred including or excluding expenses, and apply to the entire claim or each exposure separately?
+- Should the report show all claims with a threshold indicator, or only claims exceeding the threshold?
+- Should the Claim Review report use the standard six-year history rule?
+Thank you,
+[Your Name]
