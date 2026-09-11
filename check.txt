@@ -1,22 +1,8 @@
-USE [CLMAA_SpecialAccounts];
-GO
+-- Selected accounts, extended history
+DECLARE @CustomerNumbersJson nvarchar(max) =
+    N'["1514748014", "0033165294"]';
+DECLARE @PolicyEffectiveDateFrom date = '20040101';
 
-SELECT
-    ORIGINAL_LOGIN() AS LoginName,
-    USER_NAME() AS DatabaseUser;
-
-
-
-    Hi team, we’ve created dbo.usp_SAC_Loss_Run in the PREPROD CLMAA_SpecialAccounts database for extended-history loss runs and account-filtering improvements.
-When executing it from SSMS, I receive: “The EXECUTE permission was denied on the object 'usp_SAC_Loss_Run'.”
-Could you please grant EXECUTE on this specific procedure to:
-- My existing database user/Entra group, for testing.
-- The Azure app’s existing managed-identity database user, for API integration. Its Object/Principal ID is bb8645bb-88c9-4a65-bb39-adf60bd93fd8.
-USE [CLMAA_SpecialAccounts];
-
-GRANT EXECUTE ON OBJECT::dbo.usp_SAC_Loss_Run
-TO [existing_user_or_group_name];
-
-GRANT EXECUTE ON OBJECT::dbo.usp_SAC_Loss_Run
-TO [existing_app_managed_identity_user_name];
-Please use the existing database principal names for the grants. We only need access to this procedure, not all procedures in the database. Thanks!
+-- All eligible accounts, standard history
+DECLARE @CustomerNumbersJson nvarchar(max) = NULL;
+DECLARE @PolicyEffectiveDateFrom date = NULL;
