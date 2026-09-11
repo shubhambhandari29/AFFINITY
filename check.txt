@@ -1,29 +1,10 @@
-USE [CLMAA_SpecialAccounts];
-GO
+Msg 229, Level 14, State 5, Procedure dbo.usp_SAC_Loss_Run, Line 1 [Batch Start Line 4]
+The EXECUTE permission was denied on the object 'usp_SAC_Loss_Run', database 'CLMAA_SpecialAccounts', schema 'dbo'.
 
-SET STATISTICS IO ON;
-SET STATISTICS TIME ON;
+ SQL Server Execution Times:
+   CPU time = 0 ms,  elapsed time = 1 ms.
 
-EXEC dbo.usp_SAC_Loss_Run
-    @CustomerNumbersJson = N'["1514748014"]';
+ SQL Server Execution Times:
+   CPU time = 0 ms,  elapsed time = 0 ms.
 
-SET STATISTICS IO OFF;
-SET STATISTICS TIME OFF;
-
-
-
-USE [CLMAA_SpecialAccounts];
-GO
-
-EXEC dbo.usp_SAC_Loss_Run
-    @CustomerNumbersJson = N'["1514748014"]',
-    @PolicyEffectiveDateFrom = '20040101';
-
-
-EXEC dbo.usp_SAC_Loss_Run
-    @CustomerNumbersJson = N'["1514748014", "0033165294"]',
-    @PolicyEffectiveDateFrom = '20040101';
-
-
--- All eligible accounts, default history
-EXEC dbo.usp_SAC_Loss_Run;
+Completion time: 2026-09-11T14:26:26.4468106+05:30
