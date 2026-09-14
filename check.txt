@@ -1,8 +1,30 @@
--- Selected accounts, extended history
-DECLARE @CustomerNumbersJson nvarchar(max) =
-    N'["1514748014", "0033165294"]';
-DECLARE @PolicyEffectiveDateFrom date = '20040101';
+Subham,
 
--- All eligible accounts, standard history
-DECLARE @CustomerNumbersJson nvarchar(max) = NULL;
-DECLARE @PolicyEffectiveDateFrom date = NULL;
+Thank you for getting back to me on this so quickly.  Also, I want to thank you, Cyrille and Akshat for all of your great work on this.  I thought the best way to respond to you would be to write my responses to your questions below in red bold font.
+
+For Extended History loss runs, we will retain the standard report layout and provide an optional calendar field to select the Policy Effective Date cutoff for the selected accounts. If no date is selected, the existing six-year rule will apply. The cover page will reflect the date range used.
+*YES, this is perfect!  Just a reminder that even with the standard six-year rule, or a selected extended history date range, ALL open claims should be pulled into the loss run report even if they are older than the selected date range.
+
+For the 20th-of-the-month Claim Review report, we recommend a dedicated report within the application using a separate Excel template. Either you can share the new template, or we can adapt the attached example using the Review columns shown in your Word document. The application would populate it automatically, avoiding manual data copying.
+Reports will continue to be stored and made available for download through the application.
+Thank you!  This is great!  I have attached to this Email a Proposed Excel template configuration of the report for the 20th-of-the-moth Claim Review report we put together after consulting with Jenna Houle from our team; this report is mainly used by her.  She requested that we include two more columns (Claimant and Adjuster) which I incorporated into the Proposed template configuration and highlighted in yellow.  Also, I want to point out on this report, it is based on claim total, so there is no breaking down of the claim by exposure.
+
+
+To finalize the Claim Review report, please confirm:
+- The example shows “Claims Above 25K.” Should the threshold be $25,000, and should it be fixed or user-selectable?
+*After discussing this with Jenna, we don’t even need this column, therefore, I completely eliminated the “Claims Above 25k” column from the Proposed template configuration.  Thank you for offering to make it more functional, but it is not necessary for our needs.
+
+- Based on the examples, we understand the Review report should show all claims, summarized by claim number, and flag claims whose total incurred exceeds $25,000, excluding expenses. Please confirm this calculation matches your current process.
+*The report should show all open claims, and closed claims within the standard six-year rule.
+*As I stated above, there is no need to flag claims over $25k, and that column is not necessary going forward.
+*Yes, the total reflected on this report, is the sum of the Current Loss Reserve + Paid Loss Net Subro/Salvage from the Claims Data page (Outstanding Loss Reserve + Total Paid Loss Net Salvage/Subro/Loss Recovery as the columns are entitled on the new loss run), excluding expenses.  Also, as I stated earlier, we only need a per claim total, as there is no need to for this report to break down claims by exposure, as is done on our standard loss report.
+
+- Should the Claim Review report use the standard six-year history rule? Or it can also go back to any selected date?
+*YES, this report needs the all open claims and standard six-year history rule.  Extended history is not necessary for this report, as the end purpose within SAC is for identifying certain high value open claims.
+
+- In our yesterday’s discussion, we agreed on auto triggering loss run on 1st of every month. But now we also need to do it on 20th as well with new template?
+*YES, if this is possible, it would be great if this report was triggered to run on the 20th of every month with the new template.
+
+Okay, I think that is it.  Please let me know if you have any other questions or would like me to clarify anything else.  One again, on behalf of the whole SAC team, I want to thank you for all of your work.  We are very excited that you are able to address all of our requests.
+
+Walt
