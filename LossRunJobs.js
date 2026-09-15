@@ -58,6 +58,13 @@ export default function LossRunJobs() {
       width: 100,
     },
     {
+      field: "reportType",
+      headerName: "Report Type",
+      width: 170,
+      renderCell: (params) =>
+        params.value === "claim_review" ? "Claim Review" : "Standard Loss Run",
+    },
+    {
       field: "requestedBy",
       headerName: "Requested By",
       flex: 1,

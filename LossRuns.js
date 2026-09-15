@@ -27,6 +27,7 @@ export default function LossRuns() {
   const [searchValue, setSearchValue] = useState("");
   const [rowSelectionModel, setRowSelectionModel] = useState([]);
   const [lossRunAll, setLossRunAll] = useState(true);
+  const [reportType, setReportType] = useState("standard");
   const theme = useTheme();
   const [...selectedIds] = rowSelectionModel?.ids || "";
   const navigate = useNavigate();
@@ -120,6 +121,7 @@ export default function LossRuns() {
   const handleLossRunTrigger = async () => {
     const url = lossRunAll ? "loss_run/generate-all" : "loss_run/generate";
     const payload = {
+      reportType,
       ...(!lossRunAll && {
         customerNumbers: selectedIds.map((i) => i.split("-")[0]),
       }),
@@ -164,6 +166,18 @@ export default function LossRuns() {
       sx={{ display: "grid", placeItems: "center", mt: 2 }}
     >
       <Grid container spacing={1}>
+        <FormControl sx={{ minWidth: 220 }}>
+          <InputLabel id="report-type-label">Report Type</InputLabel>
+          <Select
+            labelId="report-type-label"
+            label="Report Type"
+            value={reportType}
+            onChange={(e) => setReportType(e.target.value)}
+          >
+            <MenuItem value="standard">Standard Loss Run</MenuItem>
+            <MenuItem value="claim_review">Claim Review</MenuItem>
+          </Select>
+        </FormControl>
         <FormControl
           component="fieldset"
           sx={{

@@ -229,6 +229,16 @@ export default function JobDetails({ open, onClose, jobData }) {
         >
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={3}>
+              <Typography variant="caption" color="textSecondary" display="block">
+                Report Type
+              </Typography>
+              <Typography variant="body2" fontWeight="bold">
+                {jobData.reportType === "claim_review"
+                  ? "Claim Review"
+                  : "Standard Loss Run"}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
               <Typography
                 variant="caption"
                 color="textSecondary"
