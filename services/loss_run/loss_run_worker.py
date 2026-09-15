@@ -91,6 +91,7 @@ class LossRunWorker:
         try:
             await generate_loss_runs(
                 None if job_type == "all" else await self._selected_accounts(job_id),
+                report_type=job.get("ReportType", "standard"),
                 on_phase=on_phase,
                 on_customers=on_customers,
                 on_result=on_result,

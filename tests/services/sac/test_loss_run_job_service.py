@@ -12,7 +12,9 @@ def test_create_selected_job_normalizes_accounts_and_requester(monkeypatch):
     captured = {}
     job_id = uuid4()
 
-    async def fake_create(job_type, requested_by, customer_numbers):
+    async def fake_create(
+        job_type, requested_by, customer_numbers, report_type="standard"
+    ):
         captured["values"] = (job_type, requested_by, customer_numbers)
         return job_id, True
 
@@ -54,7 +56,9 @@ def test_create_selected_job_rejects_empty_accounts():
 def test_create_job_returns_existing_active_job(monkeypatch):
     active_job_id = uuid4()
 
-    async def fake_create(job_type, requested_by, customer_numbers):
+    async def fake_create(
+        job_type, requested_by, customer_numbers, report_type="standard"
+    ):
         assert job_type == "selected"
         return active_job_id, False
 

@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
-from core.date_utils import format_datetime_value
+from core.date_utils import format_date_value, format_datetime_value
 from services.loss_run.loss_run_job_repository import (
     create_job,
     get_all_failures,
@@ -21,6 +21,7 @@ async def create_loss_run_job(
     job_type: str,
     current_user: dict,
     customer_numbers: list[str] | None = None,
+    report_type: str = "standard",
 ) -> dict:
     normalized_numbers = None
     if customer_numbers is not None:
@@ -41,6 +42,7 @@ async def create_loss_run_job(
         job_type,
         _requested_by(current_user),
         normalized_numbers,
+        report_type,
     )
 
     if created:
@@ -103,6 +105,10 @@ def _format_job(job: dict, failures: list[dict]) -> dict:
     return {
         "jobId": job["JobId"],
         "jobType": job["JobType"],
+        "reportType": job.get("ReportType", "standard"),
+        "triggerSource": job.get("TriggerSource", "manual"),
+        "scheduleId": job.get("ScheduleId"),
+        "scheduledForDate": format_date_value(job.get("ScheduledForDate")),
         "status": job["Status"],
         "phase": job["Phase"],
         "requestedCount": job["RequestedCount"],

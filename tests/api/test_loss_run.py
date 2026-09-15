@@ -8,8 +8,34 @@ from api.loss_run import loss_run
 CURRENT_USER = {"user": {"id": "sx1234", "email": "user@example.com"}}
 
 
+def test_claim_review_request_reaches_job_service(monkeypatch):
+    async def fake_create(
+        job_type, current_user, customer_numbers=None, report_type="standard"
+    ):
+        assert report_type == "claim_review"
+        return {"status": "queued"}
+
+    monkeypatch.setattr(loss_run, "create_loss_run_job", fake_create)
+    options = loss_run.LossRunOptions(reportType="claim_review")
+    assert (
+        asyncio.run(loss_run.generate_all_loss_runs(CURRENT_USER, options))["status"]
+        == "queued"
+    )
+    selection = loss_run.LossRunSelection(
+        customerNumbers=["00123"], reportType="claim_review"
+    )
+    assert (
+        asyncio.run(loss_run.generate_selected_loss_runs(selection, CURRENT_USER))[
+            "status"
+        ]
+        == "queued"
+    )
+
+
 def test_generate_all_loss_runs_creates_job(monkeypatch):
-    async def fake_create(job_type, current_user, customer_numbers=None):
+    async def fake_create(
+        job_type, current_user, customer_numbers=None, report_type="standard"
+    ):
         assert job_type == "all"
         assert current_user == CURRENT_USER
         assert customer_numbers is None
@@ -24,7 +50,9 @@ def test_generate_all_loss_runs_creates_job(monkeypatch):
 def test_generate_selected_loss_runs_creates_job_with_customer_array(monkeypatch):
     captured = {}
 
-    async def fake_create(job_type, current_user, customer_numbers=None):
+    async def fake_create(
+        job_type, current_user, customer_numbers=None, report_type="standard"
+    ):
         captured["job_type"] = job_type
         captured["current_user"] = current_user
         captured["customer_numbers"] = customer_numbers

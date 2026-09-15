@@ -17,6 +17,7 @@ def _create_job(
     job_type: str,
     requested_by: str,
     customer_numbers: list[str] | None,
+    report_type: str = "standard",
 ) -> tuple[UUID, bool]:
     job_id = uuid4()
 
@@ -48,14 +49,16 @@ def _create_job(
                 Status,
                 Phase,
                 RequestedCount,
-                RequestedBy
+                RequestedBy,
+                ReportType
             )
-            VALUES (?, ?, 'queued', 'waiting_for_worker', ?, ?)
+            VALUES (?, ?, 'queued', 'waiting_for_worker', ?, ?, ?)
             """,
             str(job_id),
             job_type,
             requested_count,
             requested_by,
+            report_type,
         )
 
         if customer_numbers:
@@ -80,12 +83,14 @@ async def create_job(
     job_type: str,
     requested_by: str,
     customer_numbers: list[str] | None,
+    report_type: str = "standard",
 ) -> tuple[UUID, bool]:
     return await run_in_threadpool(
         _create_job,
         job_type,
         requested_by,
         customer_numbers,
+        report_type,
     )
 
 
@@ -97,6 +102,7 @@ def _get_job(job_id: UUID) -> dict | None:
             SELECT
                 JobId,
                 JobType,
+                ReportType, TriggerSource, ScheduleId, ScheduledForDate,
                 Status,
                 Phase,
                 RequestedCount,
@@ -129,6 +135,7 @@ def _get_jobs() -> list[dict]:
             SELECT
                 JobId,
                 JobType,
+                ReportType, TriggerSource, ScheduleId, ScheduledForDate,
                 Status,
                 Phase,
                 RequestedCount,
@@ -276,6 +283,7 @@ def _claim_next_job(worker_id: str) -> dict | None:
             OUTPUT
                 inserted.JobId,
                 inserted.JobType,
+                inserted.ReportType,
                 inserted.AttemptCount;
             """,
             worker_id,

@@ -26,6 +26,10 @@ class LossRunFailure(BaseModel):
 class LossRunJobResponse(BaseModel):
     jobId: UUID
     jobType: Literal["all", "selected"]
+    reportType: Literal["standard", "claim_review"] = "standard"
+    triggerSource: Literal["manual", "scheduled"] = "manual"
+    scheduleId: str | None = None
+    scheduledForDate: str | None = None
     status: LossRunJobStatus
     phase: str | None
     requestedCount: int | None

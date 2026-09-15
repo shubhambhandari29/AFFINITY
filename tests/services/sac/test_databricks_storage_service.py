@@ -66,6 +66,11 @@ def test_local_storage_uses_oauth_profile_for_download_and_upload(monkeypatch):
     assert captured["upload_bytes"] == b"report"
     assert captured["overwrite"] is True
 
+    assert storage.download_template("claim_review") == b"template"
+    assert captured["download_path"].endswith(
+        "/gold/statics/SACClaimReviewTemplate.xlsx"
+    )
+
     destination = BytesIO()
     storage.download_report_to(output_path, destination)
     assert destination.getvalue() == b"template"
@@ -130,6 +135,9 @@ def test_azure_storage_uses_managed_identity_and_files_api(monkeypatch):
 
     assert [method for method, _ in requests_made] == ["GET", "PUT", "GET"]
     assert all("/api/2.0/fs/files/Volumes/" in url for _, url in requests_made)
+
+    assert storage.download_template("claim_review") == b"template"
+    assert requests_made[-1][1].endswith("/gold/statics/SACClaimReviewTemplate.xlsx")
 
 
 @pytest.mark.parametrize(

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, status
 from starlette.background import BackgroundTask
 from starlette.responses import FileResponse
 
-from core.models.loss_run.loss_run import LossRunSelection
+from core.models.loss_run.loss_run import LossRunOptions, LossRunSelection
 from core.models.loss_run.loss_run_job import LossRunJobCreated, LossRunJobResponse
 from services.auth_service import get_current_user_from_token
 from services.loss_run.loss_run_download_service import prepare_loss_run_download
@@ -34,8 +34,11 @@ async def list_loss_run_accounts(
 )
 async def generate_all_loss_runs(
     current_user: Annotated[dict, Depends(get_current_user_from_token)],
+    payload: LossRunOptions | None = None,
 ):
-    return await create_loss_run_job("all", current_user)
+    return await create_loss_run_job(
+        "all", current_user, report_type=payload.reportType if payload else "standard"
+    )
 
 
 @router.post(
@@ -51,6 +54,7 @@ async def generate_selected_loss_runs(
         "selected",
         current_user,
         payload.customerNumbers,
+        report_type=payload.reportType,
     )
 
 

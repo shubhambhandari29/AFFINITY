@@ -13,6 +13,7 @@ from openpyxl.worksheet.table import TableColumn
 
 from core.date_utils import format_records_dates
 from core.db_helpers import run_raw_query_async
+from services.loss_run.claim_review_workbook import create_claim_review_workbook
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
 
 logger = logging.getLogger(__name__)
@@ -158,15 +159,20 @@ def _create_workbook(
 async def generate_loss_runs(
     customer_nums: list[str] | None = None,
     *,
+    report_type: str = "standard",
     on_phase: PhaseCallback | None = None,
     on_customers: CustomersCallback | None = None,
     on_result: ResultCallback | None = None,
 ) -> dict:
+    if report_type not in {"standard", "claim_review"}:
+        raise ValueError("Unsupported loss-run report type")
     try:
         if on_phase:
             await on_phase("downloading_template")
         storage = DatabricksLossRunStorage()
-        template_bytes = await run_in_threadpool(storage.download_template)
+        template_bytes = await run_in_threadpool(
+            storage.download_template, report_type
+        )
 
         if customer_nums is None:
             customers = await run_raw_query_async(
@@ -266,10 +272,17 @@ async def generate_loss_runs(
 
             safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", customer_name).strip(" .")
             filename = f"{safe_name or customer_num}_{datetime.now():%Y_%m_%d}.xlsx"
+            if report_type == "claim_review":
+                filename = (
+                    f"{safe_name or customer_num}_{customer_num}_"
+                    f"ClaimReview_{datetime.now():%Y_%m_%d_%H%M%S_%f}.xlsx"
+                )
 
             try:
                 workbook_bytes = await run_in_threadpool(
-                    _create_workbook,
+                    create_claim_review_workbook
+                    if report_type == "claim_review"
+                    else _create_workbook,
                     customer_records,
                     customer_num,
                     customer_name,
