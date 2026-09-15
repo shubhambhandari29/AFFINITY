@@ -1,1 +1,22 @@
-databricks auth login --host https://adb-8608532567795739.19.azuredatabricks.net --profile claims-preprod
+USE [CLMAA_SpecialAccounts];
+GO
+
+SELECT
+    j.JobId,
+    j.JobType,
+    j.ReportType,
+    j.Status AS JobStatus,
+    j.WorkerId,
+    j.AttemptCount,
+    j.CreatedAt,
+    j.StartedAt,
+    j.CompletedAt,
+    a.CustomerNumber,
+    a.Status AS AccountStatus,
+    a.OutputPath
+FROM dbo.tblLossRunJob AS j
+INNER JOIN dbo.tblLossRunJobAccount AS a
+    ON a.JobId = j.JobId
+WHERE a.OutputPath =
+    N'/Volumes/claims_data_pre_prod/gold/external_volume/specialaccounts_lossruns_temporary/Amarok LLC_2026_09_15.xlsx'
+ORDER BY j.CreatedAt DESC;
