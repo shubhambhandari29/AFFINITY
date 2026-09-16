@@ -1,3 +1,4 @@
-JobId	JobType	ReportType	JobStatus	WorkerId	AttemptCount	CreatedAt	StartedAt	CompletedAt	CustomerNumber	AccountStatus	OutputPath
-32D74FF9-6AD7-4712-BBA3-B6E952520C88	selected	claim_review	completed	10b6835f7351:1895:7ae638bd	1	2026-09-15 14:52:13.3882387	2026-09-15 14:52:15.2542408	2026-09-15 15:04:42.2424785	1521764304	completed	/Volumes/claims_data_pre_prod/gold/external_volume/specialaccounts_lossruns_temporary/Amarok LLC_2026_09_15.xlsx
-AB29C998-3747-49C9-8E94-09FEAB5106A7	all	claim_review	partially_completed	10b6835f7351:1895:7ae638bd	1	2026-09-15 14:20:00.2693928	2026-09-15 14:20:07.2103412	2026-09-15 14:38:23.6161707	1521764304	completed	/Volumes/claims_data_pre_prod/gold/external_volume/specialaccounts_lossruns_temporary/Amarok LLC_2026_09_15.xlsx
+py -c "import socket; print(socket.gethostname())"
+
+
+hostname
