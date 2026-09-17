@@ -1,9 +1,9 @@
 -- Run AFTER deploying the updated API/workers and verifying both templates.
--- Set an explicit Eastern start date. NULL intentionally prevents activation.
+-- Activation starts September 17, 2026 (Eastern date). Update if running on a later day.
 USE [CLMAA_SpecialAccounts];
 GO
 SET XACT_ABORT ON;
-DECLARE @ActiveFromDate date = NULL; -- Example: '2026-10-01'
+DECLARE @ActiveFromDate date = '2026-09-17';
 
 IF @ActiveFromDate IS NULL
     THROW 50001, 'Set @ActiveFromDate before enabling schedules.', 1;
