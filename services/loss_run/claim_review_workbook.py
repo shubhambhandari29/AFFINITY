@@ -150,6 +150,10 @@ def create_claim_review_workbook(
             raise ValueError(
                 "Claim Review template must contain the approved Review layout and pivot"
             )
+        # Client's yellow highlight only marked newly added columns in the draft.
+        # Also normalize older copies of the template still stored in Databricks.
+        for address in ("B4", "C4"):
+            review[address].fill = copy(review["A4"].fill)
         pivot = review._pivots[0]
         cache_headers = [field.name for field in pivot.cache.cacheFields]
         if [cache_headers[field.x] for field in pivot.rowFields] != expected[

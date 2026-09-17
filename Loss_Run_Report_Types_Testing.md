@@ -68,8 +68,12 @@ scheduledForDate (date-only display format, or null).
 ## Workbook checks
 
 - Visible sheets: Cover Page, Review, Claims Details, from the client's template.
-- Branding, headers (including yellow highlighting), widths and row styles come
+- Branding, headers, widths and row styles come
   from SACClaimReviewTemplate.xlsx; the standard workbook is not generated first.
+  Per client feedback, Claimant Name-Company and Adjuster headers now match the
+  other headers, without yellow highlighting. Replace the Databricks template
+  with the updated root file using the same name/path. The code also applies
+  this correction when reading an older template. Existing reports are unchanged.
 - One row per claim; distinct claimant/adjuster values are joined with semicolons.
 - Total = sum of Outstanding Loss Reserve + paid loss net recovery across the
   claim's exposure rows; expenses are excluded. No threshold flag is included.
@@ -88,7 +92,7 @@ scheduledForDate (date-only display format, or null).
 - Accounts is hidden and updated for the current customer. Obsolete hidden
   Charts, Summary By Policy Year, Record Only and XDO_METADATA sheets and legacy
   defined names are removed from generated reports to avoid retaining unrelated
-  sample records. The original converted upload template itself is unchanged.
+  sample records. Generation does not modify the uploaded template.
 - Claim Review filenames include customer number and timestamp to distinguish
   them from standard reports. Storage and ZIP downloads follow the existing flow.
 

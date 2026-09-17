@@ -7,6 +7,7 @@ from zipfile import ZipFile
 import pytest
 from openpyxl import Workbook, load_workbook
 from openpyxl.drawing.image import Image as ExcelImage
+from openpyxl.styles import PatternFill
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from PIL import Image as PILImage
 
@@ -188,6 +189,43 @@ def test_claim_review_extends_rows_and_preserves_literal_text_and_dates():
     assert workbook["Review"]._pivots[0].cache.records.count == 70
     assert workbook["Review"]._pivots[0].location.ref == "A3:I75"
     workbook.close()
+
+
+@pytest.mark.parametrize("older_template", [False, True])
+def test_claim_review_headers_have_no_draft_highlighting(older_template):
+    template = Path(__file__).resolve().parents[3] / "SACClaimReviewTemplate.xlsx"
+    workbook = load_workbook(template)
+    review = workbook["Review"]
+    for address in ("B4", "C4"):
+        assert copy(review[address].fill) == copy(review["A4"].fill)
+        if older_template:
+            review[address].fill = PatternFill("solid", fgColor="FFFFFF00")
+    content = BytesIO()
+    workbook.save(content)
+    workbook.close()
+    records = [
+        {
+            "Claim Number": "C1",
+            "Claimant Name": "Alice",
+            "Adjuster": "Bob",
+            "Outstanding Loss Reserve": 10,
+            "Total Paid Loss Net Salvage/Subro/Loss Recovery": 20,
+        }
+    ]
+    result = load_workbook(
+        BytesIO(
+            create_claim_review_workbook(records, "123", "Example", content.getvalue())
+        )
+    )
+    review = result["Review"]
+    for address in ("B4", "C4"):
+        assert copy(review[address].fill) == copy(review["A4"].fill)
+    assert review["B5"].value == "Alice"
+    assert review["C5"].value == "Bob"
+    assert review["I5"].value == 30
+    assert len(review._pivots) == 1
+    assert len(result["Cover Page"]._images) == 1
+    result.close()
 
 
 def _make_template(path):
