@@ -6,10 +6,8 @@ from contextlib import suppress
 from time import monotonic
 from uuid import UUID, uuid4
 
-from core.config import settings
 from services.loss_run.loss_run_job_repository import (
     claim_next_job,
-    create_job,
     complete_job,
     fail_job,
     get_account_numbers,
@@ -25,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 POLL_INTERVAL_SECONDS = 10
 SCHEDULE_CHECK_INTERVAL_SECONDS = 60
-LOCAL_TEST_DELAY_SECONDS = 300
 HEARTBEAT_INTERVAL_SECONDS = 60
 
 
@@ -48,37 +45,11 @@ class LossRunWorker:
 
     async def _run(self) -> None:
         logger.info("Loss-run worker started: %s", self.worker_id)
-        # Temporary test: one all-account job per local worker startup.
-        local_test = (
-            settings.ENVIRONMENT.strip().lower() == "local" and settings.LOSS_RUN_SCHEDULE_TEST_MODE
-        )
-        test_report_type = settings.LOSS_RUN_SCHEDULE_TEST_REPORT_TYPE.strip().lower()
-        if local_test and test_report_type not in {"standard", "claim_review"}:
-            raise ValueError("LOSS_RUN_SCHEDULE_TEST_REPORT_TYPE must be standard or claim_review")
-        test_due_at = monotonic() + LOCAL_TEST_DELAY_SECONDS if local_test else None
-        test_submitted = False
-        if local_test:
-            logger.warning(
-                "Local automatic test enabled: one all-account %s job after 5 minutes",
-                test_report_type,
-            )
         next_schedule_check = 0.0
         while not self._stop_event.is_set():
             if monotonic() >= next_schedule_check:
                 try:
-                    if local_test:
-                        if not test_submitted and monotonic() >= test_due_at:
-                            job_id, test_submitted = await create_job(
-                                "all", "local-schedule-test", None, test_report_type
-                            )
-                            if test_submitted:
-                                logger.warning("Local automatic test queued: %s", job_id)
-                            else:
-                                logger.info(
-                                    "Local automatic test waiting for active job: %s", job_id
-                                )
-                    else:
-                        await enqueue_due_loss_run_job()
+                    await enqueue_due_loss_run_job()
                 except asyncio.CancelledError:
                     raise
                 except Exception:

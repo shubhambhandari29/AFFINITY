@@ -57,9 +57,6 @@ test DB when testing local worker ownership. Restart API and worker after update
 
 ## Verify safely
 
-For the temporary five-minute local all-account test, follow
-`Loss_Run_Local_Automatic_Test.md`. It does not enable the real monthly schedules.
-
 Run scheduler unit tests locally; do not change your local environment to PREPROD
 against the shared DB just to test the clock. In an isolated test DB, enable a
 schedule due earlier today and verify one scheduled job appears, uses the right

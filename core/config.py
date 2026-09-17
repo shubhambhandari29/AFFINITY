@@ -26,11 +26,6 @@ def _parse_origins(value: str | None) -> list[str]:
 class Settings:
     # Feature flags / environment toggles
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "local")
-    # Temporary local-only automatic loss-run test. Never enabled by default.
-    LOSS_RUN_SCHEDULE_TEST_MODE: bool = _as_bool(os.getenv("LOSS_RUN_SCHEDULE_TEST_MODE"))
-    LOSS_RUN_SCHEDULE_TEST_REPORT_TYPE: str = os.getenv(
-        "LOSS_RUN_SCHEDULE_TEST_REPORT_TYPE", "standard"
-    )
 
     # Databricks loss-run storage
     DATABRICKS_HOST: str | None = os.getenv("DATABRICKS_HOST")
