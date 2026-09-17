@@ -2,7 +2,8 @@
 
 Prerequisite: run `Loss_Run_Scheduling_Migration.sql` on the target database.
 The application now reads ReportType, TriggerSource, ScheduleId and ScheduledForDate.
-Leave both schedule rows disabled: automatic scheduling is not part of this step.
+Leave both schedule rows disabled during manual testing. To enable automatic runs,
+follow `Loss_Run_Automatic_Scheduling.md` after validating both report types.
 
 ## Upload the Claim Review template first
 

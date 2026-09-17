@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 from fastapi.concurrency import run_in_threadpool
 
 from db import db_connection
+from core.config import settings
 
 JOB_TABLE = "dbo.tblLossRunJob"
 ACCOUNT_TABLE = "dbo.tblLossRunJobAccount"
@@ -237,6 +238,7 @@ async def get_completed_outputs(job_id: UUID) -> list[dict]:
 
 
 def _claim_next_job(worker_id: str) -> dict | None:
+    allow_scheduled = settings.ENVIRONMENT.strip().lower() != "local"
     with db_connection() as connection:
         cursor = connection.cursor()
         cursor.execute(
@@ -252,7 +254,9 @@ def _claim_next_job(worker_id: str) -> dict | None:
             WHERE Status = 'processing'
               AND LeaseUntil < SYSUTCDATETIME()
               AND AttemptCount >= 3
-            """
+              AND (TriggerSource = 'manual' OR ? = 1)
+            """,
+            allow_scheduled,
         )
         cursor.execute(
             f"""
@@ -261,13 +265,14 @@ def _claim_next_job(worker_id: str) -> dict | None:
                 SELECT TOP (1) *
                 FROM {JOB_TABLE} WITH (UPDLOCK, READPAST, ROWLOCK)
                 WHERE
-                    Status = 'queued'
+                    (Status = 'queued'
                     OR
                     (
                         Status = 'processing'
                         AND LeaseUntil < SYSUTCDATETIME()
                         AND AttemptCount < 3
-                    )
+                    ))
+                    AND (TriggerSource = 'manual' OR ? = 1)
                 ORDER BY CreatedAt
             )
             UPDATE NextJob
@@ -286,6 +291,7 @@ def _claim_next_job(worker_id: str) -> dict | None:
                 inserted.ReportType,
                 inserted.AttemptCount;
             """,
+            allow_scheduled,
             worker_id,
         )
         rows = _rows_to_dicts(cursor)
