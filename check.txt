@@ -1,5 +1,3 @@
-Jenna Houle and I have reviewed these proposed 20th-of-the-month Claim Review loss run format and we feel that they look great!  
-
-The Claimant Name-Company and Adjuster columns don’t need to be highlighted in yellow; I did that so some people could see that they were newly added from our older version.
-
-Thank you for your work on this for us!
+DECLARE @CustomerNumbersJson nvarchar(max) = N'["1521764304"]';
+DECLARE @PolicyEffectiveDateFrom date = NULL;
+DECLARE @CompareCurrentView bit = 0;

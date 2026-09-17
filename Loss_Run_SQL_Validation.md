@@ -2,9 +2,10 @@
 
 ## What is ready for testing
 
-Use `SAC_Loss_Run_Batch_Test.sql`, not `SAC_Loss_Run_Procedure.sql` or
-`SQLQuery4.sql`. The latter files contain CREATE/ALTER statements; do not run them
-for this test. This route does not require creating a stored procedure.
+Use `SAC_Loss_Run_Batch_Test.sql`, not `SQLQuery4.sql`. The latter contains an
+ALTER VIEW statement and is retained only as the original reference; do not run
+it for this test. The superseded procedure draft has been removed. This route
+does not require creating a stored procedure.
 
 The batch reads the source databases and creates/drops only session-local
 temporary tables in tempdb. It does not change the existing view, business data,
@@ -121,8 +122,8 @@ claims. Do not assume that zero older rows proves that historical data is absent
 
 Send the four Results grids and Messages from the default one-account run. If
 it succeeds, send the comparison timing and differences grids from the second
-run. On any SQL error, send its full message and line number; do not run the
-procedure/view scripts as a workaround.
+run. On any SQL error, send its full message and line number; do not alter the
+view as a workaround.
 
 ## After SQL validation
 
