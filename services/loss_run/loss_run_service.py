@@ -54,8 +54,7 @@ async def get_loss_run_accounts() -> list[dict]:
                 AcctStatus AS [Account Status],
                 LossRunDistFreq AS [Loss Run Frequency]
             FROM dbo.tblAcctSpecial
-            WHERE AcctStatus = 'Active'
-              AND LossRunDistFreq <> 'Not Needed'
+            WHERE LossRunDistFreq <> 'Not Needed'
               AND LossRunDistFreq <> ''
             ORDER BY CustomerName, CustomerNum
             """
@@ -179,8 +178,7 @@ async def generate_loss_runs(
                 """
                 SELECT CustomerNum, CustomerName
                 FROM dbo.tblAcctSpecial
-                WHERE AcctStatus = 'Active'
-                  AND LossRunDistFreq <> 'Not Needed'
+                WHERE LossRunDistFreq <> 'Not Needed'
                   AND LossRunDistFreq <> ''
                 """
             )

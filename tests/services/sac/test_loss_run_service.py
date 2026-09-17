@@ -15,6 +15,63 @@ from services.loss_run import loss_run_service
 from services.loss_run.claim_review_workbook import create_claim_review_workbook
 
 
+def test_loss_run_accounts_includes_inactive_without_removing_frequency_filters(monkeypatch):
+    async def query(sql):
+        where = sql.split("WHERE", 1)[1]
+        assert "AcctStatus" not in where
+        assert "LossRunDistFreq <> 'Not Needed'" in where
+        assert "LossRunDistFreq <> ''" in where
+        return [
+            {"Customer Number": "001", "Account Status": "Active", "On Board Date": None},
+            {"Customer Number": "002", "Account Status": "Inactive", "On Board Date": None},
+        ]
+
+    monkeypatch.setattr(loss_run_service, "run_raw_query_async", query)
+    result = asyncio.run(loss_run_service.get_loss_run_accounts())
+    assert [row["Account Status"] for row in result] == ["Active", "Inactive"]
+
+
+def test_view_customer_eligibility_has_no_status_filter():
+    # Regression guard for the checked-in definition, not a live SQL execution.
+    sql = (Path(__file__).resolve().parents[3] / "SQLQuery4.sql").read_text()
+    customer_cte = sql.split("CUSTOMERS AS (", 1)[1].split("DATA AS (", 1)[0]
+    assert "AcctStatus" not in customer_cte
+    assert "a.LossRunDistFreq <> 'Not Needed'" in customer_cte
+    assert "a.LossRunDistFreq <> ''" in customer_cte
+
+
+@pytest.mark.parametrize("selected", [None, ["002"]])
+@pytest.mark.parametrize("report_type", ["standard", "claim_review"])
+def test_inactive_account_generation_uses_existing_report_flow(monkeypatch, selected, report_type):
+    from unittest.mock import MagicMock
+
+    storage = MagicMock()
+    storage.download_template.return_value = b"template"
+    storage.upload_report.return_value = "/Volumes/test/output.xlsx"
+    monkeypatch.setattr(loss_run_service, "DatabricksLossRunStorage", lambda: storage)
+
+    async def query(sql, params=None):
+        assert "AcctStatus" not in sql
+        if "tblAcctSpecial" in sql:
+            if selected is None:
+                assert "LossRunDistFreq <> 'Not Needed'" in sql
+                assert "LossRunDistFreq <> ''" in sql
+            else:
+                assert params == ["002"]
+            return [{"CustomerNum": "002", "CustomerName": "Inactive Customer", "AcctStatus": "Inactive"}]
+        return [{"Customer Number": "002", "Claim Number": "C2"}]
+
+    build = MagicMock(return_value=b"workbook")
+    monkeypatch.setattr(loss_run_service, "run_raw_query_async", query)
+    monkeypatch.setattr(loss_run_service, "_create_workbook", build)
+    monkeypatch.setattr(loss_run_service, "create_claim_review_workbook", build)
+    result = asyncio.run(loss_run_service.generate_loss_runs(selected, report_type=report_type))
+    assert result["generatedCount"] == 1
+    assert result["failedCount"] == 0
+    storage.download_template.assert_called_once_with(report_type)
+    assert build.call_args.args[1:3] == ("002", "Inactive Customer")
+
+
 def test_claim_review_combines_exposures_without_expenses_or_record_only():
     template = Path(__file__).resolve().parents[3] / "SACClaimReviewTemplate.xlsx"
     records = [
@@ -398,8 +455,9 @@ def test_generate_all_loss_runs_uses_current_eligibility_rules(monkeypatch):
     result = asyncio.run(loss_run_service.generate_loss_runs())
 
     assert result["generatedCount"] == 1
-    assert "AcctStatus = 'Active'" in calls[0][0]
+    assert "AcctStatus" not in calls[0][0]
     assert "LossRunDistFreq <> 'Not Needed'" in calls[0][0]
+    assert "LossRunDistFreq <> ''" in calls[0][0]
     assert calls[1][0].strip() == "SELECT * FROM dbo.SAC_Loss_Run"
 
 
