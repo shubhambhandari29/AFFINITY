@@ -7,9 +7,12 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 SET NOCOUNT ON;
 
--- Edit these two inputs before executing:
-DECLARE @CustomerNumbersJson nvarchar(max) = N'["1514748014"]';
+-- Edit these inputs before executing (start with one account):
+DECLARE @CustomerNumbersJson nvarchar(max) = N'["1521764304"]';
 DECLARE @PolicyEffectiveDateFrom date = NULL;
+DECLARE @CompareCurrentView bit = 0;
+-- Set comparison to 1 only for active accounts with a NULL cutoff.
+-- Comparison runs the old slow view too; its time is reported separately.
 -- Date example: '20040101'. NULL preserves the existing six-year cutoff.
 -- Multiple accounts example: N'["1514748014", "0033165294"]'.
 
@@ -22,8 +25,13 @@ DROP TABLE IF EXISTS #ClaimNumbers;
 DROP TABLE IF EXISTS #Claims;
 DROP TABLE IF EXISTS #Policies;
 DROP TABLE IF EXISTS #Customers;
+DROP TABLE IF EXISTS #LossRunResult;
+DROP TABLE IF EXISTS #BaselineResult;
 
 BEGIN TRY
+IF @CompareCurrentView = 1 AND @PolicyEffectiveDateFrom IS NOT NULL
+    THROW 50004, 'Compare with the current view using a NULL cutoff only.', 1;
+
 IF @CustomerNumbersJson IS NOT NULL
 BEGIN
     IF ISJSON(@CustomerNumbersJson) <> 1
@@ -45,6 +53,7 @@ END;
 
 DECLARE @DefaultCutoff date =
     DATEADD(MONTH, -72, DATETRUNC(YEAR, GETDATE()));
+DECLARE @BatchStartedAt datetime2 = SYSUTCDATETIME();
 
 
 -- Separate statements materialize the account scope before expensive joins.
@@ -422,6 +431,7 @@ SELECT
   --ISNULL(MAX(D.FTR_ALAE_AMT1), 0) AS "Expense Column", --Remove this column,/Expense column hidden in the report
   /*Total amount of loss expense payments for the feature excluding expense recoveries.*/
   
+INTO #LossRunResult
 FROM
   DATA D
 GROUP BY
@@ -506,6 +516,89 @@ HAVING
   OR D.CLM_STATUS IN ('Open','open')
   )
 OPTION (RECOMPILE);
+
+DECLARE @BatchFinishedAt datetime2 = SYSUTCDATETIME();
+
+-- Result 1: elapsed time excludes comparison and transferring report rows.
+SELECT
+    'Staged batch' AS RunType,
+    @CustomerNumbersJson AS RequestedCustomers,
+    @PolicyEffectiveDateFrom AS RequestedCutoff,
+    @DefaultCutoff AS DefaultCutoff,
+    CAST(DATEDIFF_BIG(MILLISECOND, @BatchStartedAt, @BatchFinishedAt) / 1000.0
+         AS decimal(18,3)) AS ElapsedSeconds;
+
+-- Result 2: confirm the scope before judging performance.
+SELECT 'Customers' AS Stage, COUNT_BIG(*) AS [RowCount] FROM #Customers
+UNION ALL SELECT 'Policies', COUNT_BIG(*) FROM #Policies
+UNION ALL SELECT 'Claims', COUNT_BIG(*) FROM #Claims
+UNION ALL SELECT 'Distinct claim numbers', COUNT_BIG(*) FROM #ClaimNumbers
+UNION ALL SELECT 'Financial feature rows', COUNT_BIG(*) FROM #FinancialFeatures
+UNION ALL SELECT 'Report rows', COUNT_BIG(*) FROM #LossRunResult;
+
+-- Result 3: includes eligible accounts with no report rows.
+SELECT
+    C.CustomerNum,
+    A.CustomerName,
+    A.AcctStatus,
+    A.LossRunDistFreq,
+    COUNT_BIG(R.[Customer Number]) AS ReportRows,
+    COUNT(DISTINCT R.[Claim Number]) AS DistinctClaims,
+    SUM(R.[Outstanding Loss Reserve]) AS OutstandingLossReserve,
+    SUM(R.[Total Paid Loss Net Salvage/Subro/Loss Recovery]) AS NetPaidLoss,
+    SUM(R.[Incurred w/o ALAE]) AS IncurredExcludingExpenses
+FROM #Customers C
+LEFT JOIN dbo.tblAcctSpecial A ON A.CustomerNum = C.CustomerNum
+LEFT JOIN #LossRunResult R ON R.[Customer Number] = C.CustomerNum
+GROUP BY C.CustomerNum, A.CustomerName, A.AcctStatus, A.LossRunDistFreq
+ORDER BY C.CustomerNum;
+
+-- Result 4: actual report rows, with the original API/view column names.
+SELECT * FROM #LossRunResult
+ORDER BY [Customer Number], [Claim Number], [Exposure];
+
+IF @CompareCurrentView = 1
+BEGIN
+    DECLARE @BaselineStartedAt datetime2 = SYSUTCDATETIME();
+    SELECT V.* INTO #BaselineResult
+    FROM dbo.SAC_Loss_Run V
+    WHERE V.[Customer Number] IN (SELECT CustomerNum FROM #Customers);
+
+    SELECT
+        'Current view' AS RunType,
+        CAST(DATEDIFF_BIG(MILLISECOND, @BaselineStartedAt, SYSUTCDATETIME()) / 1000.0
+             AS decimal(18,3)) AS ElapsedSeconds,
+        (SELECT COUNT_BIG(*) FROM #BaselineResult) AS CurrentViewRows,
+        (SELECT COUNT_BIG(*) FROM #LossRunResult) AS StagedBatchRows;
+
+    -- Compare every output column, including the number of repeated rows.
+    -- Names come only from temp-table metadata, never from user input.
+    DECLARE @Columns nvarchar(max);
+    SELECT @Columns = STRING_AGG(CONVERT(nvarchar(max), QUOTENAME(name)), ',')
+        WITHIN GROUP (ORDER BY column_id)
+    FROM tempdb.sys.columns
+    WHERE object_id = OBJECT_ID('tempdb..#LossRunResult');
+
+    DECLARE @ComparisonSql nvarchar(max) = N'
+    WITH NewRows AS (
+        SELECT ' + @Columns + N',
+            ROW_NUMBER() OVER (PARTITION BY ' + @Columns + N' ORDER BY (SELECT NULL)) AS DuplicateOrdinal
+        FROM #LossRunResult
+    ), OldRows AS (
+        SELECT ' + @Columns + N',
+            ROW_NUMBER() OVER (PARTITION BY ' + @Columns + N' ORDER BY (SELECT NULL)) AS DuplicateOrdinal
+        FROM #BaselineResult
+    )
+    SELECT ''Only in staged batch'' AS Difference, D.*
+    FROM (SELECT * FROM NewRows EXCEPT SELECT * FROM OldRows) D
+    UNION ALL
+    SELECT ''Only in current view'' AS Difference, D.*
+    FROM (SELECT * FROM OldRows EXCEPT SELECT * FROM NewRows) D;';
+    EXEC sys.sp_executesql @ComparisonSql;
+END;
+
+DROP TABLE IF EXISTS #BaselineResult;
+DROP TABLE IF EXISTS #LossRunResult;
 DROP TABLE IF EXISTS #FinancialFeatures;
 DROP TABLE IF EXISTS #ClaimNumbers;
 DROP TABLE IF EXISTS #Claims;
@@ -513,6 +606,8 @@ DROP TABLE IF EXISTS #Policies;
 DROP TABLE IF EXISTS #Customers;
 END TRY
 BEGIN CATCH
+    DROP TABLE IF EXISTS #BaselineResult;
+    DROP TABLE IF EXISTS #LossRunResult;
     DROP TABLE IF EXISTS #FinancialFeatures;
     DROP TABLE IF EXISTS #ClaimNumbers;
     DROP TABLE IF EXISTS #Claims;
