@@ -1,4 +1,6 @@
 import {
+  Alert,
+  AlertTitle,
   Select,
   MenuItem,
   InputLabel,
@@ -165,6 +167,25 @@ export default function LossRuns() {
       spacing={2}
       sx={{ display: "grid", placeItems: "center", mt: 2 }}
     >
+      <Alert
+        severity="info"
+        variant="outlined"
+        role="note"
+        sx={{
+          width: "100%",
+          boxSizing: "border-box",
+          borderColor: "primary.main",
+          "& .MuiAlert-icon": { color: "primary.main" },
+        }}
+      >
+        <AlertTitle>Automatic monthly reports</AlertTitle>
+        When enabled, Standard Loss Runs are scheduled for the <strong>1st</strong>
+        {" "}and Claim Review reports for the <strong>20th</strong> of each month,
+        at <strong>12:00 AM Eastern Time</strong> (adjusted for daylight saving).
+        {" "}Use <strong>View Existing Jobs</strong> below to check progress and
+        download completed reports. If another report is running, the scheduled
+        run will wait.
+      </Alert>
       <Grid container spacing={1}>
         <FormControl sx={{ minWidth: 220 }}>
           <InputLabel id="report-type-label">Report Type</InputLabel>
