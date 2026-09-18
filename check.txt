@@ -1,35 +1,11 @@
-TotalClaims	EarliestPolicyEffectiveDate	LatestPolicyEffectiveDate	ClaimsFromSelectedDate
-1544	2004-09-01	2021-09-01	1544
-
-
-
---------------------------------
-
-
-
-PolicyYear	ClaimCount
-2004	2
-2005	1
-2006	1
-2007	1
-2010	1
-2018	93
-2019	478
-2020	447
-2021	520
-
-
-------------------------------
-
-
-ClaimNumber	ClaimStatus	PolicyEffectiveDate	PolicyExpirationDate	PolicySymbol	PolicyNumber	PolicyMod
-03-00398428	open	2004-09-01	2005-09-01	WMN	7902312	00
-03-00434238	open	2004-09-01	2005-09-01	WMN	7902312	00
-
-
-----------------------------------------
-
-
-
-FinancialRows	ClaimsWithFinancialRows	NonZeroFinancialRows	EarliestFinancialProcessDate	LatestFinancialProcessDate
-0	0	NULL	NULL	NULL
+SELECT
+    J.JobId,
+    J.PolicyEffectiveDateFrom,
+    A.CustomerNumber,
+    A.Status,
+    A.OutputPath,
+    A.FailureReason
+FROM dbo.tblLossRunJob J
+INNER JOIN dbo.tblLossRunJobAccount A
+    ON J.JobId = A.JobId
+WHERE J.JobId = 'PUT-NEW-JOB-ID-HERE';
