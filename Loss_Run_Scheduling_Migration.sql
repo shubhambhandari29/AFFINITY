@@ -24,6 +24,9 @@ IF COL_LENGTH('dbo.tblLossRunJob', 'ScheduleId') IS NULL
 IF COL_LENGTH('dbo.tblLossRunJob', 'ScheduledForDate') IS NULL
     ALTER TABLE dbo.tblLossRunJob ADD ScheduledForDate date NULL;
 
+IF COL_LENGTH('dbo.tblLossRunJob', 'PolicyEffectiveDateFrom') IS NULL
+    ALTER TABLE dbo.tblLossRunJob ADD PolicyEffectiveDateFrom date NULL;
+
 IF OBJECT_ID(N'dbo.tblLossRunSchedule', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.tblLossRunSchedule
@@ -109,4 +112,5 @@ ORDER BY DayOfMonth;
 SELECT name AS ColumnName, TYPE_NAME(user_type_id) AS DataType, is_nullable
 FROM sys.columns
 WHERE object_id = OBJECT_ID('dbo.tblLossRunJob')
-  AND name IN ('ReportType', 'TriggerSource', 'ScheduleId', 'ScheduledForDate');
+  AND name IN ('ReportType', 'TriggerSource', 'ScheduleId', 'ScheduledForDate',
+               'PolicyEffectiveDateFrom');

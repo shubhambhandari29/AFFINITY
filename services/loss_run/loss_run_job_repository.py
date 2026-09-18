@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID, uuid4
 
 from fastapi.concurrency import run_in_threadpool
@@ -19,6 +20,7 @@ def _create_job(
     requested_by: str,
     customer_numbers: list[str] | None,
     report_type: str = "standard",
+    policy_effective_date_from: date | None = None,
 ) -> tuple[UUID, bool]:
     job_id = uuid4()
 
@@ -38,9 +40,7 @@ def _create_job(
             connection.commit()
             return UUID(str(existing[0])), False
 
-        requested_count = (
-            len(customer_numbers) if customer_numbers is not None else None
-        )
+        requested_count = len(customer_numbers) if customer_numbers is not None else None
         cursor.execute(
             f"""
             INSERT INTO {JOB_TABLE}
@@ -51,15 +51,17 @@ def _create_job(
                 Phase,
                 RequestedCount,
                 RequestedBy,
-                ReportType
+                ReportType,
+                PolicyEffectiveDateFrom
             )
-            VALUES (?, ?, 'queued', 'waiting_for_worker', ?, ?, ?)
+            VALUES (?, ?, 'queued', 'waiting_for_worker', ?, ?, ?, ?)
             """,
             str(job_id),
             job_type,
             requested_count,
             requested_by,
             report_type,
+            policy_effective_date_from,
         )
 
         if customer_numbers:
@@ -69,10 +71,7 @@ def _create_job(
                     (JobId, CustomerNumber, Status)
                 VALUES (?, ?, 'queued')
                 """,
-                [
-                    (str(job_id), customer_number)
-                    for customer_number in customer_numbers
-                ],
+                [(str(job_id), customer_number) for customer_number in customer_numbers],
             )
 
         connection.commit()
@@ -85,6 +84,7 @@ async def create_job(
     requested_by: str,
     customer_numbers: list[str] | None,
     report_type: str = "standard",
+    policy_effective_date_from: date | None = None,
 ) -> tuple[UUID, bool]:
     return await run_in_threadpool(
         _create_job,
@@ -92,6 +92,7 @@ async def create_job(
         requested_by,
         customer_numbers,
         report_type,
+        policy_effective_date_from,
     )
 
 
@@ -104,6 +105,7 @@ def _get_job(job_id: UUID) -> dict | None:
                 JobId,
                 JobType,
                 ReportType, TriggerSource, ScheduleId, ScheduledForDate,
+                PolicyEffectiveDateFrom,
                 Status,
                 Phase,
                 RequestedCount,
@@ -137,6 +139,7 @@ def _get_jobs() -> list[dict]:
                 JobId,
                 JobType,
                 ReportType, TriggerSource, ScheduleId, ScheduledForDate,
+                PolicyEffectiveDateFrom,
                 Status,
                 Phase,
                 RequestedCount,
@@ -289,6 +292,7 @@ def _claim_next_job(worker_id: str) -> dict | None:
                 inserted.JobId,
                 inserted.JobType,
                 inserted.ReportType,
+                inserted.PolicyEffectiveDateFrom,
                 inserted.AttemptCount;
             """,
             allow_scheduled,

@@ -30,6 +30,7 @@ export default function LossRuns() {
   const [rowSelectionModel, setRowSelectionModel] = useState([]);
   const [lossRunAll, setLossRunAll] = useState(true);
   const [reportType, setReportType] = useState("standard");
+  const [policyEffectiveDateFrom, setPolicyEffectiveDateFrom] = useState("");
   const theme = useTheme();
   const [...selectedIds] = rowSelectionModel?.ids || "";
   const navigate = useNavigate();
@@ -124,6 +125,7 @@ export default function LossRuns() {
     const url = lossRunAll ? "loss_run/generate-all" : "loss_run/generate";
     const payload = {
       reportType,
+      ...(policyEffectiveDateFrom && { policyEffectiveDateFrom }),
       ...(!lossRunAll && {
         customerNumbers: selectedIds.map((i) => i.split("-")[0]),
       }),
@@ -199,6 +201,25 @@ export default function LossRuns() {
             <MenuItem value="claim_review">Claim Review</MenuItem>
           </Select>
         </FormControl>
+        <TextField
+          id="policy-effective-date-from"
+          label="Policy effective date from (optional)"
+          type="date"
+          value={policyEffectiveDateFrom}
+          onChange={(e) => setPolicyEffectiveDateFrom(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          helperText="Extended history: applies to all accounts in this request. Leave blank for the default history rules."
+          sx={{ width: 300, maxWidth: "100%" }}
+        />
+        {policyEffectiveDateFrom && (
+          <Button
+            type="button"
+            size="small"
+            onClick={() => setPolicyEffectiveDateFrom("")}
+          >
+            Clear date
+          </Button>
+        )}
         <FormControl
           component="fieldset"
           sx={{

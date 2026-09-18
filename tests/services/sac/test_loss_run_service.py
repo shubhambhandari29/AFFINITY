@@ -1,5 +1,6 @@
 import asyncio
 from copy import copy
+from datetime import date
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
@@ -58,7 +59,13 @@ def test_inactive_account_generation_uses_existing_report_flow(monkeypatch, sele
                 assert "LossRunDistFreq <> ''" in sql
             else:
                 assert params == ["002"]
-            return [{"CustomerNum": "002", "CustomerName": "Inactive Customer", "AcctStatus": "Inactive"}]
+            return [
+                {
+                    "CustomerNum": "002",
+                    "CustomerName": "Inactive Customer",
+                    "AcctStatus": "Inactive",
+                }
+            ]
         return [{"Customer Number": "002", "Claim Number": "C2"}]
 
     build = MagicMock(return_value=b"workbook")
@@ -112,9 +119,7 @@ def test_claim_review_combines_exposures_without_expenses_or_record_only():
             "Claims above 50K": 0,
         },
     ]
-    output = create_claim_review_workbook(
-        records, "00123", "Example", template.read_bytes()
-    )
+    output = create_claim_review_workbook(records, "00123", "Example", template.read_bytes())
     workbook = load_workbook(BytesIO(output))
     try:
         assert [s.title for s in workbook if s.sheet_state == "visible"] == [
@@ -141,8 +146,7 @@ def test_claim_review_combines_exposures_without_expenses_or_record_only():
         original = load_workbook(template)
         assert copy(review["B4"].fill) == copy(original["Review"]["B4"].fill)
         assert (
-            review.column_dimensions["B"].width
-            == original["Review"].column_dimensions["B"].width
+            review.column_dimensions["B"].width == original["Review"].column_dimensions["B"].width
         )
         assert [c.value for c in workbook["Claims Details"][1]] == [
             c.value for c in original["Claims Details"][1]
@@ -150,9 +154,7 @@ def test_claim_review_combines_exposures_without_expenses_or_record_only():
         original.close()
         with ZipFile(BytesIO(output)) as archive:
             xml = b"".join(
-                archive.read(name)
-                for name in archive.namelist()
-                if name.endswith(".xml")
+                archive.read(name) for name in archive.namelist() if name.endswith(".xml")
             )
         for sample in (
             b"JEROME",
@@ -162,17 +164,13 @@ def test_claim_review_combines_exposures_without_expenses_or_record_only():
             b"83-00140591",
         ):
             assert sample not in xml
-        assert "Claims above 50K" not in [
-            c.value for c in workbook["Claims Details"][1]
-        ]
+        assert "Claims above 50K" not in [c.value for c in workbook["Claims Details"][1]]
     finally:
         workbook.close()
 
 
 @pytest.mark.parametrize("selected", [["00123"], None])
-def test_claim_review_downloads_its_template_without_building_standard(
-    monkeypatch, selected
-):
+def test_claim_review_downloads_its_template_without_building_standard(monkeypatch, selected):
     downloaded = []
     uploaded = []
     template = Path(__file__).resolve().parents[3] / "SACClaimReviewTemplate.xlsx"
@@ -206,9 +204,7 @@ def test_claim_review_downloads_its_template_without_building_standard(
     monkeypatch.setattr(loss_run_service, "DatabricksLossRunStorage", Storage)
     monkeypatch.setattr(loss_run_service, "run_raw_query_async", query)
     monkeypatch.setattr(loss_run_service, "_create_workbook", standard_must_not_run)
-    result = asyncio.run(
-        loss_run_service.generate_loss_runs(selected, report_type="claim_review")
-    )
+    result = asyncio.run(loss_run_service.generate_loss_runs(selected, report_type="claim_review"))
     assert downloaded == ["claim_review"]
     assert result["generatedCount"] == 1
     assert result["failedCount"] == 0
@@ -232,11 +228,7 @@ def test_claim_review_extends_rows_and_preserves_literal_text_and_dates():
         for i in range(70)
     ]
     workbook = load_workbook(
-        BytesIO(
-            create_claim_review_workbook(
-                records, "002", "=Customer", template.read_bytes()
-            )
-        )
+        BytesIO(create_claim_review_workbook(records, "002", "=Customer", template.read_bytes()))
     )
     assert workbook["Review"]["I75"].value == 210
     assert workbook["Review"]["B5"].data_type == "s"
@@ -270,9 +262,7 @@ def test_claim_review_headers_have_no_draft_highlighting(older_template):
         }
     ]
     result = load_workbook(
-        BytesIO(
-            create_claim_review_workbook(records, "123", "Example", content.getvalue())
-        )
+        BytesIO(create_claim_review_workbook(records, "123", "Example", content.getvalue()))
     )
     review = result["Review"]
     for address in ("B4", "C4"):
@@ -301,9 +291,7 @@ def _make_template(path):
         worksheet.append(["Old Column", "Old Value"])
         worksheet.append(["old", "old"])
         excel_table = Table(displayName=table_name, ref="A1:B2")
-        excel_table.tableStyleInfo = TableStyleInfo(
-            name="TableStyleMedium2", showRowStripes=True
-        )
+        excel_table.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
         worksheet.add_table(excel_table)
 
     workbook.create_sheet("Summary By Policy Year")
@@ -347,9 +335,7 @@ def test_create_workbook_populates_claims_record_only_and_cover(tmp_path):
     assert workbook["Claims Data"]["C2"].value == "01"
     assert workbook["Record Only"]["B2"].value == "C-2"
     assert workbook["Record Only"]["C2"].value == "02"
-    assert "Record Only Indicator" not in [
-        cell.value for cell in workbook["Claims Data"][1]
-    ]
+    assert "Record Only Indicator" not in [cell.value for cell in workbook["Claims Data"][1]]
     assert "Total Incurred" not in [cell.value for cell in workbook["Record Only"][1]]
     workbook.close()
 
@@ -397,9 +383,7 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(monkeypatch):
     monkeypatch.setattr(loss_run_service, "_create_workbook", fake_create)
     monkeypatch.setattr(loss_run_service, "run_in_threadpool", fake_threadpool)
 
-    result = asyncio.run(
-        loss_run_service.generate_loss_runs(["00123", "00456", "00123"])
-    )
+    result = asyncio.run(loss_run_service.generate_loss_runs(["00123", "00456", "00123"]))
 
     assert result["requestedCount"] == 2
     assert result["generatedCount"] == 1
@@ -459,6 +443,55 @@ def test_generate_all_loss_runs_uses_current_eligibility_rules(monkeypatch):
     assert "LossRunDistFreq <> 'Not Needed'" in calls[0][0]
     assert "LossRunDistFreq <> ''" in calls[0][0]
     assert calls[1][0].strip() == "SELECT * FROM dbo.SAC_Loss_Run"
+
+
+@pytest.mark.parametrize("selected", [None, ["00123", "00456"]])
+def test_extended_history_uses_parameterized_underlying_query(monkeypatch, selected):
+    uploaded = []
+
+    class Storage:
+        @staticmethod
+        def download_template(report_type="standard"):
+            return b"template"
+
+        @staticmethod
+        def upload_report(filename, workbook_bytes):
+            uploaded.append(filename)
+            return "/Volumes/test/" + filename
+
+    calls = []
+
+    async def query(sql, params=None):
+        calls.append((sql, params))
+        if "tblAcctSpecial" in sql and sql != loss_run_service.EXTENDED_HISTORY_QUERY:
+            numbers = selected or ["00123"]
+            return [
+                {"CustomerNum": number, "CustomerName": f"Customer {number}"} for number in numbers
+            ]
+        return [
+            {
+                "Customer Number": (selected or ["00123"])[0],
+                "Claim Number": "C-1",
+                "Record Only Indicator": "N",
+            }
+        ]
+
+    monkeypatch.setattr(loss_run_service, "DatabricksLossRunStorage", Storage)
+    monkeypatch.setattr(loss_run_service, "run_raw_query_async", query)
+    monkeypatch.setattr(loss_run_service, "_create_workbook", lambda *args: b"workbook")
+
+    cutoff = date(2010, 1, 1)
+    asyncio.run(loss_run_service.generate_loss_runs(selected, policy_effective_date_from=cutoff))
+    sql, params = calls[1]
+    assert sql == loss_run_service.EXTENDED_HISTORY_QUERY
+    assert params == (['["00123", "00456"]', cutoff] if selected else [None, cutoff])
+    assert "ALTER VIEW" not in sql
+    assert "OPENJSON(@CustomerNumbersJson)" in sql
+    assert "D.POL_EFF_DT) >= @PolicyEffectiveDateFrom" in sql
+    assert "SUM(D.FTR_CHNG_IN_OSLS_AMT) > 0" in sql
+    assert "D.CLM_STATUS IN ('Open','open')" in sql
+    assert "DATEADD(MONTH, -72" not in sql
+    assert "From_2010_01_01" in uploaded[0]
 
 
 def test_generate_loss_runs_records_upload_failure(monkeypatch):

@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
@@ -13,9 +13,13 @@ def test_create_selected_job_normalizes_accounts_and_requester(monkeypatch):
     job_id = uuid4()
 
     async def fake_create(
-        job_type, requested_by, customer_numbers, report_type="standard"
+        job_type,
+        requested_by,
+        customer_numbers,
+        report_type="standard",
+        policy_effective_date_from=None,
     ):
-        captured["values"] = (job_type, requested_by, customer_numbers)
+        captured["values"] = (job_type, requested_by, customer_numbers, policy_effective_date_from)
         return job_id, True
 
     monkeypatch.setattr(loss_run_job_service, "create_job", fake_create)
@@ -32,6 +36,7 @@ def test_create_selected_job_normalizes_accounts_and_requester(monkeypatch):
         "selected",
         "user@example.com",
         ["00123", "00456"],
+        None,
     )
     assert result == {
         "jobId": job_id,
@@ -57,7 +62,11 @@ def test_create_job_returns_existing_active_job(monkeypatch):
     active_job_id = uuid4()
 
     async def fake_create(
-        job_type, requested_by, customer_numbers, report_type="standard"
+        job_type,
+        requested_by,
+        customer_numbers,
+        report_type="standard",
+        policy_effective_date_from=None,
     ):
         assert job_type == "selected"
         return active_job_id, False
@@ -84,6 +93,26 @@ def test_create_job_returns_existing_active_job(monkeypatch):
     }
 
 
+def test_create_job_persists_extended_history_date(monkeypatch):
+    job_id = uuid4()
+    captured = {}
+
+    async def fake_create(*args):
+        captured["args"] = args
+        return job_id, True
+
+    monkeypatch.setattr(loss_run_job_service, "create_job", fake_create)
+    cutoff = date(2010, 1, 1)
+    asyncio.run(
+        loss_run_job_service.create_loss_run_job(
+            "all",
+            {"user": {"email": "user@example.com"}},
+            policy_effective_date_from=cutoff,
+        )
+    )
+    assert captured["args"][-1] == cutoff
+
+
 def test_get_job_returns_failures_only_when_present(monkeypatch):
     job_id = uuid4()
     now = datetime.now(UTC)
@@ -104,6 +133,7 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
             "StartedAt": now,
             "CompletedAt": now,
             "ErrorMessage": None,
+            "PolicyEffectiveDateFrom": date(2010, 1, 1),
         }
 
     async def fake_failures(received_job_id):
@@ -125,6 +155,7 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
     assert result["createdAt"] == expected_datetime
     assert result["startedAt"] == expected_datetime
     assert result["completedAt"] == expected_datetime
+    assert result["policyEffectiveDateFrom"] == "01-01-2010"
     assert result["failures"] == [
         {
             "customerNumber": "00456",

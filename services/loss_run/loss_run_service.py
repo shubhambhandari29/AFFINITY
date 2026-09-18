@@ -1,8 +1,10 @@
 import logging
+import json
 import re
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import date, datetime
 from io import BytesIO
+from pathlib import Path
 
 import pandas as pd
 from fastapi import HTTPException
@@ -17,6 +19,10 @@ from services.loss_run.claim_review_workbook import create_claim_review_workbook
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
 
 logger = logging.getLogger(__name__)
+
+EXTENDED_HISTORY_QUERY = (
+    Path(__file__).resolve().parent / "sql" / "loss_run_extended_history.sql"
+).read_text(encoding="utf-8")
 
 PhaseCallback = Callable[[str], Awaitable[None]]
 CustomersCallback = Callable[[list[dict]], Awaitable[None]]
@@ -90,8 +96,7 @@ def _write_excel_table(worksheet, table_name: str, dataframe: pd.DataFrame) -> N
                 cell.value = None
 
     excel_table.tableColumns = [
-        TableColumn(id=index + 1, name=column)
-        for index, column in enumerate(dataframe.columns)
+        TableColumn(id=index + 1, name=column) for index, column in enumerate(dataframe.columns)
     ]
     excel_table.autoFilter = None
     excel_table.ref = new_ref
@@ -104,14 +109,10 @@ def _create_workbook(
 
     if "Exposure" in dataframe.columns:
         dataframe["Exposure"] = dataframe["Exposure"].apply(
-            lambda value: f"{int(value):02d}"
-            if pd.notna(value) and str(value).strip()
-            else ""
+            lambda value: f"{int(value):02d}" if pd.notna(value) and str(value).strip() else ""
         )
 
-    dataframe["Distinct Claim Helper"] = (
-        ~dataframe["Claim Number"].duplicated()
-    ).astype(int)
+    dataframe["Distinct Claim Helper"] = (~dataframe["Claim Number"].duplicated()).astype(int)
 
     record_only = dataframe[dataframe["Record Only Indicator"] == "Y"].drop(
         columns=["Record Only Indicator", *RECORD_ONLY_EXCLUDED_COLUMNS],
@@ -128,9 +129,7 @@ def _create_workbook(
         )
 
     workbook = load_workbook(BytesIO(template_bytes))
-    _write_excel_table(
-        workbook["Claims Data"], "ClaimsData", claims.reset_index(drop=True)
-    )
+    _write_excel_table(workbook["Claims Data"], "ClaimsData", claims.reset_index(drop=True))
     _write_excel_table(
         workbook["Record Only"], "RecordOnlyData", record_only.reset_index(drop=True)
     )
@@ -159,6 +158,7 @@ async def generate_loss_runs(
     customer_nums: list[str] | None = None,
     *,
     report_type: str = "standard",
+    policy_effective_date_from: date | None = None,
     on_phase: PhaseCallback | None = None,
     on_customers: CustomersCallback | None = None,
     on_result: ResultCallback | None = None,
@@ -169,9 +169,7 @@ async def generate_loss_runs(
         if on_phase:
             await on_phase("downloading_template")
         storage = DatabricksLossRunStorage()
-        template_bytes = await run_in_threadpool(
-            storage.download_template, report_type
-        )
+        template_bytes = await run_in_threadpool(storage.download_template, report_type)
 
         if customer_nums is None:
             customers = await run_raw_query_async(
@@ -183,9 +181,7 @@ async def generate_loss_runs(
                 """
             )
             requested_numbers = list(
-                dict.fromkeys(
-                    str(customer["CustomerNum"]).strip() for customer in customers
-                )
+                dict.fromkeys(str(customer["CustomerNum"]).strip() for customer in customers)
             )
         else:
             requested_numbers = list(
@@ -217,7 +213,15 @@ async def generate_loss_runs(
         if on_phase:
             await on_phase("querying_loss_run_data")
 
-        if customer_nums is None:
+        if policy_effective_date_from is not None:
+            records = await run_raw_query_async(
+                EXTENDED_HISTORY_QUERY,
+                [
+                    json.dumps(requested_numbers) if customer_nums is not None else None,
+                    policy_effective_date_from,
+                ],
+            )
+        elif customer_nums is None:
             records = await run_raw_query_async("SELECT * FROM dbo.SAC_Loss_Run")
         else:
             records = await run_raw_query_async(
@@ -233,9 +237,9 @@ async def generate_loss_runs(
             await on_phase("generating_reports")
 
         customer_names = {
-            str(customer["CustomerNum"]).strip(): str(
-                customer.get("CustomerName") or customer["CustomerNum"]
-            ).strip()
+            str(customer["CustomerNum"])
+            .strip(): str(customer.get("CustomerName") or customer["CustomerNum"])
+            .strip()
             for customer in customers
         }
         records_by_customer: dict[str, list[dict]] = {}
@@ -270,17 +274,31 @@ async def generate_loss_runs(
 
             safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", customer_name).strip(" .")
             filename = f"{safe_name or customer_num}_{datetime.now():%Y_%m_%d}.xlsx"
+            if policy_effective_date_from is not None:
+                filename = (
+                    f"{safe_name or customer_num}_From_"
+                    f"{policy_effective_date_from:%Y_%m_%d}_"
+                    f"{datetime.now():%Y_%m_%d}.xlsx"
+                )
             if report_type == "claim_review":
+                history_label = (
+                    f"_From_{policy_effective_date_from:%Y_%m_%d}"
+                    if policy_effective_date_from is not None
+                    else ""
+                )
                 filename = (
                     f"{safe_name or customer_num}_{customer_num}_"
-                    f"ClaimReview_{datetime.now():%Y_%m_%d_%H%M%S_%f}.xlsx"
+                    f"ClaimReview{history_label}_"
+                    f"{datetime.now():%Y_%m_%d_%H%M%S_%f}.xlsx"
                 )
 
             try:
                 workbook_bytes = await run_in_threadpool(
-                    create_claim_review_workbook
-                    if report_type == "claim_review"
-                    else _create_workbook,
+                    (
+                        create_claim_review_workbook
+                        if report_type == "claim_review"
+                        else _create_workbook
+                    ),
                     customer_records,
                     customer_num,
                     customer_name,

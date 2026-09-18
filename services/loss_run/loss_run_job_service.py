@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -22,15 +23,12 @@ async def create_loss_run_job(
     current_user: dict,
     customer_numbers: list[str] | None = None,
     report_type: str = "standard",
+    policy_effective_date_from: date | None = None,
 ) -> dict:
     normalized_numbers = None
     if customer_numbers is not None:
         normalized_numbers = list(
-            dict.fromkeys(
-                str(number).strip()
-                for number in customer_numbers
-                if str(number).strip()
-            )
+            dict.fromkeys(str(number).strip() for number in customer_numbers if str(number).strip())
         )
         if not normalized_numbers:
             raise HTTPException(
@@ -43,6 +41,7 @@ async def create_loss_run_job(
         _requested_by(current_user),
         normalized_numbers,
         report_type,
+        policy_effective_date_from,
     )
 
     if created:
@@ -96,9 +95,7 @@ async def get_loss_run_jobs() -> list[dict]:
             }
         )
 
-    return [
-        _format_job(job, failures_by_job.get(str(job["JobId"]), [])) for job in jobs
-    ]
+    return [_format_job(job, failures_by_job.get(str(job["JobId"]), [])) for job in jobs]
 
 
 def _format_job(job: dict, failures: list[dict]) -> dict:
@@ -109,6 +106,7 @@ def _format_job(job: dict, failures: list[dict]) -> dict:
         "triggerSource": job.get("TriggerSource", "manual"),
         "scheduleId": job.get("ScheduleId"),
         "scheduledForDate": format_date_value(job.get("ScheduledForDate")),
+        "policyEffectiveDateFrom": format_date_value(job.get("PolicyEffectiveDateFrom")),
         "status": job["Status"],
         "phase": job["Phase"],
         "requestedCount": job["RequestedCount"],

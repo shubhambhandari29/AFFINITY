@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -68,7 +69,8 @@ def test_scheduler_failure_does_not_block_manual_job(monkeypatch, mock_scheduler
 
 
 @pytest.mark.parametrize("expected_type", ["standard", "claim_review"])
-def test_worker_processes_selected_job_and_records_progress(monkeypatch, expected_type):
+@pytest.mark.parametrize("cutoff", [None, date(2010, 1, 1)])
+def test_worker_processes_selected_job_and_records_progress(monkeypatch, expected_type, cutoff):
     job_id = uuid4()
     calls = []
 
@@ -77,10 +79,17 @@ def test_worker_processes_selected_job_and_records_progress(monkeypatch, expecte
         return ["00123"]
 
     async def fake_generate(
-        customer_numbers, *, on_phase, on_customers, on_result, report_type="standard"
+        customer_numbers,
+        *,
+        on_phase,
+        on_customers,
+        on_result,
+        report_type="standard",
+        policy_effective_date_from=None,
     ):
         assert customer_numbers == ["00123"]
         assert report_type == expected_type
+        assert policy_effective_date_from == cutoff
         await on_phase("querying_loss_run_data")
         await on_customers([{"CustomerNum": "00123", "CustomerName": "Example Customer"}])
         await on_result("00123", True, None, "/Volumes/report.xlsx")
@@ -130,6 +139,7 @@ def test_worker_processes_selected_job_and_records_progress(monkeypatch, expecte
                 "JobId": job_id,
                 "JobType": "selected",
                 "ReportType": expected_type,
+                "PolicyEffectiveDateFrom": cutoff,
                 "AttemptCount": 1,
             }
         )

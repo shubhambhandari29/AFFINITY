@@ -239,6 +239,14 @@ export default function JobDetails({ open, onClose, jobData }) {
               </Typography>
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
+              <Typography variant="caption" color="textSecondary" display="block">
+                Policy Effective Date From
+              </Typography>
+              <Typography variant="body2" fontWeight="bold">
+                {jobData.policyEffectiveDateFrom || "Default history"}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
               <Typography
                 variant="caption"
                 color="textSecondary"

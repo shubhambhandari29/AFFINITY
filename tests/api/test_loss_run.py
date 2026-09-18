@@ -1,6 +1,7 @@
 import asyncio
 import os
 import tempfile
+from datetime import date
 from uuid import uuid4
 
 from api.loss_run import loss_run
@@ -10,31 +11,32 @@ CURRENT_USER = {"user": {"id": "sx1234", "email": "user@example.com"}}
 
 def test_claim_review_request_reaches_job_service(monkeypatch):
     async def fake_create(
-        job_type, current_user, customer_numbers=None, report_type="standard"
+        job_type,
+        current_user,
+        customer_numbers=None,
+        report_type="standard",
+        policy_effective_date_from=None,
     ):
         assert report_type == "claim_review"
         return {"status": "queued"}
 
     monkeypatch.setattr(loss_run, "create_loss_run_job", fake_create)
     options = loss_run.LossRunOptions(reportType="claim_review")
+    assert asyncio.run(loss_run.generate_all_loss_runs(CURRENT_USER, options))["status"] == "queued"
+    selection = loss_run.LossRunSelection(customerNumbers=["00123"], reportType="claim_review")
     assert (
-        asyncio.run(loss_run.generate_all_loss_runs(CURRENT_USER, options))["status"]
-        == "queued"
-    )
-    selection = loss_run.LossRunSelection(
-        customerNumbers=["00123"], reportType="claim_review"
-    )
-    assert (
-        asyncio.run(loss_run.generate_selected_loss_runs(selection, CURRENT_USER))[
-            "status"
-        ]
+        asyncio.run(loss_run.generate_selected_loss_runs(selection, CURRENT_USER))["status"]
         == "queued"
     )
 
 
 def test_generate_all_loss_runs_creates_job(monkeypatch):
     async def fake_create(
-        job_type, current_user, customer_numbers=None, report_type="standard"
+        job_type,
+        current_user,
+        customer_numbers=None,
+        report_type="standard",
+        policy_effective_date_from=None,
     ):
         assert job_type == "all"
         assert current_user == CURRENT_USER
@@ -51,15 +53,22 @@ def test_generate_selected_loss_runs_creates_job_with_customer_array(monkeypatch
     captured = {}
 
     async def fake_create(
-        job_type, current_user, customer_numbers=None, report_type="standard"
+        job_type,
+        current_user,
+        customer_numbers=None,
+        report_type="standard",
+        policy_effective_date_from=None,
     ):
         captured["job_type"] = job_type
         captured["current_user"] = current_user
         captured["customer_numbers"] = customer_numbers
+        captured["policy_effective_date_from"] = policy_effective_date_from
         return {"jobId": uuid4(), "status": "queued"}
 
     monkeypatch.setattr(loss_run, "create_loss_run_job", fake_create)
-    payload = loss_run.LossRunSelection(customerNumbers=["00123"])
+    payload = loss_run.LossRunSelection(
+        customerNumbers=["00123"], policyEffectiveDateFrom="2010-01-01"
+    )
 
     result = asyncio.run(loss_run.generate_selected_loss_runs(payload, CURRENT_USER))
 
@@ -68,7 +77,21 @@ def test_generate_selected_loss_runs_creates_job_with_customer_array(monkeypatch
         "job_type": "selected",
         "current_user": CURRENT_USER,
         "customer_numbers": ["00123"],
+        "policy_effective_date_from": date(2010, 1, 1),
     }
+
+
+def test_generate_all_passes_extended_history_date(monkeypatch):
+    captured = {}
+
+    async def fake_create(*args, **kwargs):
+        captured.update(kwargs)
+        return {"jobId": uuid4(), "status": "queued"}
+
+    monkeypatch.setattr(loss_run, "create_loss_run_job", fake_create)
+    payload = loss_run.LossRunOptions(policyEffectiveDateFrom="2004-01-01")
+    asyncio.run(loss_run.generate_all_loss_runs(CURRENT_USER, payload))
+    assert captured["policy_effective_date_from"] == date(2004, 1, 1)
 
 
 def test_get_loss_run_job_status_calls_service(monkeypatch):
@@ -113,8 +136,7 @@ def test_download_loss_run_job_returns_attachment(monkeypatch):
                 "path": temporary.name,
                 "filename": "Customer.xlsx",
                 "media_type": (
-                    "application/vnd.openxmlformats-officedocument."
-                    "spreadsheetml.sheet"
+                    "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet"
                 ),
             },
         )()
