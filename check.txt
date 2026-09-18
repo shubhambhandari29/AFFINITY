@@ -1,25 +1,25 @@
-DECLARE @JobId uniqueidentifier =
-    'PUT-THE-RETURNED-JOB-ID-HERE';
+Hi Team, we are working on improving the performance of the Loss Run functionality in PREPROD.
+Currently, the dbo.SAC_Loss_Run view performs the complete query before filtering selected accounts. We plan to introduce a parameterized, read-only stored procedure named:
+dbo.usp_SAC_Loss_Run
+This will allow customer-number and optional Policy Effective Date filters to be applied earlier.
+Could you please grant the following permissions in the PREPROD CLMAA_SpecialAccounts database?
+For developer account sh1bhandari@hanover.com:
+USE [CLMAA_SpecialAccounts];
+GO
 
-SELECT
-    JobId,
-    JobType,
-    ReportType,
-    PolicyEffectiveDateFrom,
-    Status,
-    Phase,
-    WorkerId,
-    CreatedAt,
-    StartedAt,
-    CompletedAt
-FROM dbo.tblLossRunJob
-WHERE JobId = @JobId;
-
-SELECT
-    JobId,
-    CustomerNumber,
-    Status,
-    OutputPath,
-    FailureReason
-FROM dbo.tblLossRunJobAccount
-WHERE JobId = @JobId;
+GRANT CREATE PROCEDURE TO [sh1bhandari@hanover.com];
+GRANT ALTER ON SCHEMA::dbo TO [sh1bhandari@hanover.com];
+GO
+After the procedure has been created, please grant testing permission:
+GRANT EXECUTE ON OBJECT::dbo.usp_SAC_Loss_Run
+TO [sh1bhandari@hanover.com];
+GO
+For the Azure application identity SACPlatformAPIPreprd:
+GRANT EXECUTE ON OBJECT::dbo.usp_SAC_Loss_Run
+TO [SACPlatformAPIPreprd];
+GO
+The stored procedure will only read data from the existing required objects in:
+- CLMAA_SpecialAccounts
+- CLM_LakeHouse
+It will not insert, update or delete source/business data. Please also confirm that SACPlatformAPIPreprd retains the necessary SELECT access to the underlying objects in both databases.
+We do not require db_owner or any other broad database role. If granting procedure-creation permission is not preferred, we can provide the reviewed SQL script for the DB team to deploy.
