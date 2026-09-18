@@ -1,3 +1,87 @@
-ENVIRONMENT=local
-LOSS_RUN_SCHEDULE_TEST_MODE=true
-LOSS_RUN_SCHEDULE_TEST_REPORT_TYPE=standard
+USE [CLMAA_SpecialAccounts];
+GO
+
+DECLARE @CustomerNumber varchar(50) = '0033165294';
+DECLARE @FromDate date = '2004-01-01';
+
+IF OBJECT_ID('tempdb..#AccountClaims') IS NOT NULL
+    DROP TABLE #AccountClaims;
+
+SELECT DISTINCT
+    CD.CLM_NBR AS ClaimNumber,
+    CD.CLM_STATUS AS ClaimStatus,
+    CAST(POL.POL_EFF_DT AS date) AS PolicyEffectiveDate,
+    CAST(POL.POL_EXP_DT AS date) AS PolicyExpirationDate,
+    POL.POL_SYM AS PolicySymbol,
+    POL.POL_NBR AS PolicyNumber,
+    POL.POL_MOD AS PolicyMod
+INTO #AccountClaims
+FROM CLM_LakeHouse.dbo.DW_CLMS_CLM_DIMNSN CD
+INNER JOIN CLM_LakeHouse.dbo.DW_POL_DIMNSN POL
+    ON CD.POL_SYM = POL.POL_SYM
+   AND UPPER(CD.POL_NBR) = POL.POL_NBR
+   AND CD.POL_MOD = POL.POL_MOD
+   AND POL.POL_CURR_VERSN_IND = 'Y'
+WHERE CD.CURR_VERSN_IND = 'Y'
+  AND UPPER(ISNULL(CD.ACCT_LOSS_LOC_ID, 'NA')) NOT LIKE '%REKEY%'
+  AND LTRIM(RTRIM(CONVERT(varchar(50), POL.PMS_CUSTMR_NBR)))
+      = @CustomerNumber;
+
+
+/* Result 1: overall history available in pre-prod */
+SELECT
+    COUNT(DISTINCT ClaimNumber) AS TotalClaims,
+    MIN(PolicyEffectiveDate) AS EarliestPolicyEffectiveDate,
+    MAX(PolicyEffectiveDate) AS LatestPolicyEffectiveDate,
+    COUNT(DISTINCT CASE
+        WHEN PolicyEffectiveDate >= @FromDate
+        THEN ClaimNumber
+    END) AS ClaimsFromSelectedDate
+FROM #AccountClaims;
+
+
+/* Result 2: number of claims available for every policy year */
+SELECT
+    YEAR(PolicyEffectiveDate) AS PolicyYear,
+    COUNT(DISTINCT ClaimNumber) AS ClaimCount
+FROM #AccountClaims
+GROUP BY YEAR(PolicyEffectiveDate)
+ORDER BY PolicyYear;
+
+
+/* Result 3: sample claims from 2004 */
+SELECT TOP (50)
+    ClaimNumber,
+    ClaimStatus,
+    PolicyEffectiveDate,
+    PolicyExpirationDate,
+    PolicySymbol,
+    PolicyNumber,
+    PolicyMod
+FROM #AccountClaims
+WHERE PolicyEffectiveDate >= '2004-01-01'
+  AND PolicyEffectiveDate < '2005-01-01'
+ORDER BY PolicyEffectiveDate, ClaimNumber;
+
+
+/* Result 4: check whether financial data exists for these claims */
+SELECT
+    COUNT_BIG(*) AS FinancialRows,
+    COUNT(DISTINCT FIN.CLM_NBR) AS ClaimsWithFinancialRows,
+    SUM(
+        CASE WHEN
+            ISNULL(FIN.FTR_CHNG_IN_OSLS_AMT, 0) <> 0
+            OR ISNULL(FIN.FTR_PDLS_INCL_SLVG_SUBRO_AMT, 0) <> 0
+            OR ISNULL(FIN.FTR_INCUR_INCL_SLVG_SUBRO_AMT, 0) <> 0
+            OR ISNULL(FIN.CHNG_IN_ALAE_RSRV_AMT, 0) <> 0
+            OR ISNULL(FIN.FTR_ALAE_AMT, 0) <> 0
+        THEN 1 ELSE 0 END
+    ) AS NonZeroFinancialRows,
+    MIN(FIN.LOSS_TXN_PRCSS_DT_DIMKEY) AS EarliestFinancialProcessDate,
+    MAX(FIN.LOSS_TXN_PRCSS_DT_DIMKEY) AS LatestFinancialProcessDate
+FROM CLMAA_SpecialAccounts.dbo.DW_FINCL_LOSS_FTR_SS_F_FILTERED FIN
+INNER JOIN #AccountClaims AC
+    ON AC.ClaimNumber = FIN.CLM_NBR;
+
+
+DROP TABLE #AccountClaims;
