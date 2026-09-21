@@ -1,25 +1,12 @@
-Hi Team, we are working on improving the performance of the Loss Run functionality in PREPROD.
-Currently, the dbo.SAC_Loss_Run view performs the complete query before filtering selected accounts. We plan to introduce a parameterized, read-only stored procedure named:
-dbo.usp_SAC_Loss_Run
-This will allow customer-number and optional Policy Effective Date filters to be applied earlier.
-Could you please grant the following permissions in the PREPROD CLMAA_SpecialAccounts database?
-For developer account sh1bhandari@hanover.com:
-USE [CLMAA_SpecialAccounts];
-GO
+Hi Shubham,
 
-GRANT CREATE PROCEDURE TO [sh1bhandari@hanover.com];
-GRANT ALTER ON SCHEMA::dbo TO [sh1bhandari@hanover.com];
-GO
-After the procedure has been created, please grant testing permission:
-GRANT EXECUTE ON OBJECT::dbo.usp_SAC_Loss_Run
-TO [sh1bhandari@hanover.com];
-GO
-For the Azure application identity SACPlatformAPIPreprd:
-GRANT EXECUTE ON OBJECT::dbo.usp_SAC_Loss_Run
-TO [SACPlatformAPIPreprd];
-GO
-The stored procedure will only read data from the existing required objects in:
-- CLMAA_SpecialAccounts
-- CLM_LakeHouse
-It will not insert, update or delete source/business data. Please also confirm that SACPlatformAPIPreprd retains the necessary SELECT access to the underlying objects in both databases.
-We do not require db_owner or any other broad database role. If granting procedure-creation permission is not preferred, we can provide the reviewed SQL script for the DB team to deploy.
+Thank you for this latest report.  As we have been reviewing this report, I suspect that we weren’t entirely clear on what we were requesting in our extended history (XHIST) loss run.  I am going to attach our most recent F W Webb extended history loss run so you can see what it contains.  This report you provided seems like it is a snapshot of claims for one day, 9/1 for each year going back to 2004.  That is not what we need.
+ 
+
+What we are requesting, I suspect may actually be an easier build for you.  We want ALL claims that occurred in the timespan from a single date that we choose, to the present day.  So if we choose 10/1/2004 as the START date, the report will capture ALL claims starting from that date, and every day in between, to the current day.  Our current loss run provides all claims open and closed going back six years, (plus ALL open claims, regardless of when they occurred).  This is stated on the cover page of our loss run:  This report contains information on all open claims; as well as closed claims limited to the current and prior six policy years.  
+
+So instead of the report being limited to the current and prior six policy years, we want to be able to change that range on an ad hoc basis, to capture all claims from the current day, back to whatever date we limit it to.  And, of course, it must contain all open claims, even if they occurred before that limiting date we specified.
+
+I apologize if there was any confusion about what exactly requesting.  I hope my explanation here clarifies things.  Please let me know if you have any questions.  Thank you again for all of your work on this.
+
+Walt
