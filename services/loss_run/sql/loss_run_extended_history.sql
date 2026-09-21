@@ -1,8 +1,9 @@
 -- Used only when an optional extended-history date is supplied.
 -- Parameters, in order: customer-number JSON (NULL means all eligible accounts),
--- policy effective date from (required for this query).
+-- loss date from and report-through date (inclusive, supplied by the worker).
 DECLARE @CustomerNumbersJson nvarchar(max) = ?;
-DECLARE @PolicyEffectiveDateFrom date = ?;
+DECLARE @LossDateFrom date = ?;
+DECLARE @ReportThroughDate date = ?;
 
 WITH 
 
@@ -420,7 +421,9 @@ GROUP BY
   --D.FTR_ALAE_AMT
 HAVING
   (
-  (D.CLM_STATUS IN ('Closed','closed') AND DATETRUNC(DAY, D.POL_EFF_DT) >= @PolicyEffectiveDateFrom)
+  (D.CLM_STATUS IN ('Closed','closed')
+   AND D.DT_OF_LOSS >= @LossDateFrom
+   AND D.DT_OF_LOSS < DATEADD(DAY, 1, @ReportThroughDate))
   OR SUM(D.FTR_CHNG_IN_OSLS_AMT) > 0
   OR D.CLM_STATUS IN ('Open','open')
   )

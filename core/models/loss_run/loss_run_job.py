@@ -30,7 +30,8 @@ class LossRunJobResponse(BaseModel):
     triggerSource: Literal["manual", "scheduled"] = "manual"
     scheduleId: str | None = None
     scheduledForDate: str | None = None
-    policyEffectiveDateFrom: str | None = None
+    lossDateFrom: str | None = None
+    policyEffectiveDateFrom: str | None = None  # Historical policy-cutoff jobs only.
     status: LossRunJobStatus
     phase: str | None
     requestedCount: int | None

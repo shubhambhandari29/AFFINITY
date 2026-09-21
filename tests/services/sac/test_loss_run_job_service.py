@@ -17,9 +17,9 @@ def test_create_selected_job_normalizes_accounts_and_requester(monkeypatch):
         requested_by,
         customer_numbers,
         report_type="standard",
-        policy_effective_date_from=None,
+        loss_date_from=None,
     ):
-        captured["values"] = (job_type, requested_by, customer_numbers, policy_effective_date_from)
+        captured["values"] = (job_type, requested_by, customer_numbers, loss_date_from)
         return job_id, True
 
     monkeypatch.setattr(loss_run_job_service, "create_job", fake_create)
@@ -66,7 +66,7 @@ def test_create_job_returns_existing_active_job(monkeypatch):
         requested_by,
         customer_numbers,
         report_type="standard",
-        policy_effective_date_from=None,
+        loss_date_from=None,
     ):
         assert job_type == "selected"
         return active_job_id, False
@@ -107,7 +107,7 @@ def test_create_job_persists_extended_history_date(monkeypatch):
         loss_run_job_service.create_loss_run_job(
             "all",
             {"user": {"email": "user@example.com"}},
-            policy_effective_date_from=cutoff,
+            loss_date_from=cutoff,
         )
     )
     assert captured["args"][-1] == cutoff
@@ -133,7 +133,7 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
             "StartedAt": now,
             "CompletedAt": now,
             "ErrorMessage": None,
-            "PolicyEffectiveDateFrom": date(2010, 1, 1),
+            "LossDateFrom": date(2010, 1, 1),
         }
 
     async def fake_failures(received_job_id):
@@ -155,7 +155,7 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
     assert result["createdAt"] == expected_datetime
     assert result["startedAt"] == expected_datetime
     assert result["completedAt"] == expected_datetime
-    assert result["policyEffectiveDateFrom"] == "01-01-2010"
+    assert result["lossDateFrom"] == "01-01-2010"
     assert result["failures"] == [
         {
             "customerNumber": "00456",

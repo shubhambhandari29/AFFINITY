@@ -40,7 +40,7 @@ async def generate_all_loss_runs(
         "all",
         current_user,
         report_type=payload.reportType if payload else "standard",
-        policy_effective_date_from=(payload.policyEffectiveDateFrom if payload else None),
+        loss_date_from=(payload.lossDateFrom if payload else None),
     )
 
 
@@ -58,7 +58,7 @@ async def generate_selected_loss_runs(
         current_user,
         payload.customerNumbers,
         report_type=payload.reportType,
-        policy_effective_date_from=payload.policyEffectiveDateFrom,
+        loss_date_from=payload.lossDateFrom,
     )
 
 

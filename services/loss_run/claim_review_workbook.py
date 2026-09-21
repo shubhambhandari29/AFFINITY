@@ -2,6 +2,7 @@ from copy import copy
 from datetime import date, datetime
 from decimal import Decimal
 from io import BytesIO
+from zoneinfo import ZoneInfo
 
 from openpyxl import load_workbook
 from openpyxl.pivot.cache import CacheField, SharedItems, WorksheetSource
@@ -9,6 +10,8 @@ from openpyxl.pivot.fields import Index, Missing, Number, Text
 from openpyxl.pivot.record import Record, RecordList
 from openpyxl.pivot.table import FieldItem, RowColItem
 from openpyxl.utils import get_column_letter
+
+from services.loss_run.report_cover import update_report_cover
 
 REVIEW_FIELDS = {
     "Claimant Name-Company": "Claimant Name",
@@ -138,7 +141,12 @@ def _populate_pivot(workbook, pivot, summaries: list[dict]) -> None:
 
 
 def create_claim_review_workbook(
-    records: list[dict], customer_num: str, customer_name: str, template_bytes: bytes
+    records: list[dict],
+    customer_num: str,
+    customer_name: str,
+    template_bytes: bytes,
+    loss_date_from: date | None = None,
+    report_date: date | None = None,
 ) -> bytes:
     """Populate the converted client Claim Review template, not a new workbook."""
     workbook = load_workbook(BytesIO(template_bytes))
@@ -256,13 +264,15 @@ def create_claim_review_workbook(
             cell._style = style
         _populate_pivot(workbook, pivot, summaries)
 
-        today = datetime.now().strftime("%m/%d/%Y")
+        report_date = report_date or datetime.now(ZoneInfo("America/New_York")).date()
+        today = report_date.strftime("%m/%d/%Y")
         accounts = workbook["Accounts"]
         _fill_template_rows(accounts, [[customer_num, today, customer_name]], 2)
         cover = workbook["Cover Page"]
         for row, value in ((2, customer_num), (3, customer_name), (4, today)):
             cover.cell(row, 2).value = value
             cover.cell(row, 2).data_type = "s"
+        update_report_cover(workbook, loss_date_from, report_date)
         workbook.calculation.fullCalcOnLoad = True
         output = BytesIO()
         workbook.save(output)

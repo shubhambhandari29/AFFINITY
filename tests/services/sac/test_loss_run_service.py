@@ -372,7 +372,7 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(monkeypatch):
             }
         ]
 
-    def fake_create(records, customer_num, customer_name, received_template):
+    def fake_create(records, customer_num, customer_name, received_template, loss_date_from, report_date):
         assert received_template == template_bytes
         return b"workbook"
 
@@ -426,7 +426,7 @@ def test_generate_all_loss_runs_uses_current_eligibility_rules(monkeypatch):
             }
         ]
 
-    def fake_create(records, customer_num, customer_name, template_bytes):
+    def fake_create(records, customer_num, customer_name, template_bytes, loss_date_from, report_date):
         return b"workbook"
 
     async def fake_threadpool(func, *args):
@@ -481,13 +481,16 @@ def test_extended_history_uses_parameterized_underlying_query(monkeypatch, selec
     monkeypatch.setattr(loss_run_service, "_create_workbook", lambda *args: b"workbook")
 
     cutoff = date(2010, 1, 1)
-    asyncio.run(loss_run_service.generate_loss_runs(selected, policy_effective_date_from=cutoff))
+    asyncio.run(loss_run_service.generate_loss_runs(selected, loss_date_from=cutoff))
     sql, params = calls[1]
     assert sql == loss_run_service.EXTENDED_HISTORY_QUERY
-    assert params == (['["00123", "00456"]', cutoff] if selected else [None, cutoff])
+    assert params[:2] == (['["00123", "00456"]', cutoff] if selected else [None, cutoff])
+    assert isinstance(params[2], date)
     assert "ALTER VIEW" not in sql
     assert "OPENJSON(@CustomerNumbersJson)" in sql
-    assert "D.POL_EFF_DT) >= @PolicyEffectiveDateFrom" in sql
+    assert "D.DT_OF_LOSS >= @LossDateFrom" in sql
+    assert "D.DT_OF_LOSS < DATEADD(DAY, 1, @ReportThroughDate)" in sql
+    assert "D.POL_EFF_DT) >=" not in sql
     assert "SUM(D.FTR_CHNG_IN_OSLS_AMT) > 0" in sql
     assert "D.CLM_STATUS IN ('Open','open')" in sql
     assert "DATEADD(MONTH, -72" not in sql
@@ -515,7 +518,7 @@ def test_generate_loss_runs_records_upload_failure(monkeypatch):
             }
         ]
 
-    def fake_create(records, customer_num, customer_name, template_bytes):
+    def fake_create(records, customer_num, customer_name, template_bytes, loss_date_from, report_date):
         return b"workbook"
 
     async def fake_threadpool(func, *args):

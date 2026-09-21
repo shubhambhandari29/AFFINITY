@@ -16,8 +16,8 @@ from services.loss_run.loss_run_job_repository import (
     update_phase,
     upsert_accounts,
 )
-from services.loss_run.loss_run_service import generate_loss_runs
 from services.loss_run.loss_run_scheduler import enqueue_due_loss_run_job
+from services.loss_run.loss_run_service import generate_loss_runs
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +103,16 @@ class LossRunWorker:
             )
 
         try:
+            if job.get("PolicyEffectiveDateFrom") and not job.get("LossDateFrom"):
+                await fail_job(
+                    job_id, self.worker_id,
+                    "This job used the old policy-date cutoff. Submit a new job using Loss date from.",
+                )
+                return
             await generate_loss_runs(
                 None if job_type == "all" else await self._selected_accounts(job_id),
                 report_type=job.get("ReportType", "standard"),
-                policy_effective_date_from=job.get("PolicyEffectiveDateFrom"),
+                loss_date_from=job.get("LossDateFrom"),
                 on_phase=on_phase,
                 on_customers=on_customers,
                 on_result=on_result,

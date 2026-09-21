@@ -85,11 +85,11 @@ def test_worker_processes_selected_job_and_records_progress(monkeypatch, expecte
         on_customers,
         on_result,
         report_type="standard",
-        policy_effective_date_from=None,
+        loss_date_from=None,
     ):
         assert customer_numbers == ["00123"]
         assert report_type == expected_type
-        assert policy_effective_date_from == cutoff
+        assert loss_date_from == cutoff
         await on_phase("querying_loss_run_data")
         await on_customers([{"CustomerNum": "00123", "CustomerName": "Example Customer"}])
         await on_result("00123", True, None, "/Volumes/report.xlsx")
@@ -139,7 +139,7 @@ def test_worker_processes_selected_job_and_records_progress(monkeypatch, expecte
                 "JobId": job_id,
                 "JobType": "selected",
                 "ReportType": expected_type,
-                "PolicyEffectiveDateFrom": cutoff,
+                "LossDateFrom": cutoff,
                 "AttemptCount": 1,
             }
         )

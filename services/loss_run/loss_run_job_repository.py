@@ -3,8 +3,8 @@ from uuid import UUID, uuid4
 
 from fastapi.concurrency import run_in_threadpool
 
-from db import db_connection
 from core.config import settings
+from db import db_connection
 
 JOB_TABLE = "dbo.tblLossRunJob"
 ACCOUNT_TABLE = "dbo.tblLossRunJobAccount"
@@ -20,7 +20,7 @@ def _create_job(
     requested_by: str,
     customer_numbers: list[str] | None,
     report_type: str = "standard",
-    policy_effective_date_from: date | None = None,
+    loss_date_from: date | None = None,
 ) -> tuple[UUID, bool]:
     job_id = uuid4()
 
@@ -52,7 +52,7 @@ def _create_job(
                 RequestedCount,
                 RequestedBy,
                 ReportType,
-                PolicyEffectiveDateFrom
+                LossDateFrom
             )
             VALUES (?, ?, 'queued', 'waiting_for_worker', ?, ?, ?, ?)
             """,
@@ -61,7 +61,7 @@ def _create_job(
             requested_count,
             requested_by,
             report_type,
-            policy_effective_date_from,
+            loss_date_from,
         )
 
         if customer_numbers:
@@ -84,7 +84,7 @@ async def create_job(
     requested_by: str,
     customer_numbers: list[str] | None,
     report_type: str = "standard",
-    policy_effective_date_from: date | None = None,
+    loss_date_from: date | None = None,
 ) -> tuple[UUID, bool]:
     return await run_in_threadpool(
         _create_job,
@@ -92,7 +92,7 @@ async def create_job(
         requested_by,
         customer_numbers,
         report_type,
-        policy_effective_date_from,
+        loss_date_from,
     )
 
 
@@ -105,7 +105,7 @@ def _get_job(job_id: UUID) -> dict | None:
                 JobId,
                 JobType,
                 ReportType, TriggerSource, ScheduleId, ScheduledForDate,
-                PolicyEffectiveDateFrom,
+                LossDateFrom, PolicyEffectiveDateFrom,
                 Status,
                 Phase,
                 RequestedCount,
@@ -139,7 +139,7 @@ def _get_jobs() -> list[dict]:
                 JobId,
                 JobType,
                 ReportType, TriggerSource, ScheduleId, ScheduledForDate,
-                PolicyEffectiveDateFrom,
+                LossDateFrom, PolicyEffectiveDateFrom,
                 Status,
                 Phase,
                 RequestedCount,
@@ -292,6 +292,7 @@ def _claim_next_job(worker_id: str) -> dict | None:
                 inserted.JobId,
                 inserted.JobType,
                 inserted.ReportType,
+                inserted.LossDateFrom,
                 inserted.PolicyEffectiveDateFrom,
                 inserted.AttemptCount;
             """,

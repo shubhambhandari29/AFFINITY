@@ -65,10 +65,10 @@ export default function LossRunJobs() {
         params.value === "claim_review" ? "Claim Review" : "Standard Loss Run",
     },
     {
-      field: "policyEffectiveDateFrom",
-      headerName: "History From",
+      field: "lossDateFrom",
+      headerName: "Loss Date From",
       width: 130,
-      renderCell: (params) => params.value || "Default",
+      renderCell: (params) => params.value || (params.row.policyEffectiveDateFrom ? `Legacy policy: ${params.row.policyEffectiveDateFrom}` : "Default"),
     },
     {
       field: "requestedBy",

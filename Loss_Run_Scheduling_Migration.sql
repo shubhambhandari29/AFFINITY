@@ -27,6 +27,9 @@ IF COL_LENGTH('dbo.tblLossRunJob', 'ScheduledForDate') IS NULL
 IF COL_LENGTH('dbo.tblLossRunJob', 'PolicyEffectiveDateFrom') IS NULL
     ALTER TABLE dbo.tblLossRunJob ADD PolicyEffectiveDateFrom date NULL;
 
+IF COL_LENGTH('dbo.tblLossRunJob', 'LossDateFrom') IS NULL
+    ALTER TABLE dbo.tblLossRunJob ADD LossDateFrom date NULL;
+
 IF OBJECT_ID(N'dbo.tblLossRunSchedule', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.tblLossRunSchedule
@@ -103,7 +106,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes
 COMMIT TRANSACTION;
 GO
 
--- Verify two disabled schedule rows and the four new job columns.
+-- Verify the schedules and job metadata columns.
 SELECT ScheduleId, ReportType, DayOfMonth, RunAtLocalTime,
        TimeZoneName, ActiveFromDate, IsEnabled
 FROM dbo.tblLossRunSchedule
@@ -113,4 +116,4 @@ SELECT name AS ColumnName, TYPE_NAME(user_type_id) AS DataType, is_nullable
 FROM sys.columns
 WHERE object_id = OBJECT_ID('dbo.tblLossRunJob')
   AND name IN ('ReportType', 'TriggerSource', 'ScheduleId', 'ScheduledForDate',
-               'PolicyEffectiveDateFrom');
+               'PolicyEffectiveDateFrom', 'LossDateFrom');

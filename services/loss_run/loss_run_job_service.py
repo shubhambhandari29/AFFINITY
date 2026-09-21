@@ -23,7 +23,7 @@ async def create_loss_run_job(
     current_user: dict,
     customer_numbers: list[str] | None = None,
     report_type: str = "standard",
-    policy_effective_date_from: date | None = None,
+    loss_date_from: date | None = None,
 ) -> dict:
     normalized_numbers = None
     if customer_numbers is not None:
@@ -41,7 +41,7 @@ async def create_loss_run_job(
         _requested_by(current_user),
         normalized_numbers,
         report_type,
-        policy_effective_date_from,
+        loss_date_from,
     )
 
     if created:
@@ -106,6 +106,7 @@ def _format_job(job: dict, failures: list[dict]) -> dict:
         "triggerSource": job.get("TriggerSource", "manual"),
         "scheduleId": job.get("ScheduleId"),
         "scheduledForDate": format_date_value(job.get("ScheduledForDate")),
+        "lossDateFrom": format_date_value(job.get("LossDateFrom")),
         "policyEffectiveDateFrom": format_date_value(job.get("PolicyEffectiveDateFrom")),
         "status": job["Status"],
         "phase": job["Phase"],

@@ -1,10 +1,11 @@
-import logging
 import json
+import logging
 import re
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from fastapi import HTTPException
@@ -17,6 +18,8 @@ from core.date_utils import format_records_dates
 from core.db_helpers import run_raw_query_async
 from services.loss_run.claim_review_workbook import create_claim_review_workbook
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
+from services.loss_run.report_cover import update_report_cover
+from services.loss_run.standard_report_summary import populate_standard_summaries
 
 logger = logging.getLogger(__name__)
 
@@ -96,23 +99,33 @@ def _write_excel_table(worksheet, table_name: str, dataframe: pd.DataFrame) -> N
                 cell.value = None
 
     excel_table.tableColumns = [
-        TableColumn(id=index + 1, name=column) for index, column in enumerate(dataframe.columns)
+        TableColumn(id=index + 1, name=column)
+        for index, column in enumerate(dataframe.columns)
     ]
     excel_table.autoFilter = None
     excel_table.ref = new_ref
 
 
 def _create_workbook(
-    records: list[dict], customer_num: str, customer_name: str, template_bytes: bytes
+    records: list[dict],
+    customer_num: str,
+    customer_name: str,
+    template_bytes: bytes,
+    loss_date_from: date | None = None,
+    report_date: date | None = None,
 ) -> bytes:
     dataframe = pd.DataFrame(records)
 
     if "Exposure" in dataframe.columns:
         dataframe["Exposure"] = dataframe["Exposure"].apply(
-            lambda value: f"{int(value):02d}" if pd.notna(value) and str(value).strip() else ""
+            lambda value: f"{int(value):02d}"
+            if pd.notna(value) and str(value).strip()
+            else ""
         )
 
-    dataframe["Distinct Claim Helper"] = (~dataframe["Claim Number"].duplicated()).astype(int)
+    dataframe["Distinct Claim Helper"] = (
+        ~dataframe["Claim Number"].duplicated()
+    ).astype(int)
 
     record_only = dataframe[dataframe["Record Only Indicator"] == "Y"].drop(
         columns=["Record Only Indicator", *RECORD_ONLY_EXCLUDED_COLUMNS],
@@ -121,6 +134,7 @@ def _create_workbook(
     claims = dataframe[dataframe["Record Only Indicator"] != "Y"].drop(
         columns=["Record Only Indicator"]
     )
+    claims["Distinct Claim Helper"] = (~claims["Claim Number"].duplicated()).astype(int)
 
     if record_only.empty:
         record_only = pd.DataFrame(
@@ -129,7 +143,9 @@ def _create_workbook(
         )
 
     workbook = load_workbook(BytesIO(template_bytes))
-    _write_excel_table(workbook["Claims Data"], "ClaimsData", claims.reset_index(drop=True))
+    _write_excel_table(
+        workbook["Claims Data"], "ClaimsData", claims.reset_index(drop=True)
+    )
     _write_excel_table(
         workbook["Record Only"], "RecordOnlyData", record_only.reset_index(drop=True)
     )
@@ -138,12 +154,15 @@ def _create_workbook(
     cover_page.cell(2, 2, customer_num)
     cover_page.cell(3, 2, customer_name)
     cover_page.cell(4, 2, datetime.now().strftime("%m/%d/%Y"))
+    update_report_cover(
+        workbook,
+        loss_date_from,
+        report_date or datetime.now(ZoneInfo("America/New_York")).date(),
+    )
 
-    for sheet_name in ("Summary By Policy Year", "Chart"):
-        if sheet_name not in workbook.sheetnames:
-            continue
-        for pivot in getattr(workbook[sheet_name], "_pivots", []):
-            pivot.cache.refreshOnLoad = True
+    populate_standard_summaries(
+        workbook, claims.astype(object).where(pd.notna(claims), None).to_dict("records")
+    )
 
     workbook.calculation.fullCalcOnLoad = True
     output = BytesIO()
@@ -158,7 +177,7 @@ async def generate_loss_runs(
     customer_nums: list[str] | None = None,
     *,
     report_type: str = "standard",
-    policy_effective_date_from: date | None = None,
+    loss_date_from: date | None = None,
     on_phase: PhaseCallback | None = None,
     on_customers: CustomersCallback | None = None,
     on_result: ResultCallback | None = None,
@@ -168,6 +187,7 @@ async def generate_loss_runs(
     try:
         if on_phase:
             await on_phase("downloading_template")
+        report_date = datetime.now(ZoneInfo("America/New_York")).date()
         storage = DatabricksLossRunStorage()
         template_bytes = await run_in_threadpool(storage.download_template, report_type)
 
@@ -181,7 +201,9 @@ async def generate_loss_runs(
                 """
             )
             requested_numbers = list(
-                dict.fromkeys(str(customer["CustomerNum"]).strip() for customer in customers)
+                dict.fromkeys(
+                    str(customer["CustomerNum"]).strip() for customer in customers
+                )
             )
         else:
             requested_numbers = list(
@@ -213,12 +235,15 @@ async def generate_loss_runs(
         if on_phase:
             await on_phase("querying_loss_run_data")
 
-        if policy_effective_date_from is not None:
+        if loss_date_from is not None:
             records = await run_raw_query_async(
                 EXTENDED_HISTORY_QUERY,
                 [
-                    json.dumps(requested_numbers) if customer_nums is not None else None,
-                    policy_effective_date_from,
+                    json.dumps(requested_numbers)
+                    if customer_nums is not None
+                    else None,
+                    loss_date_from,
+                    report_date,
                 ],
             )
         elif customer_nums is None:
@@ -237,9 +262,9 @@ async def generate_loss_runs(
             await on_phase("generating_reports")
 
         customer_names = {
-            str(customer["CustomerNum"])
-            .strip(): str(customer.get("CustomerName") or customer["CustomerNum"])
-            .strip()
+            str(customer["CustomerNum"]).strip(): str(
+                customer.get("CustomerName") or customer["CustomerNum"]
+            ).strip()
             for customer in customers
         }
         records_by_customer: dict[str, list[dict]] = {}
@@ -273,17 +298,17 @@ async def generate_loss_runs(
                 continue
 
             safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", customer_name).strip(" .")
-            filename = f"{safe_name or customer_num}_{datetime.now():%Y_%m_%d}.xlsx"
-            if policy_effective_date_from is not None:
+            filename = f"{safe_name or customer_num}_{report_date:%Y_%m_%d}.xlsx"
+            if loss_date_from is not None:
                 filename = (
                     f"{safe_name or customer_num}_From_"
-                    f"{policy_effective_date_from:%Y_%m_%d}_"
-                    f"{datetime.now():%Y_%m_%d}.xlsx"
+                    f"{loss_date_from:%Y_%m_%d}_"
+                    f"{report_date:%Y_%m_%d}.xlsx"
                 )
             if report_type == "claim_review":
                 history_label = (
-                    f"_From_{policy_effective_date_from:%Y_%m_%d}"
-                    if policy_effective_date_from is not None
+                    f"_From_{loss_date_from:%Y_%m_%d}"
+                    if loss_date_from is not None
                     else ""
                 )
                 filename = (
@@ -303,6 +328,8 @@ async def generate_loss_runs(
                     customer_num,
                     customer_name,
                     template_bytes,
+                    loss_date_from,
+                    report_date,
                 )
                 output_path = await run_in_threadpool(
                     storage.upload_report,

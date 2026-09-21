@@ -28,6 +28,8 @@ def test_create_job_persists_request_and_accounts(database, monkeypatch, custome
     monkeypatch.setattr(repository, "uuid4", lambda: JOB_ID)
     result = asyncio.run(repository.create_job("selected", "tester", customers, "standard", cutoff))
     assert result == (JOB_ID, True)
+    assert "LossDateFrom" in cursor.execute.call_args.args[0]
+    assert "PolicyEffectiveDateFrom" not in cursor.execute.call_args.args[0]
     assert cursor.execute.call_args.args[1:] == (
         str(JOB_ID),
         "selected",

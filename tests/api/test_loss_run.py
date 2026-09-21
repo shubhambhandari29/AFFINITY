@@ -15,7 +15,7 @@ def test_claim_review_request_reaches_job_service(monkeypatch):
         current_user,
         customer_numbers=None,
         report_type="standard",
-        policy_effective_date_from=None,
+        loss_date_from=None,
     ):
         assert report_type == "claim_review"
         return {"status": "queued"}
@@ -36,7 +36,7 @@ def test_generate_all_loss_runs_creates_job(monkeypatch):
         current_user,
         customer_numbers=None,
         report_type="standard",
-        policy_effective_date_from=None,
+        loss_date_from=None,
     ):
         assert job_type == "all"
         assert current_user == CURRENT_USER
@@ -57,17 +57,17 @@ def test_generate_selected_loss_runs_creates_job_with_customer_array(monkeypatch
         current_user,
         customer_numbers=None,
         report_type="standard",
-        policy_effective_date_from=None,
+        loss_date_from=None,
     ):
         captured["job_type"] = job_type
         captured["current_user"] = current_user
         captured["customer_numbers"] = customer_numbers
-        captured["policy_effective_date_from"] = policy_effective_date_from
+        captured["loss_date_from"] = loss_date_from
         return {"jobId": uuid4(), "status": "queued"}
 
     monkeypatch.setattr(loss_run, "create_loss_run_job", fake_create)
     payload = loss_run.LossRunSelection(
-        customerNumbers=["00123"], policyEffectiveDateFrom="2010-01-01"
+        customerNumbers=["00123"], lossDateFrom="2010-01-01"
     )
 
     result = asyncio.run(loss_run.generate_selected_loss_runs(payload, CURRENT_USER))
@@ -77,7 +77,7 @@ def test_generate_selected_loss_runs_creates_job_with_customer_array(monkeypatch
         "job_type": "selected",
         "current_user": CURRENT_USER,
         "customer_numbers": ["00123"],
-        "policy_effective_date_from": date(2010, 1, 1),
+        "loss_date_from": date(2010, 1, 1),
     }
 
 
@@ -89,9 +89,9 @@ def test_generate_all_passes_extended_history_date(monkeypatch):
         return {"jobId": uuid4(), "status": "queued"}
 
     monkeypatch.setattr(loss_run, "create_loss_run_job", fake_create)
-    payload = loss_run.LossRunOptions(policyEffectiveDateFrom="2004-01-01")
+    payload = loss_run.LossRunOptions(lossDateFrom="2004-01-01")
     asyncio.run(loss_run.generate_all_loss_runs(CURRENT_USER, payload))
-    assert captured["policy_effective_date_from"] == date(2004, 1, 1)
+    assert captured["loss_date_from"] == date(2004, 1, 1)
 
 
 def test_get_loss_run_job_status_calls_service(monkeypatch):

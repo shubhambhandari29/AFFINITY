@@ -30,7 +30,7 @@ export default function LossRuns() {
   const [rowSelectionModel, setRowSelectionModel] = useState([]);
   const [lossRunAll, setLossRunAll] = useState(true);
   const [reportType, setReportType] = useState("standard");
-  const [policyEffectiveDateFrom, setPolicyEffectiveDateFrom] = useState("");
+  const [lossDateFrom, setLossDateFrom] = useState("");
   const theme = useTheme();
   const [...selectedIds] = rowSelectionModel?.ids || "";
   const navigate = useNavigate();
@@ -47,7 +47,7 @@ export default function LossRuns() {
     const loadOptions = async () => {
       setLoading("fetching");
       try {
-        const res = await api.get(`/loss_run/accounts/`, {
+        const res = await api.get(`/loss_run/accounts`, {
           params: { search_by: searchBy },
         });
 
@@ -125,7 +125,7 @@ export default function LossRuns() {
     const url = lossRunAll ? "loss_run/generate-all" : "loss_run/generate";
     const payload = {
       reportType,
-      ...(policyEffectiveDateFrom && { policyEffectiveDateFrom }),
+      ...(lossDateFrom && { lossDateFrom }),
       ...(!lossRunAll && {
         customerNumbers: selectedIds.map((i) => i.split("-")[0]),
       }),
@@ -202,20 +202,20 @@ export default function LossRuns() {
           </Select>
         </FormControl>
         <TextField
-          id="policy-effective-date-from"
-          label="Policy effective date from (optional)"
+          id="loss-date-from"
+          label="Loss date from (optional)"
           type="date"
-          value={policyEffectiveDateFrom}
-          onChange={(e) => setPolicyEffectiveDateFrom(e.target.value)}
+          value={lossDateFrom}
+          onChange={(e) => setLossDateFrom(e.target.value)}
           InputLabelProps={{ shrink: true }}
-          helperText="Extended history: applies to all accounts in this request. Leave blank for the default history rules."
+          helperText="Includes losses from this date through the report date, plus older open claims and claims with outstanding loss reserves. Applies to all accounts in this request. Leave blank for default history."
           sx={{ width: 300, maxWidth: "100%" }}
         />
-        {policyEffectiveDateFrom && (
+        {lossDateFrom && (
           <Button
             type="button"
             size="small"
-            onClick={() => setPolicyEffectiveDateFrom("")}
+            onClick={() => setLossDateFrom("")}
           >
             Clear date
           </Button>
