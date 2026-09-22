@@ -1,12 +1,5 @@
-Hi Shubham,
+Shubham,
 
-Thank you for this latest report.  As we have been reviewing this report, I suspect that we weren’t entirely clear on what we were requesting in our extended history (XHIST) loss run.  I am going to attach our most recent F W Webb extended history loss run so you can see what it contains.  This report you provided seems like it is a snapshot of claims for one day, 9/1 for each year going back to 2004.  That is not what we need.
- 
+We had previously communicated that, going forward, all Data Science users will have read-only access to the all the DBs across both the servers except DatamodelingandtextminingDB in Preprod(here you should have DDL admin). But after careful consideration of DE’s capacity and ownership of data in Sepcial Accounts DB, we have decided that we will switch DS permissions to SpecialAccounts DB to DDL Admin DB in Preprod.
 
-What we are requesting, I suspect may actually be an easier build for you.  We want ALL claims that occurred in the timespan from a single date that we choose, to the present day.  So if we choose 10/1/2004 as the START date, the report will capture ALL claims starting from that date, and every day in between, to the current day.  Our current loss run provides all claims open and closed going back six years, (plus ALL open claims, regardless of when they occurred).  This is stated on the cover page of our loss run:  This report contains information on all open claims; as well as closed claims limited to the current and prior six policy years.  
-
-So instead of the report being limited to the current and prior six policy years, we want to be able to change that range on an ad hoc basis, to capture all claims from the current day, back to whatever date we limit it to.  And, of course, it must contain all open claims, even if they occurred before that limiting date we specified.
-
-I apologize if there was any confusion about what exactly requesting.  I hope my explanation here clarifies things.  Please let me know if you have any questions.  Thank you again for all of your work on this.
-
-Walt
+I will work on making this change but in the meantime, if you have any scripts/executes to run in preprod SA DB then please let me know, I can run them for you.
