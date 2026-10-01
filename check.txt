@@ -1,5 +1,11 @@
-Shubham,
+Hi Shubham,
 
-We had previously communicated that, going forward, all Data Science users will have read-only access to the all the DBs across both the servers except DatamodelingandtextminingDB in Preprod(here you should have DDL admin). But after careful consideration of DE’s capacity and ownership of data in Sepcial Accounts DB, we have decided that we will switch DS permissions to SpecialAccounts DB to DDL Admin DB in Preprod.
+Thank you for getting back to us now that you got the DB connectivity permissions squared away.  I am attaching the old version of our loss run for  F W Webb, which is still being burst from the OBIEE system.  We have two monthly loss runs that requiring extended history, and these are the only two loss runs being burst each month from the OBIEE system.
 
-I will work on making this change but in the meantime, if you have any scripts/executes to run in preprod SA DB then please let me know, I can run them for you.
+When I compare the amount of data in the report you sent me, against this version from OBIEE, there is a significant difference in the amount of data.  
+
+On the Claim Data page, your report contained 2249 rows of claims/exposures, while the old version contained 6864 rows.  Clearly, a significant amount of data is not coming through on the report you sent me.
+
+Also, I noticed that a policy was completely omitted from the report you sent me.  This policy only had a single claim appearing on the extended history report, but that single claim did appear on our old version of the report.  Claim #15-00966934 from 4/24/2017, on policy D017260
+
+Finally, when I went to open the report you sent me, I had this box pop up; I am not sure if this explains why so much data is missing from the report you sent.
