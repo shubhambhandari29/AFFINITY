@@ -92,7 +92,7 @@ def test_old_queued_policy_job_requires_resubmission(monkeypatch):
 
 
 def test_standard_summary_values_and_caches_match_claims():
-    template = ROOT / "F W Webb Company Inc_From_2004_09_01_2026_09_18.xlsx"
+    template = ROOT / "SACLossRunTemplate.xlsx"
     base = {
         "Customer Number": "TEST-CUSTOMER",
         "Record Only Indicator": "N",

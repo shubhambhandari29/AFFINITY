@@ -208,7 +208,7 @@ def test_full_client_sample_keeps_all_claims_and_interactive_pivots():
     from services.loss_run.loss_run_service import _create_workbook
 
     root = Path(__file__).resolve().parents[3]
-    sample = root / "F W Webb Company Inc_From_2004_09_01_2026_10_01.xlsx"
+    sample = root / "SACLossRunTemplate.xlsx"
     data = root / "PREPRD_9.csv"
     if not sample.exists() or not data.exists():
         pytest.skip("Client repair sample and source extract are not available")
@@ -249,3 +249,78 @@ def test_full_client_sample_keeps_all_claims_and_interactive_pivots():
         assert pivot.cache.enableRefresh
         assert not pivot.formats
     result.close()
+
+
+@pytest.mark.parametrize("report_type", ["standard", "claim_review"])
+def test_real_templates_final_package_has_valid_pivot_styles_and_drawing(report_type):
+    from services.loss_run.claim_review_workbook import create_claim_review_workbook
+    from services.loss_run.excel_package import FONT_ORDER
+    from services.loss_run.loss_run_service import _create_workbook
+
+    root = Path(__file__).resolve().parents[3]
+    filename = (
+        "SACLossRunTemplate.xlsx"
+        if report_type == "standard"
+        else "SACClaimReviewTemplate.xlsx"
+    )
+    generate = (
+        _create_workbook if report_type == "standard" else create_claim_review_workbook
+    )
+    output = generate(
+        [
+            {
+                "Customer Number": "001",
+                "Claim Number": "C1",
+                "Exposure": 1,
+                "Record Only Indicator": "N",
+                "Policy Year": 2004,
+                "Outstanding Loss Reserve": Decimal("10.50"),
+                "Total Paid Loss Net Salvage/Subro/Loss Recovery": Decimal("20"),
+                "Total Incurred": Decimal("30.50"),
+            }
+        ],
+        "001",
+        "Test",
+        (root / filename).read_bytes(),
+        date(2004, 9, 1),
+        date(2026, 10, 5),
+    )
+    with ZipFile(BytesIO(output)) as archive:
+        pivots = [
+            name
+            for name in archive.namelist()
+            if name.startswith("xl/pivotTables/pivotTable") and name.endswith(".xml")
+        ]
+        assert len(pivots) == (2 if report_type == "standard" else 1)
+        rel_id = (
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+        )
+        for name in pivots:
+            pivot = ET.fromstring(archive.read(name))
+            assert rel_id not in pivot.attrib
+            assert pivot.get("cacheId") is not None
+        # The cache's r:id IS required; it still links to the record data.
+        cache = ET.fromstring(archive.read("xl/pivotCache/pivotCacheDefinition1.xml"))
+        assert cache.get(rel_id)
+        styles = ET.fromstring(archive.read("xl/styles.xml"))
+        rank = {S + name: i for i, name in enumerate(FONT_ORDER)}
+        for font in styles.iter(S + "font"):
+            indexes = [rank[item.tag] for item in font]
+            assert indexes == sorted(indexes)
+        count = len(styles.find(S + "cellStyleXfs"))
+        assert all(
+            int(xf.get("xfId", "0")) < count for xf in styles.find(S + "cellXfs")
+        )
+        drawing = ET.fromstring(archive.read("xl/drawings/drawing1.xml"))
+        for geometry in drawing.iter(A + "prstGeom"):
+            assert all(child.tag.startswith(A) for child in geometry)
+        assert len(list(drawing.iter(A + "blip"))) == 1
+    workbook = load_workbook(BytesIO(output))
+    assert len(workbook["Cover Page"]._images) == 1
+    assert "9/1/2004 through 10/5/2026" in workbook["Cover Page"]["A6"].value
+    assert (
+        workbook["Review"]["I5"].value == 30.5
+        if report_type == "claim_review"
+        else workbook["Chart"]["C2"].value == 30.5
+    )
+    workbook.close()

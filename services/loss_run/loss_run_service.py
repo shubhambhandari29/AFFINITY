@@ -18,6 +18,7 @@ from core.date_utils import format_records_dates
 from core.db_helpers import run_raw_query_async
 from services.loss_run.claim_review_workbook import create_claim_review_workbook
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
+from services.loss_run.excel_package import save_report_workbook
 from services.loss_run.report_cover import update_report_cover
 from services.loss_run.standard_report_summary import populate_standard_summaries
 
@@ -165,10 +166,8 @@ def _create_workbook(
     )
 
     workbook.calculation.fullCalcOnLoad = True
-    output = BytesIO()
     try:
-        workbook.save(output)
-        return output.getvalue()
+        return save_report_workbook(workbook)
     finally:
         workbook.close()
 

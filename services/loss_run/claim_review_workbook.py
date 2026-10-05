@@ -11,6 +11,7 @@ from openpyxl.pivot.record import Record, RecordList
 from openpyxl.pivot.table import FieldItem, RowColItem
 from openpyxl.utils import get_column_letter
 
+from services.loss_run.excel_package import save_report_workbook
 from services.loss_run.pivot_cache import shared_items
 from services.loss_run.report_cover import update_report_cover
 
@@ -279,8 +280,6 @@ def create_claim_review_workbook(
             cover.cell(row, 2).data_type = "s"
         update_report_cover(workbook, loss_date_from, report_date)
         workbook.calculation.fullCalcOnLoad = True
-        output = BytesIO()
-        workbook.save(output)
-        return output.getvalue()
+        return save_report_workbook(workbook)
     finally:
         workbook.close()
