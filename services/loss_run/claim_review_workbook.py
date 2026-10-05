@@ -5,12 +5,13 @@ from io import BytesIO
 from zoneinfo import ZoneInfo
 
 from openpyxl import load_workbook
-from openpyxl.pivot.cache import CacheField, SharedItems, WorksheetSource
+from openpyxl.pivot.cache import CacheField, WorksheetSource
 from openpyxl.pivot.fields import Index, Missing, Number, Text
 from openpyxl.pivot.record import Record, RecordList
 from openpyxl.pivot.table import FieldItem, RowColItem
 from openpyxl.utils import get_column_letter
 
+from services.loss_run.pivot_cache import shared_items
 from services.loss_run.report_cover import update_report_cover
 
 REVIEW_FIELDS = {
@@ -97,26 +98,22 @@ def _populate_pivot(workbook, pivot, summaries: list[dict]) -> None:
             Missing()
             if value is None
             else Number(v=float(value))
-            if isinstance(value, Decimal)
+            if isinstance(value, int | float | Decimal)
             else Text(v=str(value))
             for value in unique
         ]
         fields.append(
             CacheField(
                 name=header,
-                sharedItems=SharedItems(
-                    _fields=items,
-                    containsBlank=None in unique,
-                    containsString=any(isinstance(value, str) for value in unique),
-                    containsNumber=any(isinstance(value, Decimal) for value in unique),
-                    containsNonDate=True,
-                ),
+                sharedItems=shared_items(items),
             )
         )
         for row_index, row in enumerate(values):
             indexes[row_index].append(lookup[row[column]])
         field = pivot.pivotFields[column]
-        field.items = [FieldItem(x=index) for index in range(len(unique))]
+        field.items = (
+            [FieldItem(x=index) for index in range(len(unique))] if field.axis else []
+        )
         field.defaultSubtotal = False
 
     pivot.cache.cacheFields = fields
@@ -132,6 +129,14 @@ def _populate_pivot(workbook, pivot, summaries: list[dict]) -> None:
     pivot.cache.refreshOnLoad = False
     pivot.cache.enableRefresh = True
     pivot.cache.missingItemsLimit = 0
+    pivot.formats = []
+    pivot.conditionalFormats = None
+    pivot.filters = []
+    pivot.colGrandTotals = True
+    pivot.rowGrandTotals = False
+    for field in pivot.dataFields:
+        field.baseField = -1
+        field.baseItem = 1048832
     pivot.rowItems = [
         RowColItem(x=[Index(v=row[field.x]) for field in pivot.rowFields])
         for row in indexes

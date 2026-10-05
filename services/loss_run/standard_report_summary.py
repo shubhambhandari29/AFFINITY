@@ -5,11 +5,13 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from openpyxl.chart import BarChart, Reference
-from openpyxl.pivot.cache import CacheField, SharedItems, WorksheetSource
+from openpyxl.pivot.cache import CacheField, WorksheetSource
 from openpyxl.pivot.fields import DateTimeField, Index, Missing, Number, Text
 from openpyxl.pivot.record import Record, RecordList
 from openpyxl.pivot.table import FieldItem, RowColItem
 from openpyxl.utils import get_column_letter
+
+from services.loss_run.pivot_cache import shared_items
 
 
 def populate_standard_summaries(workbook, claims: list[dict]) -> None:
@@ -57,24 +59,19 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
             elif isinstance(value, int | float | Decimal):
                 items.append(Number(v=float(value)))
             elif isinstance(value, date | datetime):
-                items.append(DateTimeField(v=value))
+                items.append(
+                    DateTimeField(
+                        v=value
+                        if isinstance(value, datetime)
+                        else datetime.combine(value, datetime.min.time())
+                    )
+                )
             else:
                 items.append(Text(v=str(value)))
         fields.append(
             CacheField(
                 name=header,
-                sharedItems=SharedItems(
-                    _fields=items,
-                    containsBlank=None in unique,
-                    containsString=any(isinstance(v, str) for v in unique),
-                    containsNumber=any(
-                        isinstance(v, int | float | Decimal) for v in unique
-                    ),
-                    containsDate=any(isinstance(v, date | datetime) for v in unique),
-                    containsNonDate=any(
-                        not isinstance(v, date | datetime) for v in unique
-                    ),
-                ),
+                sharedItems=shared_items(items),
             )
         )
         for index, row in enumerate(values):
@@ -99,10 +96,19 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
         cache.refreshOnLoad = False
         cache.enableRefresh = True
         cache.missingItemsLimit = 0
+        # Template formatting/filter references can point at old cache items.
+        # Cell styles are retained below; do not retain item-specific pivot rules.
+        pivot.formats = []
+        pivot.conditionalFormats = None
+        pivot.filters = []
+        pivot.colGrandTotals = True
+        pivot.rowGrandTotals = False
         for index, field in enumerate(pivot.pivotFields):
-            field.items = [
-                FieldItem(x=i) for i in range(len(fields[index].sharedItems._fields))
-            ]
+            field.items = (
+                [FieldItem(x=i) for i in range(len(fields[index].sharedItems._fields))]
+                if field.axis
+                else []
+            )
             for name in (
                 "defaultSubtotal",
                 "sumSubtotal",
@@ -120,6 +126,9 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 setattr(field, name, False)
         for page in pivot.pageFields:
             page.item = None
+        for field in pivot.dataFields:
+            field.baseField = -1
+            field.baseItem = 1048832
         groups = {}
         for row, item_indexes in zip(values, indexes, strict=True):
             key = tuple(row[field.x] for field in pivot.rowFields)
@@ -161,6 +170,9 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
             sheet.delete_rows(end + 1, sheet.max_row - end)
         pivot.rowItems = row_items + [RowColItem(t="grand", x=[Index(v=0)])]
         pivot.location.ref = f"A{start - 1}:{get_column_letter(len(rows[-1]))}{end}"
+        pivot.location.firstHeaderRow = 0
+        pivot.location.firstDataRow = 1
+        pivot.location.firstDataCol = len(pivot.rowFields)
         if sheet.title == "Chart":
             # Replace the template chart's stale cached TEST series.
             sheet._charts.clear()
