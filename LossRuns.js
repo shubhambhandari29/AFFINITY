@@ -126,10 +126,21 @@ export default function LossRuns() {
       : [];
 
   const handleLossRunTrigger = async () => {
+    if (lossDateFrom && !dayjs(lossDateFrom).isValid()) {
+      await Swal.fire({
+        title: "Invalid date",
+        text: "Please select a valid loss date or clear it for default history.",
+        icon: "error",
+      });
+      return;
+    }
     const url = lossRunAll ? "loss_run/generate-all" : "loss_run/generate";
     const payload = {
       reportType,
-      ...(lossDateFrom && { lossDateFrom }),
+      // Send the selected calendar day, not a UTC timestamp from Day.js JSON.
+      ...(lossDateFrom && {
+        lossDateFrom: dayjs(lossDateFrom).format("YYYY-MM-DD"),
+      }),
       ...(!lossRunAll && {
         customerNumbers: selectedIds.map((i) => i.split("-")[0]),
       }),

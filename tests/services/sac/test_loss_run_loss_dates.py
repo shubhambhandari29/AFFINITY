@@ -10,12 +10,25 @@ import pytest
 from openpyxl import load_workbook
 from pydantic import ValidationError
 
-from core.models.loss_run.loss_run import LossRunOptions
+from core.models.loss_run.loss_run import LossRunOptions, LossRunSelection
 from services.loss_run import loss_run_worker
 from services.loss_run.claim_review_workbook import create_claim_review_workbook
 from services.loss_run.loss_run_service import EXTENDED_HISTORY_QUERY, _create_workbook
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+@pytest.mark.parametrize("model,extra", [
+    (LossRunOptions, {}),
+    (LossRunSelection, {"customerNumbers": ["0033165294"]}),
+])
+def test_calendar_payload_keeps_selected_day_without_timezone_conversion(model, extra):
+    assert model(**extra, lossDateFrom="2004-09-01").lossDateFrom == date(2004, 9, 1)
+    assert model(**extra).lossDateFrom is None
+    assert model(**extra, lossDateFrom=None).lossDateFrom is None
+    # The UTC timestamp cannot tell us which calendar day the user selected.
+    with pytest.raises(ValidationError):
+        model(**extra, lossDateFrom="2014-08-31T18:30:00.000Z")
 
 
 def test_old_payload_cannot_silently_become_default_history():
