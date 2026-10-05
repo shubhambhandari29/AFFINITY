@@ -12,7 +12,7 @@ SEARCH_QUERIES = {
         SELECT
             tblHcmAccount.CustomerName AS [Customer Name],
             tblHcmAccount.CustomerNum AS [Customer Number],
-            tblHcmAccount.OnBoardDate AS [On Board Date],
+            tblHcmAccount.OnBoardDate AS [Renewal Date],
             tblHcmAccount.AcctStatus AS [Account Status]
         FROM tblHcmAccount
         WHERE tblHcmAccount.Stage = 'Admin' AND tblHcmAccount.IsSubmitted = 1
@@ -27,7 +27,7 @@ SEARCH_QUERIES = {
         SELECT
             tblHcmAccount.CustomerNum AS [Customer Number],
             tblHcmAccount.CustomerName AS [Customer Name],
-            tblHcmAccount.OnBoardDate AS [On Board Date],
+            tblHcmAccount.OnBoardDate AS [Renewal Date],
             tblHcmAccount.AcctStatus AS [Account Status]
         FROM tblHcmAccount
         WHERE tblHcmAccount.Stage = 'Admin' AND tblHcmAccount.IsSubmitted = 1
