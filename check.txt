@@ -1,13 +1,2 @@
-{
-    "detail": [
-        {
-            "type": "date_from_datetime_inexact",
-            "loc": [
-                "body",
-                "lossDateFrom"
-            ],
-            "msg": "Datetimes provided to dates should have zero time - e.g. be exact dates",
-            "input": "2014-08-31T18:30:00.000Z"
-        }
-    ]
-}
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<recoveryLog xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><logFileName>error179680_01.xml</logFileName><summary>Errors were detected in file 'C:\Users\sxb640\Downloads\F W Webb Company Inc_From_2004_09_01_2026_10_05.xlsx'</summary><removedFeatures><removedFeature>Removed Feature: PivotTable report from /xl/pivotTables/pivotTable1.xml part (PivotTable view)</removedFeature></removedFeatures></recoveryLog>
