@@ -21,6 +21,10 @@ import api from "../../../../api/api";
 import Loader from "../../../ui/Loader";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import dayjs from "dayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 
 export default function LossRuns() {
   const [accounts, setAccounts] = useState([]);
@@ -164,11 +168,7 @@ export default function LossRuns() {
   };
 
   return (
-    <Grid
-      container
-      spacing={2}
-      sx={{ display: "grid", placeItems: "center", mt: 2 }}
-    >
+    <Grid container spacing={2} sx={{ display: "grid", placeItems: "center" }}>
       <Alert
         severity="info"
         variant="outlined"
@@ -181,102 +181,112 @@ export default function LossRuns() {
         }}
       >
         <AlertTitle>Automatic monthly reports</AlertTitle>
-        When enabled, Standard Loss Runs are scheduled for the <strong>1st</strong>
-        {" "}and Claim Review reports for the <strong>20th</strong> of each month,
-        at <strong>12:00 AM Eastern Time</strong> (adjusted for daylight saving).
-        {" "}Use <strong>View Existing Jobs</strong> below to check progress and
+        When enabled, Standard Loss Runs are scheduled for the{" "}
+        <strong>1st</strong> and Claim Review reports for the{" "}
+        <strong>20th</strong> of each month, at{" "}
+        <strong>12:00 AM Eastern Time</strong> (adjusted for daylight saving).{" "}
+        Use <strong>View Existing Jobs</strong> below to check progress and
         download completed reports. If another report is running, the scheduled
         run will wait.
       </Alert>
       <Grid container spacing={1}>
-        <FormControl sx={{ minWidth: 220 }}>
-          <InputLabel id="report-type-label">Report Type</InputLabel>
-          <Select
-            labelId="report-type-label"
-            label="Report Type"
-            value={reportType}
-            onChange={(e) => setReportType(e.target.value)}
-          >
-            <MenuItem value="standard">Standard Loss Run</MenuItem>
-            <MenuItem value="claim_review">Claim Review</MenuItem>
-          </Select>
-        </FormControl>
-        <TextField
-          id="loss-date-from"
-          label="Loss date from (optional)"
-          type="date"
-          value={lossDateFrom}
-          onChange={(e) => setLossDateFrom(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          helperText="Includes losses from this date through the report date, plus older open claims and claims with outstanding loss reserves. Applies to all accounts in this request. Leave blank for default history."
-          sx={{ width: 300, maxWidth: "100%" }}
-        />
-        {lossDateFrom && (
-          <Button
-            type="button"
-            size="small"
-            onClick={() => setLossDateFrom("")}
-          >
-            Clear date
-          </Button>
-        )}
-        <FormControl
-          component="fieldset"
-          sx={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 2,
-          }}
-        >
-          <FormLabel id="LossRunAll">
-            Do you want to run for all the accounts?
-          </FormLabel>
-          <RadioGroup
-            row
-            defaultValue="Yes"
-            value={lossRunAll ? "Yes" : "No"}
-            onChange={(e) => {
-              setLossRunAll(e.target.value === "Yes");
-              setRowSelectionModel([]);
+        <Grid size={2}>
+          <FormControl fullWidth>
+            <InputLabel id="report-type-label">Report Type</InputLabel>
+            <Select
+              labelId="report-type-label"
+              label="Report Type"
+              value={reportType}
+              onChange={(e) => setReportType(e.target.value)}
+            >
+              <MenuItem value="standard">Standard Loss Run</MenuItem>
+              <MenuItem value="claim_review">Claim Review</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid size={4}>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DatePicker
+              label="Loss date from (optional)"
+              value={lossDateFrom ? dayjs(lossDateFrom) : null}
+              onChange={(newValue) => setLossDateFrom(newValue)}
+              slotProps={{
+                textField: {
+                  helperText:
+                    "Includes losses from this date through the report date, plus older open claims and claims with outstanding loss reserves. Applies to all accounts in this request. Leave blank for default history.",
+                },
+                field: { clearable: true },
+              }}
+            />
+          </LocalizationProvider>
+        </Grid>
+        <Grid size={3}>
+          <FormControl
+            component="fieldset"
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 1,
             }}
           >
-            <FormControlLabel value="Yes" control={<Radio />} label="Yes" />
-            <FormControlLabel value="No" control={<Radio />} label="No" />
-          </RadioGroup>
-        </FormControl>
-        {!(lossRunAll || (!lossRunAll && selectedIds.length > 0)) ? (
-          <Tooltip title="Please select an account first" arrow>
-            <span>
-              <Button
-                variant="contained"
-                color="primary"
-                disabled={
-                  !(lossRunAll || (!lossRunAll && selectedIds.length > 0))
-                }
-                onClick={handleLossRunTrigger}
-              >
-                Trigger Loss Run
-              </Button>
-            </span>
-          </Tooltip>
-        ) : (
+            <FormLabel id="LossRunAll">
+              Do you want to run for all the accounts?
+            </FormLabel>
+            <RadioGroup
+              row
+              defaultValue="Yes"
+              value={lossRunAll ? "Yes" : "No"}
+              onChange={(e) => {
+                setLossRunAll(e.target.value === "Yes");
+                setRowSelectionModel([]);
+              }}
+            >
+              <FormControlLabel value="Yes" control={<Radio />} label="Yes" />
+              <FormControlLabel value="No" control={<Radio />} label="No" />
+            </RadioGroup>
+          </FormControl>
+        </Grid>
+        <Grid size={3} sx={{ display: "flex", gap: 1 }}>
+          {!(lossRunAll || (!lossRunAll && selectedIds.length > 0)) ? (
+            <Tooltip
+              title="Please select an account first"
+              arrow
+              placement="top"
+            >
+              <span>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disabled={
+                    !(lossRunAll || (!lossRunAll && selectedIds.length > 0))
+                  }
+                  onClick={handleLossRunTrigger}
+                >
+                  Trigger Loss Run
+                </Button>
+              </span>
+            </Tooltip>
+          ) : (
+            <Button
+              variant="contained"
+              color="primary"
+              disabled={
+                !(lossRunAll || (!lossRunAll && selectedIds.length > 0))
+              }
+              onClick={handleLossRunTrigger}
+            >
+              Trigger Loss Run
+            </Button>
+          )}
           <Button
             variant="contained"
             color="primary"
-            disabled={!(lossRunAll || (!lossRunAll && selectedIds.length > 0))}
-            onClick={handleLossRunTrigger}
+            onClick={() => navigate("/loss-run-jobs")}
           >
-            Trigger Loss Run
+            View Existing Jobs
           </Button>
-        )}
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => navigate("/loss-run-jobs")}
-        >
-          View Existing Jobs
-        </Button>
+        </Grid>
       </Grid>
 
       {!lossRunAll && (
@@ -284,7 +294,12 @@ export default function LossRuns() {
           container
           spacing={2}
           size={12}
-          sx={{ display: "flex", direction: "row", justifyContent: "center" }}
+          sx={{
+            display: "flex",
+            direction: "row",
+            justifyContent: "center",
+            mt: 1,
+          }}
         >
           <Grid size={3}>
             <FormControl fullWidth>
@@ -321,7 +336,7 @@ export default function LossRuns() {
       {!lossRunAll && (
         <Grid
           sx={{
-            height: 500,
+            height: 380,
             width: "100%",
             display: "flex",
             alignItems: "center",
