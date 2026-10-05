@@ -8,11 +8,15 @@ from openpyxl import load_workbook
 from openpyxl.pivot.cache import CacheField, WorksheetSource
 from openpyxl.pivot.fields import Index, Missing, Number, Text
 from openpyxl.pivot.record import Record, RecordList
-from openpyxl.pivot.table import FieldItem, RowColItem
+from openpyxl.pivot.table import FieldItem
 from openpyxl.utils import get_column_letter
 
 from services.loss_run.excel_package import save_report_workbook
-from services.loss_run.pivot_cache import shared_items
+from services.loss_run.pivot_cache import (
+    cache_field_values,
+    pivot_row_items,
+    shared_items,
+)
 from services.loss_run.report_cover import update_report_cover
 
 REVIEW_FIELDS = {
@@ -93,8 +97,7 @@ def _populate_pivot(workbook, pivot, summaries: list[dict]) -> None:
     indexes = [[] for _ in values]
     fields = []
     for column, header in enumerate(headers):
-        unique = list(dict.fromkeys(row[column] for row in values))
-        lookup = {value: index for index, value in enumerate(unique)}
+        unique, references = cache_field_values(row[column] for row in values)
         items = [
             Missing()
             if value is None
@@ -109,8 +112,8 @@ def _populate_pivot(workbook, pivot, summaries: list[dict]) -> None:
                 sharedItems=shared_items(items),
             )
         )
-        for row_index, row in enumerate(values):
-            indexes[row_index].append(lookup[row[column]])
+        for row_index, reference in enumerate(references):
+            indexes[row_index].append(reference)
         field = pivot.pivotFields[column]
         field.items = (
             [FieldItem(x=index) for index in range(len(unique))] if field.axis else []
@@ -138,10 +141,9 @@ def _populate_pivot(workbook, pivot, summaries: list[dict]) -> None:
     for field in pivot.dataFields:
         field.baseField = -1
         field.baseItem = 1048832
-    pivot.rowItems = [
-        RowColItem(x=[Index(v=row[field.x]) for field in pivot.rowFields])
-        for row in indexes
-    ] + [RowColItem(t="grand", x=[Index(v=0)])]
+    pivot.rowItems = pivot_row_items(
+        [[row[field.x] for field in pivot.rowFields] for row in indexes]
+    )
     pivot.location.ref = f"A3:I{len(values) + 5}"
     pivot.location.firstHeaderRow = 1
 

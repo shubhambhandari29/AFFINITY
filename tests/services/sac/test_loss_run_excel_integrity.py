@@ -25,12 +25,49 @@ from openpyxl.pivot.table import (
     TableDefinition,
 )
 
-from services.loss_run.pivot_cache import shared_items
+from services.loss_run.pivot_cache import (
+    cache_field_values,
+    pivot_row_items,
+    shared_items,
+)
 from services.loss_run.report_cover import update_report_cover
 from services.loss_run.standard_report_summary import populate_standard_summaries
 
 S = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+
+
+def test_pivot_cache_deduplicates_case_without_changing_input():
+    values = ["Closed", "closed", "CLOSED", "Open", "open", None, "", 1, "1"]
+    unique, refs = cache_field_values(values)
+    assert unique == ["Closed", "Open", None, "", 1, "1"]
+    assert refs == [0, 0, 0, 1, 1, 2, 3, 4, 5]
+    assert values[1] == "closed"
+
+
+def test_pivot_rows_encode_repeated_parents_and_decode_losslessly():
+    paths = [[0, 0, 0], [0, 0, 1], [0, 1, 0], [1, 0, 0]]
+    items = pivot_row_items(paths)
+    assert [item.r for item in items[:-1]] == [0, 2, 1, 0]
+    previous = []
+    for item, expected in zip(items[:-1], paths, strict=True):
+        previous = previous[: item.r] + [ref.v for ref in item.x]
+        assert previous == expected
+    assert items[-1].t == "grand"
+
+
+def test_case_only_row_labels_aggregate_like_excel():
+    wb = template()
+    claims = [
+        {"Policy Year": "Closed", "Claim Number": "A", "Total Incurred": 10},
+        {"Policy Year": "closed", "Claim Number": "B", "Total Incurred": 20},
+    ]
+    populate_standard_summaries(wb, claims)
+    assert list(wb["Chart"].values)[1:] == [
+        ("Closed", 2, Decimal(30)),
+        ("Grand Total", 2, Decimal(30)),
+    ]
+    assert wb["Summary Source"]["A3"].value == "closed"
 
 
 @pytest.mark.parametrize(
@@ -177,10 +214,7 @@ def test_summary_pivots_keep_valid_indexes_and_totals(claims):
 
 
 def test_client_repair_sample_drawing_is_rebuilt_without_invalid_geometry():
-    sample = (
-        Path(__file__).resolve().parents[3]
-        / "F W Webb Company Inc_From_2004_09_01_2026_10_01.xlsx"
-    )
+    sample = Path(__file__).resolve().parents[3] / "SACLossRunTemplate.xlsx"
     if not sample.exists():
         pytest.skip("Client repair sample is not available")
     wb = load_workbook(sample)
@@ -203,35 +237,36 @@ def test_client_repair_sample_drawing_is_rebuilt_without_invalid_geometry():
 
 
 def test_full_client_sample_keeps_all_claims_and_interactive_pivots():
-    import csv
-
     from services.loss_run.loss_run_service import _create_workbook
 
     root = Path(__file__).resolve().parents[3]
     sample = root / "SACLossRunTemplate.xlsx"
-    data = root / "PREPRD_9.csv"
+    data = root / "F W Webb Company Inc_From_2004_09_01_2026_10_05.xlsx"
     if not sample.exists() or not data.exists():
         pytest.skip("Client repair sample and source extract are not available")
-    wb = load_workbook(sample)
-    headers = [f.name for f in wb["Chart"]._pivots[0].cache.cacheFields][:-1]
+    wb = load_workbook(data)
+    source = list(wb["Summary Source"].values)
+    records = [
+        {**dict(zip(source[0], row, strict=True)), "Record Only Indicator": "N"}
+        for row in source[1:]
+    ]
+    rows = list(wb["Record Only"].values)
+    records.extend(
+        {
+            **{h: value for h, value in zip(rows[0], row, strict=True) if h},
+            "Record Only Indicator": "Y",
+        }
+        for row in rows[1:]
+        if row[2]
+    )
     wb.close()
-    with data.open(encoding="utf-8-sig", newline="") as stream:
-        records = [
-            dict(zip(headers, [None if v == "NULL" else v for v in row], strict=True))
-            for row in csv.reader(stream)
-        ]
-    for record in records:
-        for header in [*headers[18:29], "Total Incurred"]:
-            if record[header] is not None:
-                record[header] = Decimal(record[header])
-        record["Policy Year"] = int(record["Policy Year"])
     output = _create_workbook(
         records,
         "0033165294",
         "F W Webb Company Inc",
         sample.read_bytes(),
         date(2004, 9, 1),
-        date(2026, 10, 1),
+        date(2026, 10, 5),
     )
     result = load_workbook(BytesIO(output))
     actual = {
@@ -240,7 +275,7 @@ def test_full_client_sample_keeps_all_claims_and_interactive_pivots():
         for row in list(result[name].values)[1:]
         if row[2]
     }
-    assert actual == {(r["Claim Number"], r["Exposure"]) for r in records}
+    assert actual == {(r["Claim Number"], r["Exposure"] or None) for r in records}
     assert len(actual) == 2479
     for name in ("Summary By Policy Year", "Chart"):
         pivot = result[name]._pivots[0]
@@ -248,6 +283,25 @@ def test_full_client_sample_keeps_all_claims_and_interactive_pivots():
         assert pivot.colGrandTotals
         assert pivot.cache.enableRefresh
         assert not pivot.formats
+        for field in pivot.cache.cacheFields:
+            text_values = [
+                item.v.casefold()
+                for item in field.sharedItems._fields
+                if item.tagname == "s"
+            ]
+            assert len(text_values) == len(set(text_values))
+        previous = []
+        for item in pivot.rowItems[:-1]:
+            current = previous[: item.r] + [ref.v for ref in item.x]
+            assert len(current) == len(pivot.rowFields)
+            prefix = 0
+            while (
+                prefix < min(len(previous), len(current) - 1)
+                and previous[prefix] == current[prefix]
+            ):
+                prefix += 1
+            assert item.r == prefix
+            previous = current
     result.close()
 
 

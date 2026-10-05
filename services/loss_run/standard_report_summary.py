@@ -8,10 +8,14 @@ from openpyxl.chart import BarChart, Reference
 from openpyxl.pivot.cache import CacheField, WorksheetSource
 from openpyxl.pivot.fields import DateTimeField, Index, Missing, Number, Text
 from openpyxl.pivot.record import Record, RecordList
-from openpyxl.pivot.table import FieldItem, RowColItem
+from openpyxl.pivot.table import FieldItem
 from openpyxl.utils import get_column_letter
 
-from services.loss_run.pivot_cache import shared_items
+from services.loss_run.pivot_cache import (
+    cache_field_values,
+    pivot_row_items,
+    shared_items,
+)
 
 
 def populate_standard_summaries(workbook, claims: list[dict]) -> None:
@@ -48,10 +52,11 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 cell.data_type = "s"
 
     fields = []
+    display_values = []
     indexes = [[] for _ in values]
     for column, header in enumerate(headers):
-        unique = list(dict.fromkeys(row[column] for row in values))
-        lookup = {value: index for index, value in enumerate(unique)}
+        unique, references = cache_field_values(row[column] for row in values)
+        display_values.append(unique)
         items = []
         for value in unique:
             if value is None:
@@ -74,8 +79,8 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 sharedItems=shared_items(items),
             )
         )
-        for index, row in enumerate(values):
-            indexes[index].append(lookup[row[column]])
+        for index, reference in enumerate(references):
+            indexes[index].append(reference)
 
     for sheet in targets:
         pivot = sheet._pivots[0]
@@ -131,7 +136,7 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
             field.baseItem = 1048832
         groups = {}
         for row, item_indexes in zip(values, indexes, strict=True):
-            key = tuple(row[field.x] for field in pivot.rowFields)
+            key = tuple(item_indexes[field.x] for field in pivot.rowFields)
             if key not in groups:
                 groups[key] = (
                     [Decimal(0) for _ in pivot.dataFields],
@@ -149,12 +154,21 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
             for cell in row:
                 cell.value = None
         rows = []
-        row_items = []
+        row_paths = []
         grand = [Decimal(0) for _ in pivot.dataFields]
-        for key in sorted(groups, key=lambda k: tuple(str(v or "") for v in k)):
+
+        def labels(key, row_fields=pivot.rowFields):
+            return [
+                display_values[field.x][ref]
+                for field, ref in zip(row_fields, key, strict=True)
+            ]
+
+        for key in sorted(
+            groups, key=lambda k: tuple(str(v or "").casefold() for v in labels(k))
+        ):
             totals, refs = groups[key]
-            rows.append([*key, *totals])
-            row_items.append(RowColItem(x=[Index(v=v) for v in refs]))
+            rows.append([*labels(key), *totals])
+            row_paths.append(refs)
             grand = [a + b for a, b in zip(grand, totals, strict=True)]
         rows.append(["Grand Total", *([None] * (len(pivot.rowFields) - 1)), *grand])
         for index, row in enumerate(rows, start):
@@ -168,7 +182,7 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
         end = start + len(rows) - 1
         if sheet.max_row > end:
             sheet.delete_rows(end + 1, sheet.max_row - end)
-        pivot.rowItems = row_items + [RowColItem(t="grand", x=[Index(v=0)])]
+        pivot.rowItems = pivot_row_items(row_paths)
         pivot.location.ref = f"A{start - 1}:{get_column_letter(len(rows[-1]))}{end}"
         pivot.location.firstHeaderRow = 0
         pivot.location.firstDataRow = 1
