@@ -1,2 +1,15 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<recoveryLog xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><logFileName>error179680_01.xml</logFileName><summary>Errors were detected in file 'C:\Users\sxb640\Downloads\F W Webb Company Inc_From_2004_09_01_2026_10_05.xlsx'</summary><removedFeatures><removedFeature>Removed Feature: PivotTable report from /xl/pivotTables/pivotTable1.xml part (PivotTable view)</removedFeature></removedFeatures></recoveryLog>
+Hi Walt,
+Thank you for sharing the OBIEE report and highlighting the differences.
+We have resolved the Excel repair issue and confirmed that the updated workbook opens successfully. This issue was separate from the missing claims.
+We also ran the same diagnostic queries against PROD and PREPROD for F W Webb and found:
+- Both environments return the same 2,248 Claims Data rows and 231 Record Only rows, excluding headers. Our generated Excel includes all these records.
+- Claim 15-00966934 and policy D017260 were not found by the direct PROD source queries.
+- The financial-source objects used by our report returned no matching records for this account, explaining the zero financial amounts.
+Our application reads from CLMAA_SpecialAccounts and CLM_LakeHouse. We have not yet confirmed whether the OBIEE report uses the same sources and rules. Therefore, we cannot currently reproduce its full historical claim population and financial values, or attribute every difference solely to missing source data.
+Could you please help us connect with the OBIEE/data team to obtain:
+1. The source tables/views and query or filtering logic used by the existing extended-history report.
+2. Confirmation of where the missing claim, policy and historical financial records are stored, and whether they are available in our reporting sources.
+3. The account numbers and required history start dates for the two monthly extended-history reports, along with their current generation schedule.
+This will help us identify whether the remaining changes belong in our query logic, the underlying data feeds, or both.
+Thanks,
+Shubham
