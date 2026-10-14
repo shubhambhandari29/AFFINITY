@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
-from core.date_utils import format_date_value, format_datetime_value
+from core.date_utils import format_date_value, format_loss_run_timestamp
 from services.loss_run.loss_run_job_repository import (
     create_job,
     get_all_failures,
@@ -115,9 +115,9 @@ def _format_job(job: dict, failures: list[dict]) -> dict:
         "generatedCount": job["GeneratedCount"],
         "failedCount": job["FailedCount"],
         "requestedBy": job["RequestedBy"],
-        "createdAt": format_datetime_value(job["CreatedAt"]),
-        "startedAt": format_datetime_value(job["StartedAt"]),
-        "completedAt": format_datetime_value(job["CompletedAt"]),
+        "createdAt": format_loss_run_timestamp(job["CreatedAt"]),
+        "startedAt": format_loss_run_timestamp(job["StartedAt"]),
+        "completedAt": format_loss_run_timestamp(job["CompletedAt"]),
         "errorMessage": job["ErrorMessage"],
         "failures": failures,
     }

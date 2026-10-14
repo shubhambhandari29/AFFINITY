@@ -115,7 +115,7 @@ def test_create_job_persists_extended_history_date(monkeypatch):
 
 def test_get_job_returns_failures_only_when_present(monkeypatch):
     job_id = uuid4()
-    now = datetime.now(UTC)
+    now = datetime(2026, 1, 15, 18, 30, tzinfo=UTC)
 
     async def fake_get(received_job_id):
         assert received_job_id == job_id
@@ -151,7 +151,7 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
     result = asyncio.run(loss_run_job_service.get_loss_run_job(job_id))
 
     assert result["generatedCount"] == 1
-    expected_datetime = now.strftime("%m-%d-%Y %I:%M:%S %p")
+    expected_datetime = "01-15-2026 01:30:00 PM"
     assert result["createdAt"] == expected_datetime
     assert result["startedAt"] == expected_datetime
     assert result["completedAt"] == expected_datetime
@@ -167,7 +167,7 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
 def test_get_all_jobs_returns_newest_jobs_with_grouped_failures(monkeypatch):
     first_job_id = uuid4()
     second_job_id = uuid4()
-    now = datetime.now(UTC)
+    now = datetime(2026, 7, 15, 18, 30)
 
     def job(job_id, status, failed_count):
         return {
@@ -207,7 +207,7 @@ def test_get_all_jobs_returns_newest_jobs_with_grouped_failures(monkeypatch):
     result = asyncio.run(loss_run_job_service.get_loss_run_jobs())
 
     assert [item["jobId"] for item in result] == [first_job_id, second_job_id]
-    expected_datetime = now.strftime("%m-%d-%Y %I:%M:%S %p")
+    expected_datetime = "07-15-2026 02:30:00 PM"
     assert all(item["createdAt"] == expected_datetime for item in result)
     assert result[0]["failures"] == [
         {

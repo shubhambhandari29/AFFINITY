@@ -34,6 +34,21 @@ def test_format_datetime_value_includes_time_and_handles_sentinel():
     assert date_utils.format_datetime_value(None) is None
 
 
+def test_loss_run_timestamps_use_eastern_with_dst_and_date_rollover():
+    convert = date_utils.format_loss_run_timestamp
+    assert convert(datetime(2026, 1, 15, 18, 30)) == "01-15-2026 01:30:00 PM"
+    assert convert("2026-07-15T18:30:00Z") == "07-15-2026 02:30:00 PM"
+    assert convert("2026-01-15T02:30:00Z") == "01-14-2026 09:30:00 PM"
+    assert convert("2026-03-08T06:59:00Z") == "03-08-2026 01:59:00 AM"
+    assert convert("2026-03-08T07:00:00Z") == "03-08-2026 03:00:00 AM"
+    assert convert("2026-11-01T05:30:00Z") == "11-01-2026 01:30:00 AM"
+    assert convert("2026-11-01T06:30:00Z") == "11-01-2026 01:30:00 AM"
+    assert convert(None) is None
+    assert convert("") == ""
+    assert convert("not-a-date") == "not-a-date"
+    assert convert(datetime(1900, 1, 1)) is None
+
+
 def test_parse_date_input_handles_formats_and_sentinel():
     assert date_utils.parse_date_input("2024-01-02") == date(2024, 1, 2)
     parsed = date_utils.parse_date_input("2024-01-02T08:30:00Z")
