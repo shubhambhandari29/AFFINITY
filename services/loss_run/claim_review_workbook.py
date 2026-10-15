@@ -12,6 +12,7 @@ from openpyxl.pivot.table import FieldItem
 from openpyxl.utils import get_column_letter
 
 from services.loss_run.excel_package import save_report_workbook
+from services.loss_run.no_claims_workbook import create_no_claims_workbook
 from services.loss_run.pivot_cache import (
     cache_field_values,
     pivot_row_items,
@@ -157,6 +158,11 @@ def create_claim_review_workbook(
     report_date: date | None = None,
 ) -> bytes:
     """Populate the converted client Claim Review template, not a new workbook."""
+    if not records:
+        return create_no_claims_workbook(
+            customer_num, customer_name, template_bytes, "claim_review",
+            loss_date_from, report_date,
+        )
     workbook = load_workbook(BytesIO(template_bytes))
     try:
         review = workbook["Review"]

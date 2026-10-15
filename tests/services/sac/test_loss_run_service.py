@@ -386,11 +386,10 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(monkeypatch):
     result = asyncio.run(loss_run_service.generate_loss_runs(["00123", "00456", "00123"]))
 
     assert result["requestedCount"] == 2
-    assert result["generatedCount"] == 1
-    assert result["failedCount"] == 1
-    assert result["failures"] == [
-        {"customerNumber": "00456", "reason": "No loss-run records found"}
-    ]
+    assert result["generatedCount"] == 2
+    assert result["failedCount"] == 0
+    assert result["failures"] == []
+    assert len(uploaded) == 2
     assert "files" not in result
     assert len(calls) == 2
     assert calls[0][1] == ["00123", "00456"]

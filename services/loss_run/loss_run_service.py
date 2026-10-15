@@ -19,6 +19,7 @@ from core.db_helpers import run_raw_query_async
 from services.loss_run.claim_review_workbook import create_claim_review_workbook
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
 from services.loss_run.excel_package import save_report_workbook
+from services.loss_run.no_claims_workbook import create_no_claims_workbook
 from services.loss_run.report_cover import update_report_cover
 from services.loss_run.standard_report_summary import populate_standard_summaries
 
@@ -115,6 +116,11 @@ def _create_workbook(
     loss_date_from: date | None = None,
     report_date: date | None = None,
 ) -> bytes:
+    if not records:
+        return create_no_claims_workbook(
+            customer_num, customer_name, template_bytes, "standard",
+            loss_date_from, report_date,
+        )
     dataframe = pd.DataFrame(records)
 
     if "Exposure" in dataframe.columns:
@@ -276,22 +282,11 @@ async def generate_loss_runs(
 
         for customer_num in requested_numbers:
             customer_name = customer_names.get(customer_num)
-            customer_records = records_by_customer.get(customer_num)
+            customer_records = records_by_customer.get(customer_num, [])
 
             if customer_name is None:
                 reason = "Customer not found"
                 failures.append({"customerNumber": customer_num, "reason": reason})
-                if on_result:
-                    await on_result(customer_num, False, reason, None)
-                continue
-            if not customer_records:
-                reason = "No loss-run records found"
-                failures.append(
-                    {
-                        "customerNumber": customer_num,
-                        "reason": reason,
-                    }
-                )
                 if on_result:
                     await on_result(customer_num, False, reason, None)
                 continue
