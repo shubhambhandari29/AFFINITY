@@ -1,35 +1,99 @@
-SELECT
-    DB_NAME() AS DatabaseName,
-    s.name AS SchemaName,
-    o.name AS ObjectName,
-    o.type_desc AS ObjectType,
-    c.column_id AS ColumnPosition,
-    c.name AS ColumnName,
-    t.name AS DataType,
-    c.max_length AS MaxLengthBytes,
-    c.precision AS NumericPrecision,
-    c.scale AS NumericScale,
-    c.is_nullable AS IsNullable
-FROM sys.objects o
-JOIN sys.schemas s ON s.schema_id = o.schema_id
-JOIN sys.columns c ON c.object_id = o.object_id
-JOIN sys.types t ON t.user_type_id = c.user_type_id
-WHERE o.type IN ('U', 'V')
-  AND o.is_ms_shipped = 0
-ORDER BY s.name, o.name, c.column_id;
-
-
-
+USE [CLMAA_SpecialAccounts];
 
 SELECT
-    s.name AS SchemaName,
-    o.name AS ObjectName,
-    o.type_desc AS ObjectType,
-    m.definition AS SQLDefinition
-FROM sys.objects o
-JOIN sys.schemas s ON s.schema_id = o.schema_id
-LEFT JOIN sys.sql_modules m ON m.object_id = o.object_id
-WHERE o.name IN (
-    'DW_FINCL_LOSS_FTR_SS_F_FILTERED',
-    'DW_FINCL_LOSS_TXN_SS_F_FILTERED'
-);
+    a.ProgramName,
+    a.AgentCode,
+    a.AgentName,
+    a.LossRunReq,
+    p.AcctAffinityProgramKey,
+    p.AcctStatus,
+    p.LossRunDistFreq
+FROM dbo.tblAffinityAgents a
+LEFT JOIN dbo.tblAcctAffinityProgram p
+    ON p.ProgramName = a.ProgramName
+WHERE LTRIM(RTRIM(a.AgentCode)) IN (
+    '5701083',
+    '5701212',
+    '1502070'
+)
+ORDER BY a.ProgramName, a.AgentCode;
+
+
+
+USE [CLMAA_SpecialAccounts];
+
+;WITH Producers AS (
+    SELECT AgentCode
+    FROM (VALUES
+        ('5701083'),
+        ('5701212'),
+        ('1502070')
+    ) v(AgentCode)
+),
+Policies AS (
+    SELECT DISTINCT
+        p.PRDCNG_AGNT_CD AS AgentCode,
+        p.POL_SYM,
+        p.POL_NBR,
+        p.POL_MOD
+    FROM CLM_LakeHouse.dbo.DW_POL_DIMNSN p
+    JOIN Producers a
+        ON a.AgentCode = p.PRDCNG_AGNT_CD
+    WHERE p.POL_CURR_VERSN_IND = 'Y'
+),
+PolicyCounts AS (
+    SELECT AgentCode, COUNT_BIG(*) AS CurrentPolicyCount
+    FROM Policies
+    GROUP BY AgentCode
+),
+Claims AS (
+    SELECT DISTINCT
+        p.AgentCode,
+        c.CLM_NBR
+    FROM Policies p
+    JOIN CLM_LakeHouse.dbo.DW_CLMS_CLM_DIMNSN c
+        ON c.POL_SYM = p.POL_SYM
+       AND c.POL_NBR = p.POL_NBR
+       AND c.POL_MOD = p.POL_MOD
+    WHERE c.CURR_VERSN_IND = 'Y'
+),
+ClaimCoverage AS (
+    SELECT
+        c.AgentCode,
+        c.CLM_NBR,
+        CASE WHEN EXISTS (
+            SELECT 1
+            FROM CLM_LakeHouse.dbo.DW_FINCL_LOSS_FTR_SS_F f
+            WHERE f.CLM_NBR = c.CLM_NBR
+        ) THEN 1 ELSE 0 END AS HasFinancialSnapshot,
+        CASE WHEN EXISTS (
+            SELECT 1
+            FROM CLM_LakeHouse.dbo.DW_FINCL_LOSS_TXN_SS_F t
+            WHERE t.CLM_NBR = c.CLM_NBR
+        ) THEN 1 ELSE 0 END AS HasFinancialTransactions
+    FROM Claims c
+),
+ClaimCounts AS (
+    SELECT
+        AgentCode,
+        COUNT_BIG(*) AS CurrentClaimCount,
+        SUM(CAST(HasFinancialSnapshot AS bigint))
+            AS ClaimsWithFinancialSnapshot,
+        SUM(CAST(HasFinancialTransactions AS bigint))
+            AS ClaimsWithFinancialTransactions
+    FROM ClaimCoverage
+    GROUP BY AgentCode
+)
+SELECT
+    @@SERVERNAME AS ServerName,
+    a.AgentCode,
+    COALESCE(p.CurrentPolicyCount, 0) AS CurrentPolicyCount,
+    COALESCE(c.CurrentClaimCount, 0) AS CurrentClaimCount,
+    COALESCE(c.ClaimsWithFinancialSnapshot, 0)
+        AS ClaimsWithFinancialSnapshot,
+    COALESCE(c.ClaimsWithFinancialTransactions, 0)
+        AS ClaimsWithFinancialTransactions
+FROM Producers a
+LEFT JOIN PolicyCounts p ON p.AgentCode = a.AgentCode
+LEFT JOIN ClaimCounts c ON c.AgentCode = a.AgentCode
+ORDER BY a.AgentCode;
