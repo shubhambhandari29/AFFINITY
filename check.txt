@@ -1,99 +1,12 @@
-USE [CLMAA_SpecialAccounts];
-
-SELECT
-    a.ProgramName,
-    a.AgentCode,
-    a.AgentName,
-    a.LossRunReq,
-    p.AcctAffinityProgramKey,
-    p.AcctStatus,
-    p.LossRunDistFreq
-FROM dbo.tblAffinityAgents a
-LEFT JOIN dbo.tblAcctAffinityProgram p
-    ON p.ProgramName = a.ProgramName
-WHERE LTRIM(RTRIM(a.AgentCode)) IN (
-    '5701083',
-    '5701212',
-    '1502070'
-)
-ORDER BY a.ProgramName, a.AgentCode;
+ProgramName	AgentCode	AgentName	LossRunReq	AcctAffinityProgramKey	AcctStatus	LossRunDistFreq
+Carpet Cleaners and Janitorial Programs	5701083	HALLMARK INS. ASSOCIATES	Yes	3	Active	2.Quarterly
+Carpet Cleaners and Janitorial Programs	5701212	HALLMARK INS. ASSOCIATES	Yes	3	Active	2.Quarterly
+Subway Affinity Program	1502070	L H BRENNER	Yes	33	Active	1.Monthly
 
 
 
-USE [CLMAA_SpecialAccounts];
 
-;WITH Producers AS (
-    SELECT AgentCode
-    FROM (VALUES
-        ('5701083'),
-        ('5701212'),
-        ('1502070')
-    ) v(AgentCode)
-),
-Policies AS (
-    SELECT DISTINCT
-        p.PRDCNG_AGNT_CD AS AgentCode,
-        p.POL_SYM,
-        p.POL_NBR,
-        p.POL_MOD
-    FROM CLM_LakeHouse.dbo.DW_POL_DIMNSN p
-    JOIN Producers a
-        ON a.AgentCode = p.PRDCNG_AGNT_CD
-    WHERE p.POL_CURR_VERSN_IND = 'Y'
-),
-PolicyCounts AS (
-    SELECT AgentCode, COUNT_BIG(*) AS CurrentPolicyCount
-    FROM Policies
-    GROUP BY AgentCode
-),
-Claims AS (
-    SELECT DISTINCT
-        p.AgentCode,
-        c.CLM_NBR
-    FROM Policies p
-    JOIN CLM_LakeHouse.dbo.DW_CLMS_CLM_DIMNSN c
-        ON c.POL_SYM = p.POL_SYM
-       AND c.POL_NBR = p.POL_NBR
-       AND c.POL_MOD = p.POL_MOD
-    WHERE c.CURR_VERSN_IND = 'Y'
-),
-ClaimCoverage AS (
-    SELECT
-        c.AgentCode,
-        c.CLM_NBR,
-        CASE WHEN EXISTS (
-            SELECT 1
-            FROM CLM_LakeHouse.dbo.DW_FINCL_LOSS_FTR_SS_F f
-            WHERE f.CLM_NBR = c.CLM_NBR
-        ) THEN 1 ELSE 0 END AS HasFinancialSnapshot,
-        CASE WHEN EXISTS (
-            SELECT 1
-            FROM CLM_LakeHouse.dbo.DW_FINCL_LOSS_TXN_SS_F t
-            WHERE t.CLM_NBR = c.CLM_NBR
-        ) THEN 1 ELSE 0 END AS HasFinancialTransactions
-    FROM Claims c
-),
-ClaimCounts AS (
-    SELECT
-        AgentCode,
-        COUNT_BIG(*) AS CurrentClaimCount,
-        SUM(CAST(HasFinancialSnapshot AS bigint))
-            AS ClaimsWithFinancialSnapshot,
-        SUM(CAST(HasFinancialTransactions AS bigint))
-            AS ClaimsWithFinancialTransactions
-    FROM ClaimCoverage
-    GROUP BY AgentCode
-)
-SELECT
-    @@SERVERNAME AS ServerName,
-    a.AgentCode,
-    COALESCE(p.CurrentPolicyCount, 0) AS CurrentPolicyCount,
-    COALESCE(c.CurrentClaimCount, 0) AS CurrentClaimCount,
-    COALESCE(c.ClaimsWithFinancialSnapshot, 0)
-        AS ClaimsWithFinancialSnapshot,
-    COALESCE(c.ClaimsWithFinancialTransactions, 0)
-        AS ClaimsWithFinancialTransactions
-FROM Producers a
-LEFT JOIN PolicyCounts p ON p.AgentCode = a.AgentCode
-LEFT JOIN ClaimCounts c ON c.AgentCode = a.AgentCode
-ORDER BY a.AgentCode;
+ServerName	AgentCode	CurrentPolicyCount	CurrentClaimCount	ClaimsWithFinancialSnapshot	ClaimsWithFinancialTransactions
+clms-preprd-sqlmanagedinstance.3b98dc354c37.database.windows.net	1502070	1561	107	97	97
+clms-preprd-sqlmanagedinstance.3b98dc354c37.database.windows.net	5701083	4909	178	168	168
+clms-preprd-sqlmanagedinstance.3b98dc354c37.database.windows.net	5701212	378	13	12	12
