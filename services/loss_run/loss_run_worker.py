@@ -110,7 +110,7 @@ class LossRunWorker:
                 )
                 return
             await generate_loss_runs(
-                None if job_type == "all" else await self._selected_accounts(job_id),
+                None if job_type == "all" else await get_account_numbers(job_id),
                 report_type=job.get("ReportType", "standard"),
                 loss_date_from=job.get("LossDateFrom"),
                 on_phase=on_phase,
@@ -131,9 +131,6 @@ class LossRunWorker:
             heartbeat.cancel()
             with suppress(asyncio.CancelledError):
                 await heartbeat
-
-    async def _selected_accounts(self, job_id: UUID) -> list[str]:
-        return await get_account_numbers(job_id)
 
     async def _heartbeat(self, job_id: UUID) -> None:
         while True:

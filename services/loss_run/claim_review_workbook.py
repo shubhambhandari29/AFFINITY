@@ -12,13 +12,15 @@ from openpyxl.pivot.table import FieldItem
 from openpyxl.utils import get_column_letter
 
 from services.loss_run.excel_package import save_report_workbook
-from services.loss_run.no_claims_workbook import create_no_claims_workbook
 from services.loss_run.pivot_cache import (
     cache_field_values,
     pivot_row_items,
     shared_items,
 )
-from services.loss_run.report_cover import update_report_cover
+from services.loss_run.workbook_template import (
+    create_no_claims_workbook,
+    update_report_cover,
+)
 
 REVIEW_FIELDS = {
     "Claimant Name-Company": "Claimant Name",

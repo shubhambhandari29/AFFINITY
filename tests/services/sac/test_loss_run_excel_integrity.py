@@ -30,8 +30,8 @@ from services.loss_run.pivot_cache import (
     pivot_row_items,
     shared_items,
 )
-from services.loss_run.report_cover import update_report_cover
 from services.loss_run.standard_report_summary import populate_standard_summaries
+from services.loss_run.workbook_template import update_report_cover
 
 S = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
@@ -68,6 +68,29 @@ def test_case_only_row_labels_aggregate_like_excel():
         ("Grand Total", 2, Decimal(30)),
     ]
     assert wb["Summary Source"]["A3"].value == "closed"
+
+
+def test_summary_source_does_not_rescan_dimensions_for_each_claim(monkeypatch):
+    from openpyxl.worksheet.worksheet import Worksheet
+
+    scans = []
+    original = Worksheet.max_row.fget
+
+    def track_max_row(sheet):
+        if sheet.title == "Summary Source":
+            scans.append(sheet.title)
+        return original(sheet)
+
+    monkeypatch.setattr(Worksheet, "max_row", property(track_max_row))
+    wb = template()
+    claims = [
+        {"Policy Year": 2020, "Claim Number": str(i), "Total Incurred": 1}
+        for i in range(100)
+    ]
+    populate_standard_summaries(wb, claims)
+    assert scans == []
+    assert wb["Summary Source"]["B101"].value == "99"
+    wb.close()
 
 
 @pytest.mark.parametrize(

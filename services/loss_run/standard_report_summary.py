@@ -39,7 +39,7 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
     source.append(headers)
     seen = set()
     values = []
-    for claim in claims:
+    for row_index, claim in enumerate(claims, 2):
         claim = dict(claim)
         number = claim["Claim Number"]
         claim["Distinct Claim Helper"] = int(number not in seen)
@@ -47,7 +47,10 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
         row = [claim.get(header) for header in headers]
         values.append(row)
         source.append(row)
-        for cell in source[source.max_row]:
+        # max_row and sheet[row] scan the populated cell map. Avoid doing that
+        # for every claim, which makes building a large source quadratic.
+        for column in range(1, len(headers) + 1):
+            cell = source.cell(row_index, column)
             if isinstance(cell.value, str):
                 cell.data_type = "s"
 

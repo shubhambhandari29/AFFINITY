@@ -8,7 +8,7 @@ from openpyxl import load_workbook
 
 from services.loss_run.claim_review_workbook import create_claim_review_workbook
 from services.loss_run.loss_run_service import _create_workbook
-from services.loss_run.no_claims_workbook import NO_CLAIMS_MESSAGE
+from services.loss_run.workbook_template import NO_CLAIMS_MESSAGE
 
 
 @pytest.mark.parametrize("cutoff", [None, date(2004, 9, 1)])

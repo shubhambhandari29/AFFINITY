@@ -1,7 +1,7 @@
 """Create due monthly jobs; the existing worker generates their reports."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -52,7 +52,7 @@ def _enqueue_due_job():
             return None
 
         cursor.execute("SELECT SYSUTCDATETIME()")
-        now = cursor.fetchone()[0].replace(tzinfo=timezone.utc)
+        now = cursor.fetchone()[0].replace(tzinfo=UTC)
         cursor.execute("SELECT * FROM dbo.tblLossRunSchedule WHERE IsEnabled = 1")
         schedules = _rows_to_dicts(cursor)
         cursor.execute(

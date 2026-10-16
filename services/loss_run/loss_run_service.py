@@ -4,6 +4,7 @@ import re
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime
 from io import BytesIO
+from itertools import chain
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -19,9 +20,11 @@ from core.db_helpers import run_raw_query_async
 from services.loss_run.claim_review_workbook import create_claim_review_workbook
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
 from services.loss_run.excel_package import save_report_workbook
-from services.loss_run.no_claims_workbook import create_no_claims_workbook
-from services.loss_run.report_cover import update_report_cover
 from services.loss_run.standard_report_summary import populate_standard_summaries
+from services.loss_run.workbook_template import (
+    create_no_claims_workbook,
+    update_report_cover,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,14 +89,13 @@ def _write_excel_table(worksheet, table_name: str, dataframe: pd.DataFrame) -> N
     column_count = len(dataframe.columns)
     new_ref = f"A1:{get_column_letter(column_count)}{row_count}"
 
-    for row_index, row in enumerate(worksheet[new_ref]):
-        for column_index, cell in enumerate(row):
-            if row_index == 0:
-                cell.value = dataframe.columns[column_index]
-                continue
-
-            value = dataframe.iat[row_index - 1, column_index]
-            cell.value = None if pd.isna(value) else value
+    # Iterate rows once instead of performing a pandas scalar lookup per cell.
+    rows = chain([dataframe.columns], dataframe.itertuples(index=False, name=None))
+    for row_index, values in enumerate(rows, 1):
+        for column_index, value in enumerate(values, 1):
+            worksheet.cell(row_index, column_index).value = (
+                None if row_index > 1 and pd.isna(value) else value
+            )
 
     for row in old_cells:
         for cell in row:
@@ -160,7 +162,6 @@ def _create_workbook(
     cover_page = workbook["Cover Page"]
     cover_page.cell(2, 2, customer_num)
     cover_page.cell(3, 2, customer_name)
-    cover_page.cell(4, 2, datetime.now().strftime("%m/%d/%Y"))
     update_report_cover(
         workbook,
         loss_date_from,
@@ -279,6 +280,10 @@ async def generate_loss_runs(
 
         generated_count = 0
         failures = []
+        workbook_builder = (
+            create_claim_review_workbook if report_type == "claim_review" else _create_workbook
+        )
+        history_label = f"_From_{loss_date_from:%Y_%m_%d}" if loss_date_from is not None else ""
 
         for customer_num in requested_numbers:
             customer_name = customer_names.get(customer_num)
@@ -292,19 +297,8 @@ async def generate_loss_runs(
                 continue
 
             safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", customer_name).strip(" .")
-            filename = f"{safe_name or customer_num}_{report_date:%Y_%m_%d}.xlsx"
-            if loss_date_from is not None:
-                filename = (
-                    f"{safe_name or customer_num}_From_"
-                    f"{loss_date_from:%Y_%m_%d}_"
-                    f"{report_date:%Y_%m_%d}.xlsx"
-                )
+            filename = f"{safe_name or customer_num}{history_label}_{report_date:%Y_%m_%d}.xlsx"
             if report_type == "claim_review":
-                history_label = (
-                    f"_From_{loss_date_from:%Y_%m_%d}"
-                    if loss_date_from is not None
-                    else ""
-                )
                 filename = (
                     f"{safe_name or customer_num}_{customer_num}_"
                     f"ClaimReview{history_label}_"
@@ -313,11 +307,7 @@ async def generate_loss_runs(
 
             try:
                 workbook_bytes = await run_in_threadpool(
-                    (
-                        create_claim_review_workbook
-                        if report_type == "claim_review"
-                        else _create_workbook
-                    ),
+                    workbook_builder,
                     customer_records,
                     customer_num,
                     customer_name,

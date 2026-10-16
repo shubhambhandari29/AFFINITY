@@ -5,6 +5,7 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
 
+import pandas as pd
 import pytest
 from openpyxl import Workbook, load_workbook
 from openpyxl.drawing.image import Image as ExcelImage
@@ -297,6 +298,35 @@ def _make_template(path):
     workbook.create_sheet("Summary By Policy Year")
     workbook.create_sheet("Chart")
     workbook.save(path)
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_write_excel_table_preserves_values_and_clears_stale_cells(empty):
+    from decimal import Decimal
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["Old A", "Old B", "Old C", "Old D"])
+    for _ in range(4):
+        sheet.append(["stale"] * 4)
+    sheet.add_table(Table(displayName="Data", ref="A1:D5"))
+    data = pd.DataFrame(
+        [] if empty else [["00123", Decimal("12.50"), date(2026, 1, 1)],
+                          [None, float("nan"), pd.NaT]],
+        columns=["Customer", "Amount", "Date"],
+    )
+    loss_run_service._write_excel_table(sheet, "Data", data)
+    assert sheet.tables["Data"].ref == ("A1:C1" if empty else "A1:C3")
+    assert [c.name for c in sheet.tables["Data"].tableColumns] == list(data.columns)
+    assert [c.value for c in sheet[1]][:3] == list(data.columns)
+    assert all(sheet.cell(row, 4).value is None for row in range(1, 6))
+    if not empty:
+        assert [sheet.cell(2, col).value for col in range(1, 4)] == [
+            "00123", Decimal("12.50"), date(2026, 1, 1)
+        ]
+    for row in sheet.iter_rows(min_row=2 if empty else 3):
+        assert all(cell.value is None for cell in row)
+    workbook.close()
 
 
 def test_create_workbook_populates_claims_record_only_and_cover(tmp_path):

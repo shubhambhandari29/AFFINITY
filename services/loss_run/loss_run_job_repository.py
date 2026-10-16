@@ -8,6 +8,12 @@ from db import db_connection
 
 JOB_TABLE = "dbo.tblLossRunJob"
 ACCOUNT_TABLE = "dbo.tblLossRunJobAccount"
+JOB_COLUMNS = """
+    JobId, JobType, ReportType, TriggerSource, ScheduleId, ScheduledForDate,
+    LossDateFrom, PolicyEffectiveDateFrom, Status, Phase, RequestedCount,
+    ProcessedCount, GeneratedCount, FailedCount, RequestedBy,
+    CreatedAt, StartedAt, CompletedAt, ErrorMessage
+"""
 
 
 def _rows_to_dicts(cursor) -> list[dict]:
@@ -101,22 +107,7 @@ def _get_job(job_id: UUID) -> dict | None:
         cursor = connection.cursor()
         cursor.execute(
             f"""
-            SELECT
-                JobId,
-                JobType,
-                ReportType, TriggerSource, ScheduleId, ScheduledForDate,
-                LossDateFrom, PolicyEffectiveDateFrom,
-                Status,
-                Phase,
-                RequestedCount,
-                ProcessedCount,
-                GeneratedCount,
-                FailedCount,
-                RequestedBy,
-                CreatedAt,
-                StartedAt,
-                CompletedAt,
-                ErrorMessage
+            SELECT {JOB_COLUMNS}
             FROM {JOB_TABLE}
             WHERE JobId = ?
             """,
@@ -135,22 +126,7 @@ def _get_jobs() -> list[dict]:
         cursor = connection.cursor()
         cursor.execute(
             f"""
-            SELECT
-                JobId,
-                JobType,
-                ReportType, TriggerSource, ScheduleId, ScheduledForDate,
-                LossDateFrom, PolicyEffectiveDateFrom,
-                Status,
-                Phase,
-                RequestedCount,
-                ProcessedCount,
-                GeneratedCount,
-                FailedCount,
-                RequestedBy,
-                CreatedAt,
-                StartedAt,
-                CompletedAt,
-                ErrorMessage
+            SELECT {JOB_COLUMNS}
             FROM {JOB_TABLE}
             ORDER BY CreatedAt DESC
             """

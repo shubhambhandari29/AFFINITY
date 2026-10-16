@@ -13,11 +13,6 @@ from services.loss_run.loss_run_job_repository import (
 )
 
 
-def _requested_by(current_user: dict) -> str:
-    user = current_user.get("user") or {}
-    return str(user.get("email") or user.get("id") or "unknown").strip()
-
-
 async def create_loss_run_job(
     job_type: str,
     current_user: dict,
@@ -36,9 +31,11 @@ async def create_loss_run_job(
                 detail={"error": "At least one customer number is required"},
             )
 
+    user = current_user.get("user") or {}
+    requested_by = str(user.get("email") or user.get("id") or "unknown").strip()
     job_id, created = await create_job(
         job_type,
-        _requested_by(current_user),
+        requested_by,
         normalized_numbers,
         report_type,
         loss_date_from,
