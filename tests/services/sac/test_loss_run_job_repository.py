@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import nullcontext
+from datetime import date
 from unittest.mock import MagicMock
 from uuid import UUID
 
@@ -21,16 +22,21 @@ def database(monkeypatch):
 
 
 @pytest.mark.parametrize("customers", [None, [], ["001", "002"]])
-def test_create_job_persists_request_and_accounts(database, monkeypatch, customers):
+@pytest.mark.parametrize("cutoff", [None, date(2010, 1, 1)])
+def test_create_job_persists_request_and_accounts(database, monkeypatch, customers, cutoff):
     connection, cursor = database
     monkeypatch.setattr(repository, "uuid4", lambda: JOB_ID)
-    result = asyncio.run(repository.create_job("selected", "tester", customers))
+    result = asyncio.run(repository.create_job("selected", "tester", customers, "standard", cutoff))
     assert result == (JOB_ID, True)
+    assert "LossDateFrom" in cursor.execute.call_args.args[0]
+    assert "PolicyEffectiveDateFrom" not in cursor.execute.call_args.args[0]
     assert cursor.execute.call_args.args[1:] == (
         str(JOB_ID),
         "selected",
         None if customers is None else len(customers),
         "tester",
+        "standard",
+        cutoff,
     )
     if customers:
         assert cursor.executemany.call_args.args[1] == [(str(JOB_ID), c) for c in customers]
@@ -82,7 +88,9 @@ def test_queries_map_database_results(database, method, arguments, columns, rows
 
 
 @pytest.mark.parametrize("rows", [[], [(str(JOB_ID), "all", 2)]])
-def test_claim_job_uses_lease_and_retry_limits(database, rows):
+@pytest.mark.parametrize("environment", ["local", "PREPROD", "PROD"])
+def test_claim_job_uses_lease_and_retry_limits(database, rows, environment, monkeypatch):
+    monkeypatch.setattr(repository.settings, "ENVIRONMENT", environment)
     connection, cursor = database
     cursor.description = [("JobId",), ("JobType",), ("AttemptCount",)]
     cursor.fetchall.return_value = rows
@@ -92,7 +100,11 @@ def test_claim_job_uses_lease_and_retry_limits(database, rows):
     assert "AttemptCount >= 3" in expire.args[0]
     assert "AttemptCount < 3" in claim.args[0]
     assert "UPDLOCK, READPAST, ROWLOCK" in claim.args[0]
-    assert claim.args[1:] == ("worker",)
+    allow_scheduled = repository.settings.ENVIRONMENT.strip().lower() != "local"
+    assert expire.args[1:] == (allow_scheduled,)
+    assert claim.args[1:] == (allow_scheduled, "worker")
+    assert "TriggerSource = 'manual' OR ? = 1" in expire.args[0]
+    assert "TriggerSource = 'manual' OR ? = 1" in claim.args[0]
     connection.commit.assert_called_once()
 
 

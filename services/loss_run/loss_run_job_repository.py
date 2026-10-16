@@ -1,11 +1,19 @@
+from datetime import date
 from uuid import UUID, uuid4
 
 from fastapi.concurrency import run_in_threadpool
 
+from core.config import settings
 from db import db_connection
 
 JOB_TABLE = "dbo.tblLossRunJob"
 ACCOUNT_TABLE = "dbo.tblLossRunJobAccount"
+JOB_COLUMNS = """
+    JobId, JobType, ReportType, TriggerSource, ScheduleId, ScheduledForDate,
+    LossDateFrom, PolicyEffectiveDateFrom, Status, Phase, RequestedCount,
+    ProcessedCount, GeneratedCount, FailedCount, RequestedBy,
+    CreatedAt, StartedAt, CompletedAt, ErrorMessage
+"""
 
 
 def _rows_to_dicts(cursor) -> list[dict]:
@@ -17,6 +25,8 @@ def _create_job(
     job_type: str,
     requested_by: str,
     customer_numbers: list[str] | None,
+    report_type: str = "standard",
+    loss_date_from: date | None = None,
 ) -> tuple[UUID, bool]:
     job_id = uuid4()
 
@@ -36,9 +46,7 @@ def _create_job(
             connection.commit()
             return UUID(str(existing[0])), False
 
-        requested_count = (
-            len(customer_numbers) if customer_numbers is not None else None
-        )
+        requested_count = len(customer_numbers) if customer_numbers is not None else None
         cursor.execute(
             f"""
             INSERT INTO {JOB_TABLE}
@@ -48,14 +56,18 @@ def _create_job(
                 Status,
                 Phase,
                 RequestedCount,
-                RequestedBy
+                RequestedBy,
+                ReportType,
+                LossDateFrom
             )
-            VALUES (?, ?, 'queued', 'waiting_for_worker', ?, ?)
+            VALUES (?, ?, 'queued', 'waiting_for_worker', ?, ?, ?, ?)
             """,
             str(job_id),
             job_type,
             requested_count,
             requested_by,
+            report_type,
+            loss_date_from,
         )
 
         if customer_numbers:
@@ -65,10 +77,7 @@ def _create_job(
                     (JobId, CustomerNumber, Status)
                 VALUES (?, ?, 'queued')
                 """,
-                [
-                    (str(job_id), customer_number)
-                    for customer_number in customer_numbers
-                ],
+                [(str(job_id), customer_number) for customer_number in customer_numbers],
             )
 
         connection.commit()
@@ -80,12 +89,16 @@ async def create_job(
     job_type: str,
     requested_by: str,
     customer_numbers: list[str] | None,
+    report_type: str = "standard",
+    loss_date_from: date | None = None,
 ) -> tuple[UUID, bool]:
     return await run_in_threadpool(
         _create_job,
         job_type,
         requested_by,
         customer_numbers,
+        report_type,
+        loss_date_from,
     )
 
 
@@ -94,20 +107,7 @@ def _get_job(job_id: UUID) -> dict | None:
         cursor = connection.cursor()
         cursor.execute(
             f"""
-            SELECT
-                JobId,
-                JobType,
-                Status,
-                Phase,
-                RequestedCount,
-                ProcessedCount,
-                GeneratedCount,
-                FailedCount,
-                RequestedBy,
-                CreatedAt,
-                StartedAt,
-                CompletedAt,
-                ErrorMessage
+            SELECT {JOB_COLUMNS}
             FROM {JOB_TABLE}
             WHERE JobId = ?
             """,
@@ -126,20 +126,7 @@ def _get_jobs() -> list[dict]:
         cursor = connection.cursor()
         cursor.execute(
             f"""
-            SELECT
-                JobId,
-                JobType,
-                Status,
-                Phase,
-                RequestedCount,
-                ProcessedCount,
-                GeneratedCount,
-                FailedCount,
-                RequestedBy,
-                CreatedAt,
-                StartedAt,
-                CompletedAt,
-                ErrorMessage
+            SELECT {JOB_COLUMNS}
             FROM {JOB_TABLE}
             ORDER BY CreatedAt DESC
             """
@@ -230,6 +217,7 @@ async def get_completed_outputs(job_id: UUID) -> list[dict]:
 
 
 def _claim_next_job(worker_id: str) -> dict | None:
+    allow_scheduled = settings.ENVIRONMENT.strip().lower() != "local"
     with db_connection() as connection:
         cursor = connection.cursor()
         cursor.execute(
@@ -245,7 +233,9 @@ def _claim_next_job(worker_id: str) -> dict | None:
             WHERE Status = 'processing'
               AND LeaseUntil < SYSUTCDATETIME()
               AND AttemptCount >= 3
-            """
+              AND (TriggerSource = 'manual' OR ? = 1)
+            """,
+            allow_scheduled,
         )
         cursor.execute(
             f"""
@@ -254,13 +244,14 @@ def _claim_next_job(worker_id: str) -> dict | None:
                 SELECT TOP (1) *
                 FROM {JOB_TABLE} WITH (UPDLOCK, READPAST, ROWLOCK)
                 WHERE
-                    Status = 'queued'
+                    (Status = 'queued'
                     OR
                     (
                         Status = 'processing'
                         AND LeaseUntil < SYSUTCDATETIME()
                         AND AttemptCount < 3
-                    )
+                    ))
+                    AND (TriggerSource = 'manual' OR ? = 1)
                 ORDER BY CreatedAt
             )
             UPDATE NextJob
@@ -276,8 +267,12 @@ def _claim_next_job(worker_id: str) -> dict | None:
             OUTPUT
                 inserted.JobId,
                 inserted.JobType,
+                inserted.ReportType,
+                inserted.LossDateFrom,
+                inserted.PolicyEffectiveDateFrom,
                 inserted.AttemptCount;
             """,
+            allow_scheduled,
             worker_id,
         )
         rows = _rows_to_dicts(cursor)

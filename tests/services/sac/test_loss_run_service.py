@@ -1,12 +1,279 @@
 import asyncio
+from copy import copy
+from datetime import date
 from io import BytesIO
+from pathlib import Path
+from zipfile import ZipFile
 
+import pandas as pd
+import pytest
 from openpyxl import Workbook, load_workbook
 from openpyxl.drawing.image import Image as ExcelImage
+from openpyxl.styles import PatternFill
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from PIL import Image as PILImage
 
 from services.loss_run import loss_run_service
+from services.loss_run.claim_review_workbook import create_claim_review_workbook
+
+
+def test_loss_run_accounts_includes_inactive_without_removing_frequency_filters(monkeypatch):
+    async def query(sql):
+        where = sql.split("WHERE", 1)[1]
+        assert "AcctStatus" not in where
+        assert "LossRunDistFreq <> 'Not Needed'" in where
+        assert "LossRunDistFreq <> ''" in where
+        return [
+            {"Customer Number": "001", "Account Status": "Active", "On Board Date": None},
+            {"Customer Number": "002", "Account Status": "Inactive", "On Board Date": None},
+        ]
+
+    monkeypatch.setattr(loss_run_service, "run_raw_query_async", query)
+    result = asyncio.run(loss_run_service.get_loss_run_accounts())
+    assert [row["Account Status"] for row in result] == ["Active", "Inactive"]
+
+
+def test_view_customer_eligibility_has_no_status_filter():
+    # Regression guard for the checked-in definition, not a live SQL execution.
+    sql = (Path(__file__).resolve().parents[3] / "SQLQuery4.sql").read_text()
+    customer_cte = sql.split("CUSTOMERS AS (", 1)[1].split("DATA AS (", 1)[0]
+    assert "AcctStatus" not in customer_cte
+    assert "a.LossRunDistFreq <> 'Not Needed'" in customer_cte
+    assert "a.LossRunDistFreq <> ''" in customer_cte
+
+
+@pytest.mark.parametrize("selected", [None, ["002"]])
+@pytest.mark.parametrize("report_type", ["standard", "claim_review"])
+def test_inactive_account_generation_uses_existing_report_flow(monkeypatch, selected, report_type):
+    from unittest.mock import MagicMock
+
+    storage = MagicMock()
+    storage.download_template.return_value = b"template"
+    storage.upload_report.return_value = "/Volumes/test/output.xlsx"
+    monkeypatch.setattr(loss_run_service, "DatabricksLossRunStorage", lambda: storage)
+
+    async def query(sql, params=None):
+        assert "AcctStatus" not in sql
+        if "tblAcctSpecial" in sql:
+            if selected is None:
+                assert "LossRunDistFreq <> 'Not Needed'" in sql
+                assert "LossRunDistFreq <> ''" in sql
+            else:
+                assert params == ["002"]
+            return [
+                {
+                    "CustomerNum": "002",
+                    "CustomerName": "Inactive Customer",
+                    "AcctStatus": "Inactive",
+                }
+            ]
+        return [{"Customer Number": "002", "Claim Number": "C2"}]
+
+    build = MagicMock(return_value=b"workbook")
+    monkeypatch.setattr(loss_run_service, "run_raw_query_async", query)
+    monkeypatch.setattr(loss_run_service, "_create_workbook", build)
+    monkeypatch.setattr(loss_run_service, "create_claim_review_workbook", build)
+    result = asyncio.run(loss_run_service.generate_loss_runs(selected, report_type=report_type))
+    assert result["generatedCount"] == 1
+    assert result["failedCount"] == 0
+    storage.download_template.assert_called_once_with(report_type)
+    assert build.call_args.args[1:3] == ("002", "Inactive Customer")
+
+
+def test_claim_review_combines_exposures_without_expenses_or_record_only():
+    template = Path(__file__).resolve().parents[3] / "SACClaimReviewTemplate.xlsx"
+    records = [
+        {
+            "Customer Number": "00123",
+            "Claim Number": "C1",
+            "Exposure": 1,
+            "Record Only Indicator": "N",
+            "Claimant Name": "Alice",
+            "Adjuster": "One",
+            "Outstanding Loss Reserve": 100.10,
+            "Total Paid Loss Net Salvage/Subro/Loss Recovery": 200.20,
+            "ALAE Paid": 999,
+            "Claims above 50K": 0,
+        },
+        {
+            "Customer Number": "00123",
+            "Claim Number": "C1",
+            "Exposure": 2,
+            "Record Only Indicator": "N",
+            "Claimant Name": "Bob",
+            "Adjuster": "Two",
+            "Outstanding Loss Reserve": 10,
+            "Total Paid Loss Net Salvage/Subro/Loss Recovery": 20,
+            "ALAE Paid": 999,
+            "Claims above 50K": 0,
+        },
+        {
+            "Customer Number": "00123",
+            "Claim Number": "C2",
+            "Exposure": 1,
+            "Record Only Indicator": "Y",
+            "Claimant Name": "Other",
+            "Adjuster": "Other",
+            "Outstanding Loss Reserve": 900,
+            "Total Paid Loss Net Salvage/Subro/Loss Recovery": 900,
+            "ALAE Paid": 999,
+            "Claims above 50K": 0,
+        },
+    ]
+    output = create_claim_review_workbook(records, "00123", "Example", template.read_bytes())
+    workbook = load_workbook(BytesIO(output))
+    try:
+        assert [s.title for s in workbook if s.sheet_state == "visible"] == [
+            "Cover Page",
+            "Review",
+            "Claims Details",
+        ]
+        assert len(workbook["Cover Page"]._images) == 1
+        review = workbook["Review"]
+        assert review["A5"].value == "C1"
+        assert review["B5"].value == "Alice; Bob"
+        assert review["C5"].value == "One; Two"
+        assert review["I5"].value == 330.30
+        assert review["A6"].value == "Grand Total"
+        assert review["I6"].value == 330.30
+        assert workbook["Claims Details"].max_row == 3
+        pivot = review._pivots[0]
+        assert pivot.cache.recordCount == 1
+        assert pivot.cache.records.count == 1
+        assert pivot.cache.cacheSource.worksheetSource.sheet == "Review Source"
+        assert pivot.cache.refreshOnLoad is False
+        assert pivot.location.ref == "A3:I6"
+        assert workbook["Cover Page"]["B3"].value == "Example"
+        original = load_workbook(template)
+        assert copy(review["B4"].fill) == copy(original["Review"]["B4"].fill)
+        assert (
+            review.column_dimensions["B"].width == original["Review"].column_dimensions["B"].width
+        )
+        assert [c.value for c in workbook["Claims Details"][1]] == [
+            c.value for c in original["Claims Details"][1]
+        ]
+        original.close()
+        with ZipFile(BytesIO(output)) as archive:
+            xml = b"".join(
+                archive.read(name) for name in archive.namelist() if name.endswith(".xml")
+            )
+        for sample in (
+            b"JEROME",
+            b"ANDERSON UNIVERSITY",
+            b"03-00777588",
+            b"1524368671",
+            b"83-00140591",
+        ):
+            assert sample not in xml
+        assert "Claims above 50K" not in [c.value for c in workbook["Claims Details"][1]]
+    finally:
+        workbook.close()
+
+
+@pytest.mark.parametrize("selected", [["00123"], None])
+def test_claim_review_downloads_its_template_without_building_standard(monkeypatch, selected):
+    downloaded = []
+    uploaded = []
+    template = Path(__file__).resolve().parents[3] / "SACClaimReviewTemplate.xlsx"
+
+    class Storage:
+        @staticmethod
+        def download_template(report_type):
+            downloaded.append(report_type)
+            return template.read_bytes()
+
+        @staticmethod
+        def upload_report(filename, content):
+            uploaded.append((filename, content))
+            return "/Volumes/test/" + filename
+
+    async def query(sql, params=None):
+        if "tblAcctSpecial" in sql:
+            return [{"CustomerNum": "00123", "CustomerName": "Example"}]
+        return [
+            {
+                "Customer Number": "00123",
+                "Claim Number": "C1",
+                "Outstanding Loss Reserve": 10,
+                "Total Paid Loss Net Salvage/Subro/Loss Recovery": 20,
+            }
+        ]
+
+    def standard_must_not_run(*args):
+        raise AssertionError("Claim Review must not load the standard workbook")
+
+    monkeypatch.setattr(loss_run_service, "DatabricksLossRunStorage", Storage)
+    monkeypatch.setattr(loss_run_service, "run_raw_query_async", query)
+    monkeypatch.setattr(loss_run_service, "_create_workbook", standard_must_not_run)
+    result = asyncio.run(loss_run_service.generate_loss_runs(selected, report_type="claim_review"))
+    assert downloaded == ["claim_review"]
+    assert result["generatedCount"] == 1
+    assert result["failedCount"] == 0
+    assert "_ClaimReview_" in uploaded[0][0]
+    workbook = load_workbook(BytesIO(uploaded[0][1]))
+    assert workbook["Review"]["I5"].value == 30
+    workbook.close()
+
+
+def test_claim_review_extends_rows_and_preserves_literal_text_and_dates():
+    template = Path(__file__).resolve().parents[3] / "SACClaimReviewTemplate.xlsx"
+    records = [
+        {
+            "Claim Number": f"C{i:03}",
+            "Claimant Name": "=1+1",
+            "Date of Notice": "09/01/2026",
+            "Exposure": 1,
+            "Outstanding Loss Reserve": 1,
+            "Total Paid Loss Net Salvage/Subro/Loss Recovery": 2,
+        }
+        for i in range(70)
+    ]
+    workbook = load_workbook(
+        BytesIO(create_claim_review_workbook(records, "002", "=Customer", template.read_bytes()))
+    )
+    assert workbook["Review"]["I75"].value == 210
+    assert workbook["Review"]["B5"].data_type == "s"
+    assert workbook["Cover Page"]["B3"].data_type == "s"
+    assert workbook["Claims Details"].max_row == 71
+    assert workbook["Claims Details"]["AO2"].value.strftime("%m/%d/%Y") == "09/01/2026"
+    assert workbook["Review"]._pivots[0].cache.records.count == 70
+    assert workbook["Review"]._pivots[0].location.ref == "A3:I75"
+    workbook.close()
+
+
+@pytest.mark.parametrize("older_template", [False, True])
+def test_claim_review_headers_have_no_draft_highlighting(older_template):
+    template = Path(__file__).resolve().parents[3] / "SACClaimReviewTemplate.xlsx"
+    workbook = load_workbook(template)
+    review = workbook["Review"]
+    for address in ("B4", "C4"):
+        assert copy(review[address].fill) == copy(review["A4"].fill)
+        if older_template:
+            review[address].fill = PatternFill("solid", fgColor="FFFFFF00")
+    content = BytesIO()
+    workbook.save(content)
+    workbook.close()
+    records = [
+        {
+            "Claim Number": "C1",
+            "Claimant Name": "Alice",
+            "Adjuster": "Bob",
+            "Outstanding Loss Reserve": 10,
+            "Total Paid Loss Net Salvage/Subro/Loss Recovery": 20,
+        }
+    ]
+    result = load_workbook(
+        BytesIO(create_claim_review_workbook(records, "123", "Example", content.getvalue()))
+    )
+    review = result["Review"]
+    for address in ("B4", "C4"):
+        assert copy(review[address].fill) == copy(review["A4"].fill)
+    assert review["B5"].value == "Alice"
+    assert review["C5"].value == "Bob"
+    assert review["I5"].value == 30
+    assert len(review._pivots) == 1
+    assert len(result["Cover Page"]._images) == 1
+    result.close()
 
 
 def _make_template(path):
@@ -25,14 +292,41 @@ def _make_template(path):
         worksheet.append(["Old Column", "Old Value"])
         worksheet.append(["old", "old"])
         excel_table = Table(displayName=table_name, ref="A1:B2")
-        excel_table.tableStyleInfo = TableStyleInfo(
-            name="TableStyleMedium2", showRowStripes=True
-        )
+        excel_table.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
         worksheet.add_table(excel_table)
 
     workbook.create_sheet("Summary By Policy Year")
     workbook.create_sheet("Chart")
     workbook.save(path)
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_write_excel_table_preserves_values_and_clears_stale_cells(empty):
+    from decimal import Decimal
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["Old A", "Old B", "Old C", "Old D"])
+    for _ in range(4):
+        sheet.append(["stale"] * 4)
+    sheet.add_table(Table(displayName="Data", ref="A1:D5"))
+    data = pd.DataFrame(
+        [] if empty else [["00123", Decimal("12.50"), date(2026, 1, 1)],
+                          [None, float("nan"), pd.NaT]],
+        columns=["Customer", "Amount", "Date"],
+    )
+    loss_run_service._write_excel_table(sheet, "Data", data)
+    assert sheet.tables["Data"].ref == ("A1:C1" if empty else "A1:C3")
+    assert [c.name for c in sheet.tables["Data"].tableColumns] == list(data.columns)
+    assert [c.value for c in sheet[1]][:3] == list(data.columns)
+    assert all(sheet.cell(row, 4).value is None for row in range(1, 6))
+    if not empty:
+        assert [sheet.cell(2, col).value for col in range(1, 4)] == [
+            "00123", Decimal("12.50"), date(2026, 1, 1)
+        ]
+    for row in sheet.iter_rows(min_row=2 if empty else 3):
+        assert all(cell.value is None for cell in row)
+    workbook.close()
 
 
 def test_create_workbook_populates_claims_record_only_and_cover(tmp_path):
@@ -71,9 +365,7 @@ def test_create_workbook_populates_claims_record_only_and_cover(tmp_path):
     assert workbook["Claims Data"]["C2"].value == "01"
     assert workbook["Record Only"]["B2"].value == "C-2"
     assert workbook["Record Only"]["C2"].value == "02"
-    assert "Record Only Indicator" not in [
-        cell.value for cell in workbook["Claims Data"][1]
-    ]
+    assert "Record Only Indicator" not in [cell.value for cell in workbook["Claims Data"][1]]
     assert "Total Incurred" not in [cell.value for cell in workbook["Record Only"][1]]
     workbook.close()
 
@@ -84,7 +376,7 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(monkeypatch):
 
     class Storage:
         @staticmethod
-        def download_template():
+        def download_template(report_type="standard"):
             return template_bytes
 
         @staticmethod
@@ -110,7 +402,7 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(monkeypatch):
             }
         ]
 
-    def fake_create(records, customer_num, customer_name, received_template):
+    def fake_create(records, customer_num, customer_name, received_template, loss_date_from, report_date):
         assert received_template == template_bytes
         return b"workbook"
 
@@ -121,16 +413,13 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(monkeypatch):
     monkeypatch.setattr(loss_run_service, "_create_workbook", fake_create)
     monkeypatch.setattr(loss_run_service, "run_in_threadpool", fake_threadpool)
 
-    result = asyncio.run(
-        loss_run_service.generate_loss_runs(["00123", "00456", "00123"])
-    )
+    result = asyncio.run(loss_run_service.generate_loss_runs(["00123", "00456", "00123"]))
 
     assert result["requestedCount"] == 2
-    assert result["generatedCount"] == 1
-    assert result["failedCount"] == 1
-    assert result["failures"] == [
-        {"customerNumber": "00456", "reason": "No loss-run records found"}
-    ]
+    assert result["generatedCount"] == 2
+    assert result["failedCount"] == 0
+    assert result["failures"] == []
+    assert len(uploaded) == 2
     assert "files" not in result
     assert len(calls) == 2
     assert calls[0][1] == ["00123", "00456"]
@@ -143,7 +432,7 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(monkeypatch):
 def test_generate_all_loss_runs_uses_current_eligibility_rules(monkeypatch):
     class Storage:
         @staticmethod
-        def download_template():
+        def download_template(report_type="standard"):
             return b"template"
 
         @staticmethod
@@ -166,7 +455,7 @@ def test_generate_all_loss_runs_uses_current_eligibility_rules(monkeypatch):
             }
         ]
 
-    def fake_create(records, customer_num, customer_name, template_bytes):
+    def fake_create(records, customer_num, customer_name, template_bytes, loss_date_from, report_date):
         return b"workbook"
 
     async def fake_threadpool(func, *args):
@@ -179,15 +468,68 @@ def test_generate_all_loss_runs_uses_current_eligibility_rules(monkeypatch):
     result = asyncio.run(loss_run_service.generate_loss_runs())
 
     assert result["generatedCount"] == 1
-    assert "AcctStatus = 'Active'" in calls[0][0]
+    assert "AcctStatus" not in calls[0][0]
     assert "LossRunDistFreq <> 'Not Needed'" in calls[0][0]
+    assert "LossRunDistFreq <> ''" in calls[0][0]
     assert calls[1][0].strip() == "SELECT * FROM dbo.SAC_Loss_Run"
+
+
+@pytest.mark.parametrize("selected", [None, ["00123", "00456"]])
+def test_extended_history_uses_parameterized_underlying_query(monkeypatch, selected):
+    uploaded = []
+
+    class Storage:
+        @staticmethod
+        def download_template(report_type="standard"):
+            return b"template"
+
+        @staticmethod
+        def upload_report(filename, workbook_bytes):
+            uploaded.append(filename)
+            return "/Volumes/test/" + filename
+
+    calls = []
+
+    async def query(sql, params=None):
+        calls.append((sql, params))
+        if "tblAcctSpecial" in sql and sql != loss_run_service.EXTENDED_HISTORY_QUERY:
+            numbers = selected or ["00123"]
+            return [
+                {"CustomerNum": number, "CustomerName": f"Customer {number}"} for number in numbers
+            ]
+        return [
+            {
+                "Customer Number": (selected or ["00123"])[0],
+                "Claim Number": "C-1",
+                "Record Only Indicator": "N",
+            }
+        ]
+
+    monkeypatch.setattr(loss_run_service, "DatabricksLossRunStorage", Storage)
+    monkeypatch.setattr(loss_run_service, "run_raw_query_async", query)
+    monkeypatch.setattr(loss_run_service, "_create_workbook", lambda *args: b"workbook")
+
+    cutoff = date(2010, 1, 1)
+    asyncio.run(loss_run_service.generate_loss_runs(selected, loss_date_from=cutoff))
+    sql, params = calls[1]
+    assert sql == loss_run_service.EXTENDED_HISTORY_QUERY
+    assert params[:2] == (['["00123", "00456"]', cutoff] if selected else [None, cutoff])
+    assert isinstance(params[2], date)
+    assert "ALTER VIEW" not in sql
+    assert "OPENJSON(@CustomerNumbersJson)" in sql
+    assert "D.DT_OF_LOSS >= @LossDateFrom" in sql
+    assert "D.DT_OF_LOSS < DATEADD(DAY, 1, @ReportThroughDate)" in sql
+    assert "D.POL_EFF_DT) >=" not in sql
+    assert "SUM(D.FTR_CHNG_IN_OSLS_AMT) > 0" in sql
+    assert "D.CLM_STATUS IN ('Open','open')" in sql
+    assert "DATEADD(MONTH, -72" not in sql
+    assert "From_2010_01_01" in uploaded[0]
 
 
 def test_generate_loss_runs_records_upload_failure(monkeypatch):
     class Storage:
         @staticmethod
-        def download_template():
+        def download_template(report_type="standard"):
             return b"template"
 
         @staticmethod
@@ -205,7 +547,7 @@ def test_generate_loss_runs_records_upload_failure(monkeypatch):
             }
         ]
 
-    def fake_create(records, customer_num, customer_name, template_bytes):
+    def fake_create(records, customer_num, customer_name, template_bytes, loss_date_from, report_date):
         return b"workbook"
 
     async def fake_threadpool(func, *args):

@@ -43,3 +43,7 @@ htmlcov/
 
 .API_CHECKS.txt
 API_CHECKS.txt
+
+# Keep documentation local; continue updating without committing it.
+*.md
+*.docx

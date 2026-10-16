@@ -3,6 +3,7 @@ import logging
 import os
 import socket
 from contextlib import suppress
+from time import monotonic
 from uuid import UUID, uuid4
 
 from services.loss_run.loss_run_job_repository import (
@@ -15,11 +16,13 @@ from services.loss_run.loss_run_job_repository import (
     update_phase,
     upsert_accounts,
 )
+from services.loss_run.loss_run_scheduler import enqueue_due_loss_run_job
 from services.loss_run.loss_run_service import generate_loss_runs
 
 logger = logging.getLogger(__name__)
 
 POLL_INTERVAL_SECONDS = 10
+SCHEDULE_CHECK_INTERVAL_SECONDS = 60
 HEARTBEAT_INTERVAL_SECONDS = 60
 
 
@@ -42,7 +45,18 @@ class LossRunWorker:
 
     async def _run(self) -> None:
         logger.info("Loss-run worker started: %s", self.worker_id)
+        next_schedule_check = 0.0
         while not self._stop_event.is_set():
+            if monotonic() >= next_schedule_check:
+                try:
+                    await enqueue_due_loss_run_job()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    # A scheduling/configuration failure must not stop manual jobs.
+                    logger.exception("Loss-run scheduling check failed")
+                finally:
+                    next_schedule_check = monotonic() + SCHEDULE_CHECK_INTERVAL_SECONDS
             try:
                 job = await claim_next_job(self.worker_id)
                 if job:
@@ -89,8 +103,16 @@ class LossRunWorker:
             )
 
         try:
+            if job.get("PolicyEffectiveDateFrom") and not job.get("LossDateFrom"):
+                await fail_job(
+                    job_id, self.worker_id,
+                    "This job used the old policy-date cutoff. Submit a new job using Loss date from.",
+                )
+                return
             await generate_loss_runs(
-                None if job_type == "all" else await self._selected_accounts(job_id),
+                None if job_type == "all" else await get_account_numbers(job_id),
+                report_type=job.get("ReportType", "standard"),
+                loss_date_from=job.get("LossDateFrom"),
                 on_phase=on_phase,
                 on_customers=on_customers,
                 on_result=on_result,
@@ -109,9 +131,6 @@ class LossRunWorker:
             heartbeat.cancel()
             with suppress(asyncio.CancelledError):
                 await heartbeat
-
-    async def _selected_accounts(self, job_id: UUID) -> list[str]:
-        return await get_account_numbers(job_id)
 
     async def _heartbeat(self, job_id: UUID) -> None:
         while True:

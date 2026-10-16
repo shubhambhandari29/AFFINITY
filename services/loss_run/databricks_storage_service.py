@@ -21,9 +21,6 @@ class DatabricksLossRunStorage:
 
         self.host = settings.DATABRICKS_HOST.rstrip("/")
         self.catalog = settings.LOSS_RUN_DATABRICKS_CATALOG
-        self.template_path = (
-            f"/Volumes/{self.catalog}/gold/statics/SACLossRunTemplate.xlsx"
-        )
         self.output_directory = (
             f"/Volumes/{self.catalog}/gold/external_volume/"
             "specialaccounts_lossruns_temporary"
@@ -42,14 +39,19 @@ class DatabricksLossRunStorage:
             self.client = None
             self.credential = ManagedIdentityCredential()
 
-    def download_template(self) -> bytes:
+    def download_template(self, report_type: str = "standard") -> bytes:
+        filenames = {
+            "standard": "SACLossRunTemplate.xlsx",
+            "claim_review": "SACClaimReviewTemplate.xlsx",
+        }
+        template_path = f"/Volumes/{self.catalog}/gold/statics/{filenames[report_type]}"
         if self.client:
-            download = self.client.files.download(self.template_path)
+            download = self.client.files.download(template_path)
             with download.contents as stream:
                 return stream.read()
 
         response = requests.get(
-            self._files_api_url(self.template_path),
+            self._files_api_url(template_path),
             headers=self._authorization_header(),
             timeout=REQUEST_TIMEOUT_SECONDS,
         )

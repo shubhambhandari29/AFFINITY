@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -7,7 +8,69 @@ import pytest
 from services.loss_run import loss_run_worker
 
 
-def test_worker_processes_selected_job_and_records_progress(monkeypatch):
+@pytest.fixture(autouse=True)
+def mock_scheduler(monkeypatch):
+    check = AsyncMock()
+    monkeypatch.setattr(loss_run_worker, "enqueue_due_loss_run_job", check)
+    return check
+
+
+@pytest.mark.parametrize("schedule_fails", [False, True])
+def test_schedule_checks_are_throttled_without_delaying_job_pickup(
+    monkeypatch, mock_scheduler, schedule_fails
+):
+    async def scenario():
+        worker = loss_run_worker.LossRunWorker()
+        elapsed = 0
+        checks_at = []
+        claimed_at = []
+
+        async def check():
+            checks_at.append(elapsed)
+            if schedule_fails:
+                raise RuntimeError("schedule unavailable")
+
+        async def claim(_worker_id):
+            nonlocal elapsed
+            claimed_at.append(elapsed)
+            elapsed += 10
+            if elapsed > 120:
+                worker._stop_event.set()
+            return None
+
+        mock_scheduler.side_effect = check
+        monkeypatch.setattr(loss_run_worker, "monotonic", lambda: elapsed)
+        monkeypatch.setattr(loss_run_worker, "claim_next_job", claim)
+        monkeypatch.setattr(loss_run_worker, "POLL_INTERVAL_SECONDS", 0)
+        await worker._run()
+        assert checks_at == [0, 60, 120]
+        assert claimed_at == list(range(0, 121, 10))
+
+    asyncio.run(scenario())
+
+
+def test_scheduler_failure_does_not_block_manual_job(monkeypatch, mock_scheduler):
+    async def scenario():
+        worker = loss_run_worker.LossRunWorker()
+        mock_scheduler.side_effect = RuntimeError("schedule unavailable")
+        job = {"JobId": uuid4()}
+        claim = AsyncMock(return_value=job)
+
+        async def process(received):
+            assert received == job
+            worker._stop_event.set()
+
+        monkeypatch.setattr(loss_run_worker, "claim_next_job", claim)
+        monkeypatch.setattr(worker, "_process_job", process)
+        await worker._run()
+        claim.assert_awaited_once_with(worker.worker_id)
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("expected_type", ["standard", "claim_review"])
+@pytest.mark.parametrize("cutoff", [None, date(2010, 1, 1)])
+def test_worker_processes_selected_job_and_records_progress(monkeypatch, expected_type, cutoff):
     job_id = uuid4()
     calls = []
 
@@ -15,8 +78,18 @@ def test_worker_processes_selected_job_and_records_progress(monkeypatch):
         assert received_job_id == job_id
         return ["00123"]
 
-    async def fake_generate(customer_numbers, *, on_phase, on_customers, on_result):
+    async def fake_generate(
+        customer_numbers,
+        *,
+        on_phase,
+        on_customers,
+        on_result,
+        report_type="standard",
+        loss_date_from=None,
+    ):
         assert customer_numbers == ["00123"]
+        assert report_type == expected_type
+        assert loss_date_from == cutoff
         await on_phase("querying_loss_run_data")
         await on_customers([{"CustomerNum": "00123", "CustomerName": "Example Customer"}])
         await on_result("00123", True, None, "/Volumes/report.xlsx")
@@ -65,6 +138,8 @@ def test_worker_processes_selected_job_and_records_progress(monkeypatch):
             {
                 "JobId": job_id,
                 "JobType": "selected",
+                "ReportType": expected_type,
+                "LossDateFrom": cutoff,
                 "AttemptCount": 1,
             }
         )
@@ -112,7 +187,6 @@ def test_worker_marks_job_failed_when_generation_fails(monkeypatch):
 
 
 def test_worker_start_is_idempotent_and_stop_cancels_polling(monkeypatch):
-
     async def scenario():
         entered = asyncio.Event()
 
@@ -135,7 +209,6 @@ def test_worker_start_is_idempotent_and_stop_cancels_polling(monkeypatch):
 
 
 def test_polling_recovers_after_error_and_processes_next_job(monkeypatch):
-
     async def scenario():
         worker = loss_run_worker.LossRunWorker()
         job = {"JobId": uuid4()}
@@ -155,7 +228,6 @@ def test_polling_recovers_after_error_and_processes_next_job(monkeypatch):
 
 
 def test_all_job_skips_account_lookup(monkeypatch):
-
     generate = AsyncMock()
     accounts = AsyncMock()
     complete = AsyncMock()
@@ -171,7 +243,6 @@ def test_all_job_skips_account_lookup(monkeypatch):
 
 
 def test_cancelled_job_is_not_marked_failed_or_completed(monkeypatch):
-
     generate = AsyncMock(side_effect=asyncio.CancelledError)
     fail = AsyncMock()
     complete = AsyncMock()
@@ -186,7 +257,6 @@ def test_cancelled_job_is_not_marked_failed_or_completed(monkeypatch):
 
 
 def test_heartbeat_retries_after_transient_failure(monkeypatch):
-
     sleep = AsyncMock(side_effect=[None, None, asyncio.CancelledError])
     heartbeat = AsyncMock(side_effect=[RuntimeError("temporary outage"), None])
     monkeypatch.setattr(loss_run_worker.asyncio, "sleep", sleep)

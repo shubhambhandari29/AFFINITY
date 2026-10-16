@@ -90,8 +90,7 @@ CUSTOMERS AS (
     a.CustomerName,
     a.LossRunDistFreq
     FROM CLMAA_SpecialAccounts.dbo.tblAcctSpecial a
-    WHERE AcctStatus = 'Active' 
-    AND a.LossRunDistFreq <> 'Not Needed' 
+    WHERE a.LossRunDistFreq <> 'Not Needed'
     AND a.LossRunDistFreq <> ''
 ),
 

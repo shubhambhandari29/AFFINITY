@@ -1,8 +1,9 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import HTTPException
 
-from core.date_utils import format_datetime_value
+from core.date_utils import format_date_value, format_loss_run_timestamp
 from services.loss_run.loss_run_job_repository import (
     create_job,
     get_all_failures,
@@ -12,24 +13,17 @@ from services.loss_run.loss_run_job_repository import (
 )
 
 
-def _requested_by(current_user: dict) -> str:
-    user = current_user.get("user") or {}
-    return str(user.get("email") or user.get("id") or "unknown").strip()
-
-
 async def create_loss_run_job(
     job_type: str,
     current_user: dict,
     customer_numbers: list[str] | None = None,
+    report_type: str = "standard",
+    loss_date_from: date | None = None,
 ) -> dict:
     normalized_numbers = None
     if customer_numbers is not None:
         normalized_numbers = list(
-            dict.fromkeys(
-                str(number).strip()
-                for number in customer_numbers
-                if str(number).strip()
-            )
+            dict.fromkeys(str(number).strip() for number in customer_numbers if str(number).strip())
         )
         if not normalized_numbers:
             raise HTTPException(
@@ -37,10 +31,14 @@ async def create_loss_run_job(
                 detail={"error": "At least one customer number is required"},
             )
 
+    user = current_user.get("user") or {}
+    requested_by = str(user.get("email") or user.get("id") or "unknown").strip()
     job_id, created = await create_job(
         job_type,
-        _requested_by(current_user),
+        requested_by,
         normalized_numbers,
+        report_type,
+        loss_date_from,
     )
 
     if created:
@@ -94,15 +92,19 @@ async def get_loss_run_jobs() -> list[dict]:
             }
         )
 
-    return [
-        _format_job(job, failures_by_job.get(str(job["JobId"]), [])) for job in jobs
-    ]
+    return [_format_job(job, failures_by_job.get(str(job["JobId"]), [])) for job in jobs]
 
 
 def _format_job(job: dict, failures: list[dict]) -> dict:
     return {
         "jobId": job["JobId"],
         "jobType": job["JobType"],
+        "reportType": job.get("ReportType", "standard"),
+        "triggerSource": job.get("TriggerSource", "manual"),
+        "scheduleId": job.get("ScheduleId"),
+        "scheduledForDate": format_date_value(job.get("ScheduledForDate")),
+        "lossDateFrom": format_date_value(job.get("LossDateFrom")),
+        "policyEffectiveDateFrom": format_date_value(job.get("PolicyEffectiveDateFrom")),
         "status": job["Status"],
         "phase": job["Phase"],
         "requestedCount": job["RequestedCount"],
@@ -110,9 +112,9 @@ def _format_job(job: dict, failures: list[dict]) -> dict:
         "generatedCount": job["GeneratedCount"],
         "failedCount": job["FailedCount"],
         "requestedBy": job["RequestedBy"],
-        "createdAt": format_datetime_value(job["CreatedAt"]),
-        "startedAt": format_datetime_value(job["StartedAt"]),
-        "completedAt": format_datetime_value(job["CompletedAt"]),
+        "createdAt": format_loss_run_timestamp(job["CreatedAt"]),
+        "startedAt": format_loss_run_timestamp(job["StartedAt"]),
+        "completedAt": format_loss_run_timestamp(job["CompletedAt"]),
         "errorMessage": job["ErrorMessage"],
         "failures": failures,
     }

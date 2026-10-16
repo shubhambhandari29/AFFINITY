@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
@@ -12,8 +12,14 @@ def test_create_selected_job_normalizes_accounts_and_requester(monkeypatch):
     captured = {}
     job_id = uuid4()
 
-    async def fake_create(job_type, requested_by, customer_numbers):
-        captured["values"] = (job_type, requested_by, customer_numbers)
+    async def fake_create(
+        job_type,
+        requested_by,
+        customer_numbers,
+        report_type="standard",
+        loss_date_from=None,
+    ):
+        captured["values"] = (job_type, requested_by, customer_numbers, loss_date_from)
         return job_id, True
 
     monkeypatch.setattr(loss_run_job_service, "create_job", fake_create)
@@ -30,6 +36,7 @@ def test_create_selected_job_normalizes_accounts_and_requester(monkeypatch):
         "selected",
         "user@example.com",
         ["00123", "00456"],
+        None,
     )
     assert result == {
         "jobId": job_id,
@@ -54,7 +61,13 @@ def test_create_selected_job_rejects_empty_accounts():
 def test_create_job_returns_existing_active_job(monkeypatch):
     active_job_id = uuid4()
 
-    async def fake_create(job_type, requested_by, customer_numbers):
+    async def fake_create(
+        job_type,
+        requested_by,
+        customer_numbers,
+        report_type="standard",
+        loss_date_from=None,
+    ):
         assert job_type == "selected"
         return active_job_id, False
 
@@ -80,9 +93,29 @@ def test_create_job_returns_existing_active_job(monkeypatch):
     }
 
 
+def test_create_job_persists_extended_history_date(monkeypatch):
+    job_id = uuid4()
+    captured = {}
+
+    async def fake_create(*args):
+        captured["args"] = args
+        return job_id, True
+
+    monkeypatch.setattr(loss_run_job_service, "create_job", fake_create)
+    cutoff = date(2010, 1, 1)
+    asyncio.run(
+        loss_run_job_service.create_loss_run_job(
+            "all",
+            {"user": {"email": "user@example.com"}},
+            loss_date_from=cutoff,
+        )
+    )
+    assert captured["args"][-1] == cutoff
+
+
 def test_get_job_returns_failures_only_when_present(monkeypatch):
     job_id = uuid4()
-    now = datetime.now(UTC)
+    now = datetime(2026, 1, 15, 18, 30, tzinfo=UTC)
 
     async def fake_get(received_job_id):
         assert received_job_id == job_id
@@ -100,6 +133,7 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
             "StartedAt": now,
             "CompletedAt": now,
             "ErrorMessage": None,
+            "LossDateFrom": date(2010, 1, 1),
         }
 
     async def fake_failures(received_job_id):
@@ -117,10 +151,11 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
     result = asyncio.run(loss_run_job_service.get_loss_run_job(job_id))
 
     assert result["generatedCount"] == 1
-    expected_datetime = now.strftime("%m-%d-%Y %I:%M:%S %p")
+    expected_datetime = "01-15-2026 01:30:00 PM"
     assert result["createdAt"] == expected_datetime
     assert result["startedAt"] == expected_datetime
     assert result["completedAt"] == expected_datetime
+    assert result["lossDateFrom"] == "01-01-2010"
     assert result["failures"] == [
         {
             "customerNumber": "00456",
@@ -132,7 +167,7 @@ def test_get_job_returns_failures_only_when_present(monkeypatch):
 def test_get_all_jobs_returns_newest_jobs_with_grouped_failures(monkeypatch):
     first_job_id = uuid4()
     second_job_id = uuid4()
-    now = datetime.now(UTC)
+    now = datetime(2026, 7, 15, 18, 30)
 
     def job(job_id, status, failed_count):
         return {
@@ -172,7 +207,7 @@ def test_get_all_jobs_returns_newest_jobs_with_grouped_failures(monkeypatch):
     result = asyncio.run(loss_run_job_service.get_loss_run_jobs())
 
     assert [item["jobId"] for item in result] == [first_job_id, second_job_id]
-    expected_datetime = now.strftime("%m-%d-%Y %I:%M:%S %p")
+    expected_datetime = "07-15-2026 02:30:00 PM"
     assert all(item["createdAt"] == expected_datetime for item in result)
     assert result[0]["failures"] == [
         {

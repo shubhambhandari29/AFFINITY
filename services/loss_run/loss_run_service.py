@@ -1,8 +1,12 @@
+import json
 import logging
 import re
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import date, datetime
 from io import BytesIO
+from itertools import chain
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from fastapi import HTTPException
@@ -13,9 +17,20 @@ from openpyxl.worksheet.table import TableColumn
 
 from core.date_utils import format_records_dates
 from core.db_helpers import run_raw_query_async
+from services.loss_run.claim_review_workbook import create_claim_review_workbook
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
+from services.loss_run.excel_package import save_report_workbook
+from services.loss_run.standard_report_summary import populate_standard_summaries
+from services.loss_run.workbook_template import (
+    create_no_claims_workbook,
+    update_report_cover,
+)
 
 logger = logging.getLogger(__name__)
+
+EXTENDED_HISTORY_QUERY = (
+    Path(__file__).resolve().parent / "sql" / "loss_run_extended_history.sql"
+).read_text(encoding="utf-8")
 
 PhaseCallback = Callable[[str], Awaitable[None]]
 CustomersCallback = Callable[[list[dict]], Awaitable[None]]
@@ -53,8 +68,7 @@ async def get_loss_run_accounts() -> list[dict]:
                 AcctStatus AS [Account Status],
                 LossRunDistFreq AS [Loss Run Frequency]
             FROM dbo.tblAcctSpecial
-            WHERE AcctStatus = 'Active'
-              AND LossRunDistFreq <> 'Not Needed'
+            WHERE LossRunDistFreq <> 'Not Needed'
               AND LossRunDistFreq <> ''
             ORDER BY CustomerName, CustomerNum
             """
@@ -75,14 +89,13 @@ def _write_excel_table(worksheet, table_name: str, dataframe: pd.DataFrame) -> N
     column_count = len(dataframe.columns)
     new_ref = f"A1:{get_column_letter(column_count)}{row_count}"
 
-    for row_index, row in enumerate(worksheet[new_ref]):
-        for column_index, cell in enumerate(row):
-            if row_index == 0:
-                cell.value = dataframe.columns[column_index]
-                continue
-
-            value = dataframe.iat[row_index - 1, column_index]
-            cell.value = None if pd.isna(value) else value
+    # Iterate rows once instead of performing a pandas scalar lookup per cell.
+    rows = chain([dataframe.columns], dataframe.itertuples(index=False, name=None))
+    for row_index, values in enumerate(rows, 1):
+        for column_index, value in enumerate(values, 1):
+            worksheet.cell(row_index, column_index).value = (
+                None if row_index > 1 and pd.isna(value) else value
+            )
 
     for row in old_cells:
         for cell in row:
@@ -98,8 +111,18 @@ def _write_excel_table(worksheet, table_name: str, dataframe: pd.DataFrame) -> N
 
 
 def _create_workbook(
-    records: list[dict], customer_num: str, customer_name: str, template_bytes: bytes
+    records: list[dict],
+    customer_num: str,
+    customer_name: str,
+    template_bytes: bytes,
+    loss_date_from: date | None = None,
+    report_date: date | None = None,
 ) -> bytes:
+    if not records:
+        return create_no_claims_workbook(
+            customer_num, customer_name, template_bytes, "standard",
+            loss_date_from, report_date,
+        )
     dataframe = pd.DataFrame(records)
 
     if "Exposure" in dataframe.columns:
@@ -120,6 +143,7 @@ def _create_workbook(
     claims = dataframe[dataframe["Record Only Indicator"] != "Y"].drop(
         columns=["Record Only Indicator"]
     )
+    claims["Distinct Claim Helper"] = (~claims["Claim Number"].duplicated()).astype(int)
 
     if record_only.empty:
         record_only = pd.DataFrame(
@@ -138,19 +162,19 @@ def _create_workbook(
     cover_page = workbook["Cover Page"]
     cover_page.cell(2, 2, customer_num)
     cover_page.cell(3, 2, customer_name)
-    cover_page.cell(4, 2, datetime.now().strftime("%m/%d/%Y"))
+    update_report_cover(
+        workbook,
+        loss_date_from,
+        report_date or datetime.now(ZoneInfo("America/New_York")).date(),
+    )
 
-    for sheet_name in ("Summary By Policy Year", "Chart"):
-        if sheet_name not in workbook.sheetnames:
-            continue
-        for pivot in getattr(workbook[sheet_name], "_pivots", []):
-            pivot.cache.refreshOnLoad = True
+    populate_standard_summaries(
+        workbook, claims.astype(object).where(pd.notna(claims), None).to_dict("records")
+    )
 
     workbook.calculation.fullCalcOnLoad = True
-    output = BytesIO()
     try:
-        workbook.save(output)
-        return output.getvalue()
+        return save_report_workbook(workbook)
     finally:
         workbook.close()
 
@@ -158,23 +182,27 @@ def _create_workbook(
 async def generate_loss_runs(
     customer_nums: list[str] | None = None,
     *,
+    report_type: str = "standard",
+    loss_date_from: date | None = None,
     on_phase: PhaseCallback | None = None,
     on_customers: CustomersCallback | None = None,
     on_result: ResultCallback | None = None,
 ) -> dict:
+    if report_type not in {"standard", "claim_review"}:
+        raise ValueError("Unsupported loss-run report type")
     try:
         if on_phase:
             await on_phase("downloading_template")
+        report_date = datetime.now(ZoneInfo("America/New_York")).date()
         storage = DatabricksLossRunStorage()
-        template_bytes = await run_in_threadpool(storage.download_template)
+        template_bytes = await run_in_threadpool(storage.download_template, report_type)
 
         if customer_nums is None:
             customers = await run_raw_query_async(
                 """
                 SELECT CustomerNum, CustomerName
                 FROM dbo.tblAcctSpecial
-                WHERE AcctStatus = 'Active'
-                  AND LossRunDistFreq <> 'Not Needed'
+                WHERE LossRunDistFreq <> 'Not Needed'
                   AND LossRunDistFreq <> ''
                 """
             )
@@ -213,7 +241,18 @@ async def generate_loss_runs(
         if on_phase:
             await on_phase("querying_loss_run_data")
 
-        if customer_nums is None:
+        if loss_date_from is not None:
+            records = await run_raw_query_async(
+                EXTENDED_HISTORY_QUERY,
+                [
+                    json.dumps(requested_numbers)
+                    if customer_nums is not None
+                    else None,
+                    loss_date_from,
+                    report_date,
+                ],
+            )
+        elif customer_nums is None:
             records = await run_raw_query_async("SELECT * FROM dbo.SAC_Loss_Run")
         else:
             records = await run_raw_query_async(
@@ -241,10 +280,14 @@ async def generate_loss_runs(
 
         generated_count = 0
         failures = []
+        workbook_builder = (
+            create_claim_review_workbook if report_type == "claim_review" else _create_workbook
+        )
+        history_label = f"_From_{loss_date_from:%Y_%m_%d}" if loss_date_from is not None else ""
 
         for customer_num in requested_numbers:
             customer_name = customer_names.get(customer_num)
-            customer_records = records_by_customer.get(customer_num)
+            customer_records = records_by_customer.get(customer_num, [])
 
             if customer_name is None:
                 reason = "Customer not found"
@@ -252,28 +295,25 @@ async def generate_loss_runs(
                 if on_result:
                     await on_result(customer_num, False, reason, None)
                 continue
-            if not customer_records:
-                reason = "No loss-run records found"
-                failures.append(
-                    {
-                        "customerNumber": customer_num,
-                        "reason": reason,
-                    }
-                )
-                if on_result:
-                    await on_result(customer_num, False, reason, None)
-                continue
 
             safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", customer_name).strip(" .")
-            filename = f"{safe_name or customer_num}_{datetime.now():%Y_%m_%d}.xlsx"
+            filename = f"{safe_name or customer_num}{history_label}_{report_date:%Y_%m_%d}.xlsx"
+            if report_type == "claim_review":
+                filename = (
+                    f"{safe_name or customer_num}_{customer_num}_"
+                    f"ClaimReview{history_label}_"
+                    f"{datetime.now():%Y_%m_%d_%H%M%S_%f}.xlsx"
+                )
 
             try:
                 workbook_bytes = await run_in_threadpool(
-                    _create_workbook,
+                    workbook_builder,
                     customer_records,
                     customer_num,
                     customer_name,
                     template_bytes,
+                    loss_date_from,
+                    report_date,
                 )
                 output_path = await run_in_threadpool(
                     storage.upload_report,

@@ -26,6 +26,12 @@ class LossRunFailure(BaseModel):
 class LossRunJobResponse(BaseModel):
     jobId: UUID
     jobType: Literal["all", "selected"]
+    reportType: Literal["standard", "claim_review"] = "standard"
+    triggerSource: Literal["manual", "scheduled"] = "manual"
+    scheduleId: str | None = None
+    scheduledForDate: str | None = None
+    lossDateFrom: str | None = None
+    policyEffectiveDateFrom: str | None = None  # Historical policy-cutoff jobs only.
     status: LossRunJobStatus
     phase: str | None
     requestedCount: int | None

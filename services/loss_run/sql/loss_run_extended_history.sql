@@ -1,110 +1,19 @@
-USE [CLMAA_SpecialAccounts];
-GO
-SET ANSI_NULLS ON;
-GO
-SET QUOTED_IDENTIFIER ON;
-GO
+-- Used only when an optional extended-history date is supplied.
+-- Parameters, in order: customer-number JSON (NULL means all eligible accounts),
+-- loss date from and report-through date (inclusive, supplied by the worker).
+DECLARE @CustomerNumbersJson nvarchar(max) = ?;
+DECLARE @LossDateFrom date = ?;
+DECLARE @ReportThroughDate date = ?;
 
--- Draft based on SQLQuery4.sql. Review/test in PREPROD before deployment.
--- NULL customer array = all frequency-eligible accounts, regardless of status.
--- JSON array = selected frequency-eligible accounts, regardless of status.
--- NULL date preserves the original strict > six-year cutoff.
--- Supplied date uses >= and applies to closed claims only.
--- Open claims / positive outstanding reserve retain their existing exceptions.
--- Does not alter dbo.SAC_Loss_Run or write business data.
-CREATE OR ALTER PROCEDURE dbo.usp_SAC_Loss_Run
-    @CustomerNumbersJson nvarchar(max) = NULL,
-    @PolicyEffectiveDateFrom date = NULL
-AS
-BEGIN
-SET NOCOUNT ON;
-
-IF @CustomerNumbersJson IS NOT NULL
-BEGIN
-    IF ISJSON(@CustomerNumbersJson) <> 1
-       OR LEFT(LTRIM(@CustomerNumbersJson), 1) <> '['
-        THROW 50001, 'Customer numbers must be a JSON array of strings.', 1;
-
-    IF NOT EXISTS (SELECT 1 FROM OPENJSON(@CustomerNumbersJson))
-        THROW 50002, 'Provide at least one customer number or NULL for all.', 1;
-
-    IF EXISTS (
-        SELECT 1 FROM OPENJSON(@CustomerNumbersJson)
-        WHERE [type] <> 1
-           OR LEN(LTRIM(RTRIM([value]))) NOT BETWEEN 1 AND 10
-           OR LTRIM(RTRIM([value])) COLLATE Latin1_General_100_BIN2
-               LIKE N'%[^0-9]%'
-    )
-        THROW 50003, 'Customer numbers must be strings containing 1 to 10 digits.', 1;
-END;
-
-DECLARE @DefaultCutoff date =
-    DATEADD(MONTH, -72, DATETRUNC(YEAR, GETDATE()));
-
-
--- Separate statements materialize the account scope before expensive joins.
--- SELECT INTO preserves source column types/collations for cross-database joins.
-SELECT DISTINCT a.CustomerNum
-INTO #Customers
-FROM dbo.tblAcctSpecial a
-WHERE a.LossRunDistFreq <> 'Not Needed'
-  AND a.LossRunDistFreq <> ''
-  AND (
-      @CustomerNumbersJson IS NULL
-      OR a.CustomerNum IN (
-          SELECT CONVERT(varchar(10), LTRIM(RTRIM([value])))
-          FROM OPENJSON(@CustomerNumbersJson)
-      )
-  )
-OPTION (RECOMPILE);
-
-SELECT POL.*
-INTO #Policies
-FROM CLM_Lakehouse.dbo.DW_POL_DIMNSN POL
-WHERE POL.POL_CURR_VERSN_IND = 'Y'
-  AND EXISTS (
-      SELECT 1 FROM #Customers C WHERE C.CustomerNum = POL.PMS_CUSTMR_NBR
-  );
-CREATE INDEX IX_Policies_Policy ON #Policies (POL_SYM, POL_NBR, POL_MOD);
-
--- EXISTS avoids multiplying claims when several policy rows match.
-SELECT CD.*
-INTO #Claims
-FROM CLM_Lakehouse.dbo.DW_CLMS_CLM_DIMNSN CD
-WHERE CD.CURR_VERSN_IND = 'Y'
-  AND UPPER(ISNULL(CD.ACCT_LOSS_LOC_ID, 'NA')) NOT LIKE '%REKEY%'
-  AND EXISTS (
-      SELECT 1 FROM #Policies POL
-      WHERE CD.POL_SYM = POL.POL_SYM
-        AND UPPER(CD.POL_NBR) = POL.POL_NBR
-        AND CD.POL_MOD = POL.POL_MOD
-  );
-CREATE INDEX IX_Claims_Number ON #Claims (CLM_NBR);
-
-SELECT DISTINCT CLM_NBR INTO #ClaimNumbers FROM #Claims;
-CREATE UNIQUE CLUSTERED INDEX IX_ClaimNumbers ON #ClaimNumbers (CLM_NBR);
-
-SELECT F.*
-INTO #FinancialFeatures
-FROM dbo.DW_FINCL_LOSS_FTR_SS_F_FILTERED F
-WHERE EXISTS (SELECT 1 FROM #ClaimNumbers C WHERE C.CLM_NBR = F.CLM_NBR);
-CREATE INDEX IX_FinancialFeatures_ClaimFeature
-    ON #FinancialFeatures (CLM_NBR, CLM_FTR_NBR);
-
--- Keep the policy-date cutoff in HAVING: applying it here would exclude
--- old open claims and claims retained by the positive-reserve exception.
-
-;WITH 
+WITH 
 
 LAST_DRIVER AS(
   SELECT 
     CLM_NBR,
     MAX(CLM_CNTCT_KEY) AS LAST_DRIVER_KEY
   FROM
-    CLM_Lakehouse.dbo.DW_CLMS_CLM_CNTCT_DIMNSN CONTACT
+    CLM_Lakehouse.dbo.DW_CLMS_CLM_CNTCT_DIMNSN
   WHERE
-    EXISTS (SELECT 1 FROM #ClaimNumbers C WHERE C.CLM_NBR = CONTACT.CLM_NBR)
-    AND
     CURR_VERSN_IND = 'Y' 
     AND INVLV_PARTY_ROLE_CD = 'ID'
     AND UPPER(CLM_CNTCT_ROLE_CD) = 'driver'
@@ -118,10 +27,8 @@ ALAE AS (
     CLM_NBR,
     CLM_FTR_NBR
   FROM
-    CLMAA_SpecialAccounts.dbo.DW_FINCL_LOSS_TXN_SS_F_FILTERED TXN
+    CLMAA_SpecialAccounts.dbo.DW_FINCL_LOSS_TXN_SS_F_FILTERED
   WHERE
-    EXISTS (SELECT 1 FROM #ClaimNumbers C WHERE C.CLM_NBR = TXN.CLM_NBR)
-    AND
     LOSS_TXN_TYPE_DESC LIKE '%Expense%'
     AND (COST_CATGRY_DESC <> 'State Penalties' OR COST_CATGRY_DESC IS NULL) -- NULL does not eval with '<>', so IS NULL clause is necessary
   GROUP BY
@@ -136,7 +43,7 @@ LAST_TXN AS (
     MAX(FTR_KEY) AS LAST_FTR_KEY,
     MAX(LOSS_TXN_PRCSS_DT_DIMKEY) AS LAST_TXN_PRCSS_DT_DIMKEY
   FROM 
-    #FinancialFeatures
+    CLMAA_SpecialAccounts.dbo.DW_FINCL_LOSS_FTR_SS_F_FILTERED
   GROUP BY
     CLM_NBR,
     CLM_FTR_NBR
@@ -148,16 +55,31 @@ LAST_LGL AS (
     FTR_KEY,
     MAX(CLMS_LGL_KEY) AS LAST_CLMS_LGL_KEY 
   FROM 
-    CLM_Lakehouse.dbo.DW_CLMS_LGL_FACT LEGAL
-  WHERE
-    EFF_IND = 1
-    AND EXISTS (
-        SELECT 1 FROM #FinancialFeatures F
-        WHERE F.CLM_KEY = LEGAL.CLM_KEY AND F.FTR_KEY = LEGAL.FTR_KEY
-    ) 
+    CLM_Lakehouse.dbo.DW_CLMS_LGL_FACT 
+  WHERE 
+    EFF_IND = 1 
   GROUP BY 
     CLM_KEY, 
     FTR_KEY
+),
+
+CUSTOMERS AS (
+    SELECT
+      a.CustomerNum,
+      a.CustomerName,
+      a.LossRunDistFreq
+    FROM CLMAA_SpecialAccounts.dbo.tblAcctSpecial a
+    WHERE a.LossRunDistFreq <> 'Not Needed'
+      AND a.LossRunDistFreq <> ''
+      AND (
+        @CustomerNumbersJson IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM OPENJSON(@CustomerNumbersJson) selected
+          WHERE LTRIM(RTRIM(CONVERT(varchar(50), selected.[value]))) =
+                LTRIM(RTRIM(CONVERT(varchar(50), a.CustomerNum)))
+        )
+      )
 ),
 
 DATA AS (
@@ -261,27 +183,22 @@ DATA AS (
     ISNULL(LFINCL.CHNG_IN_ALAE_RSRV_AMT, 0) AS CHNG_IN_ALAE_RSRV_AMT,
     CD.CURR_VERSN_IND
   FROM
-    #Claims CD
+    CLM_Lakehouse.dbo.DW_CLMS_CLM_DIMNSN CD
     LEFT OUTER JOIN CLM_Lakehouse.dbo.DW_CLMS_FTR_DIMNSN FD  
       ON CD.CLM_NBR = FD.CLM_NBR 
-      --AND LV.CLM_FTR_NBR = FD.CLM_FTR_NBR 
       AND FD.CURR_VERSN_IND = 'Y' 
-      --AND DATETRUNC( DAY, FD.VERSN_BEG_DT) = DATETRUNC( DAY, lv.last_VERSN)--LFINCL.FTR_KEY = FD.FTR_KEY
     --  LEFT OUTER JOIN NET_RECOVRY_AMT NRA ON FD.FTR_KEY = NRA.FTR_KEY
     LEFT OUTER JOIN LAST_TXN LFIN
       ON LFIN.CLM_NBR = CD.CLM_NBR
       AND LFIN.CLM_FTR_NBR = FD.CLM_FTR_NBR
-    LEFT OUTER JOIN #FinancialFeatures LFINCL 
+    LEFT OUTER JOIN CLMAA_SpecialAccounts.dbo.DW_FINCL_LOSS_FTR_SS_F_FILTERED LFINCL 
       ON  LFIN.CLM_NBR = LFINCL.CLM_NBR 
       AND LFIN.CLM_FTR_NBR = LFINCL.CLM_FTR_NBR 
       --AND LFIN.LAST_TXN_PRCSS_DT_DIMKEY = LFINCL.LOSS_TXN_PRCSS_DT_DIMKEY
     LEFT OUTER JOIN ALAE 
       ON ALAE.CLM_NBR = LFIN.CLM_NBR 
       AND LFIN.CLM_FTR_NBR = ALAE.CLM_FTR_NBR
-    --LEFT OUTER JOIN LAST_FTR_VERSN LV 
-    --  ON LFIN.CLM_NBR = LV.CLM_NBR 
-    --  AND LFIN.CLM_FTR_NBR = lv.CLM_FTR_NBR
-    INNER JOIN #Policies POL 
+    LEFT OUTER JOIN CLM_Lakehouse.dbo.DW_POL_DIMNSN POL 
       ON CD.POL_SYM = POL.POL_SYM 
       AND UPPER(CD.POL_NBR) = POL.POL_NBR 
       AND CD.POL_MOD = POL.POL_MOD 
@@ -324,7 +241,7 @@ DATA AS (
     CD.CURR_VERSN_IND = 'Y' AND
     --ISNULL(CD.INCID_RPT_IND, 'N') in ('U','N') AND
     --ISNULL(FD.EXPOSR_IND, 'N') = 'N' AND
-    POL.PMS_CUSTMR_NBR IN (SELECT CustomerNum FROM #Customers) -- = '1512034786'
+    POL.PMS_CUSTMR_NBR IN (SELECT CustomerNum FROM CUSTOMERS) -- = '1512034786'
     --AND CD.CLM_NBR = '85-00898010'
 )
 SELECT
@@ -487,19 +404,9 @@ GROUP BY
   --D.FTR_ALAE_AMT
 HAVING
   (
-  (
-    D.CLM_STATUS IN ('Closed','closed')
-    AND (
-      (@PolicyEffectiveDateFrom IS NOT NULL
-       AND D.POL_EFF_DT >= @PolicyEffectiveDateFrom)
-      OR
-      (@PolicyEffectiveDateFrom IS NULL
-       AND D.POL_EFF_DT > @DefaultCutoff)
-    )
-  )
+  (D.CLM_STATUS IN ('Closed','closed')
+   AND D.DT_OF_LOSS >= @LossDateFrom
+   AND D.DT_OF_LOSS < DATEADD(DAY, 1, @ReportThroughDate))
   OR SUM(D.FTR_CHNG_IN_OSLS_AMT) > 0
   OR D.CLM_STATUS IN ('Open','open')
   )
-OPTION (RECOMPILE);
-END;
-GO

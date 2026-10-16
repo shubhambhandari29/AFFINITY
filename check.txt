@@ -1,3 +1,5 @@
+Earlier client clarification: extended-history date range
+-------------------------------------------------------
 Hi Shubham,
 
 Thank you for this latest report.  As we have been reviewing this report, I suspect that we weren’t entirely clear on what we were requesting in our extended history (XHIST) loss run.  I am going to attach our most recent F W Webb extended history loss run so you can see what it contains.  This report you provided seems like it is a snapshot of claims for one day, 9/1 for each year going back to 2004.  That is not what we need.
@@ -10,3 +12,18 @@ So instead of the report being limited to the current and prior six policy years
 I apologize if there was any confusion about what exactly requesting.  I hope my explanation here clarifies things.  Please let me know if you have any questions.  Thank you again for all of your work on this.
 
 Walt
+
+Latest draft response: configurable claim review threshold
+---------------------------------------------------------
+Hi Walt,
+Yes, we can make the threshold dynamic using the account’s Claim Review Threshold setting (CRThresh) rather than a fixed $50,000 value.
+Before proceeding, could you please confirm the following?
+1. Should this apply only to the Claim Review report, or also to the standard loss run? The email mentions Claim Review, while the screenshot shows the standard report’s summary filter.
+2. Would you prefer a filter similar to “Claims above 50K,” a Yes/No indicator column, or highlighted rows? We can also display the configured threshold on the report.
+3. Should all eligible claims remain visible with an indicator, or should the report include only claims meeting the threshold?
+4. Should the comparison use the claim-level total incurred excluding expenses, combining all exposures for each claim?
+5. Should a claim equal to the threshold qualify—for example, exactly $10,000 against a $10,000 threshold—or only claims exceeding it?
+6. How should we handle accounts where the threshold is blank or zero? Should blank values show “Threshold not configured,” and is zero a valid threshold?
+Once confirmed, we can finalize the template and calculation changes. We expect to use the existing setting without requiring a new UI field.
+Thanks,
+Shubham

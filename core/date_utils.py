@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 DATE_OUTPUT_FORMAT = "%m-%d-%Y"
 DATETIME_OUTPUT_FORMAT = "%m-%d-%Y %I:%M:%S %p"
@@ -125,6 +126,20 @@ def format_datetime_value(value: Any) -> Any:
         return parsed.strftime(DATETIME_OUTPUT_FORMAT)
 
     return value
+
+
+def format_loss_run_timestamp(value: Any) -> Any:
+    """Display UTC job timestamps in Eastern time; SQL datetime2 has no tzinfo."""
+    parsed = _try_parse_datetime(value.strip()) if isinstance(value, str) else value
+    if isinstance(parsed, datetime):
+        if _is_sentinel_date(parsed):
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(ZoneInfo("America/New_York")).strftime(
+            DATETIME_OUTPUT_FORMAT
+        )
+    return format_datetime_value(value)
 
 
 def parse_date_input(value: Any) -> Any:
