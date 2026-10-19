@@ -18,6 +18,12 @@ from openpyxl.worksheet.table import TableColumn
 from core.date_utils import format_records_dates
 from core.db_helpers import run_raw_query_async
 from services.loss_run.claim_review_workbook import create_claim_review_workbook
+from services.loss_run.claim_threshold import (
+    THRESHOLD_FIELD,
+    claim_threshold_flags,
+    configure_threshold_workbook,
+    parse_threshold,
+)
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
 from services.loss_run.excel_package import save_report_workbook
 from services.loss_run.standard_report_summary import populate_standard_summaries
@@ -41,6 +47,7 @@ ResultCallback = Callable[
 
 RECORD_ONLY_EXCLUDED_COLUMNS = [
     "Claims above 50K",
+    THRESHOLD_FIELD,
     "Total Incurred",
     "Total Incurred + ALAE",
     "Total Paid Loss Net Salvage/Subro/Loss Recovery",
@@ -117,13 +124,19 @@ def _create_workbook(
     template_bytes: bytes,
     loss_date_from: date | None = None,
     report_date: date | None = None,
+    claim_review_threshold=None,
 ) -> bytes:
+    threshold = parse_threshold(claim_review_threshold)
     if not records:
         return create_no_claims_workbook(
             customer_num, customer_name, template_bytes, "standard",
-            loss_date_from, report_date,
+            loss_date_from, report_date, threshold,
         )
-    dataframe = pd.DataFrame(records)
+    flags = claim_threshold_flags(records, threshold)
+    dataframe = pd.DataFrame([
+        {**record, THRESHOLD_FIELD: flags.get(str(record.get("Claim Number") or "").strip())}
+        for record in records
+    ]).drop(columns=["Claims above 50K"], errors="ignore")
 
     if "Exposure" in dataframe.columns:
         dataframe["Exposure"] = dataframe["Exposure"].apply(
@@ -152,9 +165,12 @@ def _create_workbook(
         )
 
     workbook = load_workbook(BytesIO(template_bytes))
+    configure_threshold_workbook(workbook, threshold)
     _write_excel_table(
         workbook["Claims Data"], "ClaimsData", claims.reset_index(drop=True)
     )
+    threshold_column = claims.columns.get_loc(THRESHOLD_FIELD) + 1
+    workbook["Claims Data"].column_dimensions[get_column_letter(threshold_column)].hidden = True
     _write_excel_table(
         workbook["Record Only"], "RecordOnlyData", record_only.reset_index(drop=True)
     )
@@ -200,7 +216,7 @@ async def generate_loss_runs(
         if customer_nums is None:
             customers = await run_raw_query_async(
                 """
-                SELECT CustomerNum, CustomerName
+                SELECT CustomerNum, CustomerName, CRThresh
                 FROM dbo.tblAcctSpecial
                 WHERE LossRunDistFreq <> 'Not Needed'
                   AND LossRunDistFreq <> ''
@@ -228,7 +244,7 @@ async def generate_loss_runs(
             placeholders = ", ".join("?" for _ in requested_numbers)
             customers = await run_raw_query_async(
                 f"""
-                SELECT CustomerNum, CustomerName
+                SELECT CustomerNum, CustomerName, CRThresh
                 FROM dbo.tblAcctSpecial
                 WHERE CustomerNum IN ({placeholders})
                 """,
@@ -273,6 +289,10 @@ async def generate_loss_runs(
             ).strip()
             for customer in customers
         }
+        customer_thresholds = {
+            str(customer["CustomerNum"]).strip(): customer.get("CRThresh")
+            for customer in customers
+        }
         records_by_customer: dict[str, list[dict]] = {}
         for record in records:
             customer_num = str(record.get("Customer Number") or "").strip()
@@ -314,6 +334,7 @@ async def generate_loss_runs(
                     template_bytes,
                     loss_date_from,
                     report_date,
+                    customer_thresholds.get(customer_num),
                 )
                 output_path = await run_in_threadpool(
                     storage.upload_report,

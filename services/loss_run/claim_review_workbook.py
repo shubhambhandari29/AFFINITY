@@ -11,6 +11,13 @@ from openpyxl.pivot.record import Record, RecordList
 from openpyxl.pivot.table import FieldItem
 from openpyxl.utils import get_column_letter
 
+from services.loss_run.claim_threshold import (
+    THRESHOLD_FIELD,
+    claim_loss_total,
+    claim_threshold_flags,
+    configure_threshold_workbook,
+    parse_threshold,
+)
 from services.loss_run.excel_package import save_report_workbook
 from services.loss_run.pivot_cache import (
     cache_field_values,
@@ -158,12 +165,14 @@ def create_claim_review_workbook(
     template_bytes: bytes,
     loss_date_from: date | None = None,
     report_date: date | None = None,
+    claim_review_threshold=None,
 ) -> bytes:
     """Populate the converted client Claim Review template, not a new workbook."""
+    threshold = parse_threshold(claim_review_threshold)
     if not records:
         return create_no_claims_workbook(
             customer_num, customer_name, template_bytes, "claim_review",
-            loss_date_from, report_date,
+            loss_date_from, report_date, threshold,
         )
     workbook = load_workbook(BytesIO(template_bytes))
     try:
@@ -198,9 +207,16 @@ def create_claim_review_workbook(
             }:
                 workbook.remove(sheet)
         workbook.defined_names.clear()
+        configure_threshold_workbook(workbook, threshold)
+        flags = claim_threshold_flags(records, threshold)
         claims = {}
         detail_rows = []
         headers = [cell.value for cell in details[1]]
+        if "Claim Above 25K" in headers:
+            column = headers.index("Claim Above 25K")
+            headers[column] = THRESHOLD_FIELD
+            details.cell(1, column + 1, THRESHOLD_FIELD)
+            details.column_dimensions[get_column_letter(column + 1)].hidden = True
         seen = set()
         for record in records:
             if record.get("Record Only Indicator") == "Y":
@@ -208,18 +224,7 @@ def create_claim_review_workbook(
             number = str(record.get("Claim Number") or "").strip()
             if not number:
                 raise ValueError("Claim number is required for claim-level review")
-            total = sum(
-                (
-                    Decimal(str(record[key] or 0))
-                    for key in (
-                        "Outstanding Loss Reserve",
-                        "Total Paid Loss Net Salvage/Subro/Loss Recovery",
-                    )
-                ),
-                Decimal(0),
-            )
-            if not total.is_finite():
-                raise ValueError(f"Invalid amount for claim {number}")
+            total = claim_loss_total(record)
             claim = claims.setdefault(
                 number,
                 {"values": {field: [] for field in REVIEW_FIELDS}, "total": Decimal(0)},
@@ -241,8 +246,8 @@ def create_claim_review_workbook(
                     value = total
                 elif header == "Claim Distinct":
                     value = int(number not in seen)
-                elif header == "Claim Above 25K":
-                    value = None  # Legacy helper, explicitly not requested.
+                elif header == THRESHOLD_FIELD:
+                    value = flags[number]
                 elif header == "Feature Number" and value not in (None, ""):
                     value = f"{int(value):02d}"
                 elif base in DATE_FIELDS and isinstance(value, str) and value.strip():
@@ -260,6 +265,7 @@ def create_claim_review_workbook(
                 "Claim Number": number,
                 **{field: "; ".join(claim["values"][field]) for field in REVIEW_FIELDS},
                 "Incurred": claim["total"],
+                THRESHOLD_FIELD: flags[number],
             }
             for number, claim in sorted(claims.items())
         ]

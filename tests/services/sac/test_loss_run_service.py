@@ -15,6 +15,7 @@ from PIL import Image as PILImage
 
 from services.loss_run import loss_run_service
 from services.loss_run.claim_review_workbook import create_claim_review_workbook
+from services.loss_run.claim_threshold import THRESHOLD_FIELD
 
 
 def test_loss_run_accounts_includes_inactive_without_removing_frequency_filters(monkeypatch):
@@ -150,7 +151,8 @@ def test_claim_review_combines_exposures_without_expenses_or_record_only():
             review.column_dimensions["B"].width == original["Review"].column_dimensions["B"].width
         )
         assert [c.value for c in workbook["Claims Details"][1]] == [
-            c.value for c in original["Claims Details"][1]
+            THRESHOLD_FIELD if c.value == "Claim Above 25K" else c.value
+            for c in original["Claims Details"][1]
         ]
         original.close()
         with ZipFile(BytesIO(output)) as archive:
@@ -391,8 +393,8 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(monkeypatch):
         calls.append((query, params))
         if "tblAcctSpecial" in query:
             return [
-                {"CustomerNum": "00123", "CustomerName": "Example/Customer"},
-                {"CustomerNum": "00456", "CustomerName": "No Data Customer"},
+                {"CustomerNum": "00123", "CustomerName": "Example/Customer", "CRThresh": 10000},
+                {"CustomerNum": "00456", "CustomerName": "No Data Customer", "CRThresh": 50000},
             ]
         return [
             {
@@ -402,8 +404,9 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(monkeypatch):
             }
         ]
 
-    def fake_create(records, customer_num, customer_name, received_template, loss_date_from, report_date):
+    def fake_create(records, customer_num, customer_name, received_template, loss_date_from, report_date, claim_review_threshold):
         assert received_template == template_bytes
+        assert claim_review_threshold == {"00123": 10000, "00456": 50000}[customer_num]
         return b"workbook"
 
     async def fake_threadpool(func, *args):
@@ -423,6 +426,7 @@ def test_generate_selected_loss_runs_handles_one_or_more_customers(monkeypatch):
     assert "files" not in result
     assert len(calls) == 2
     assert calls[0][1] == ["00123", "00456"]
+    assert "CRThresh" in calls[0][0]
     assert calls[1][1] == ["00123", "00456"]
     assert "WHERE [Customer Number] IN (?, ?)" in calls[1][0]
     assert uploaded[0][0].startswith("Example_Customer_")
@@ -446,7 +450,7 @@ def test_generate_all_loss_runs_uses_current_eligibility_rules(monkeypatch):
     async def fake_query(query, params=None):
         calls.append((query, params))
         if "tblAcctSpecial" in query:
-            return [{"CustomerNum": "00123", "CustomerName": "Example Customer"}]
+            return [{"CustomerNum": "00123", "CustomerName": "Example Customer", "CRThresh": 50000}]
         return [
             {
                 "Customer Number": "00123",
@@ -455,7 +459,8 @@ def test_generate_all_loss_runs_uses_current_eligibility_rules(monkeypatch):
             }
         ]
 
-    def fake_create(records, customer_num, customer_name, template_bytes, loss_date_from, report_date):
+    def fake_create(records, customer_num, customer_name, template_bytes, loss_date_from, report_date, claim_review_threshold):
+        assert claim_review_threshold == 50000
         return b"workbook"
 
     async def fake_threadpool(func, *args):
@@ -547,7 +552,7 @@ def test_generate_loss_runs_records_upload_failure(monkeypatch):
             }
         ]
 
-    def fake_create(records, customer_num, customer_name, template_bytes, loss_date_from, report_date):
+    def fake_create(records, customer_num, customer_name, template_bytes, loss_date_from, report_date, claim_review_threshold):
         return b"workbook"
 
     async def fake_threadpool(func, *args):

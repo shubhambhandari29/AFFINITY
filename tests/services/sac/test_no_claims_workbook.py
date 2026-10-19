@@ -7,6 +7,7 @@ import pytest
 from openpyxl import load_workbook
 
 from services.loss_run.claim_review_workbook import create_claim_review_workbook
+from services.loss_run.claim_threshold import THRESHOLD_FIELD
 from services.loss_run.loss_run_service import _create_workbook
 from services.loss_run.workbook_template import NO_CLAIMS_MESSAGE
 
@@ -37,7 +38,10 @@ def test_empty_reports_clear_sample_data_and_keep_cover_and_headers(review, cuto
         assert set(workbook.sheetnames) == {"Cover Page", *headers}
         for name, row in headers.items():
             sheet = workbook[name]
-            assert [c.value for c in sheet[row]] == [c.value for c in original[name][row]]
+            assert [c.value for c in sheet[row]] == [
+                THRESHOLD_FIELD if c.value in {"Claims above 50K", "Claim Above 25K"} else c.value
+                for c in original[name][row]
+            ]
             values = [c.value for cells in sheet.iter_rows(min_row=row + 1)
                       for c in cells if c.value is not None]
             assert values == [NO_CLAIMS_MESSAGE]
