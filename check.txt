@@ -1,29 +1,25 @@
-Earlier client clarification: extended-history date range
--------------------------------------------------------
 Hi Shubham,
 
-Thank you for this latest report.  As we have been reviewing this report, I suspect that we weren’t entirely clear on what we were requesting in our extended history (XHIST) loss run.  I am going to attach our most recent F W Webb extended history loss run so you can see what it contains.  This report you provided seems like it is a snapshot of claims for one day, 9/1 for each year going back to 2004.  That is not what we need.
- 
+I have responses to your questions which Michelle Bond, Jenna Houle and I put together.  Please see our responses to your questions printed in red.
 
-What we are requesting, I suspect may actually be an easier build for you.  We want ALL claims that occurred in the timespan from a single date that we choose, to the present day.  So if we choose 10/1/2004 as the START date, the report will capture ALL claims starting from that date, and every day in between, to the current day.  Our current loss run provides all claims open and closed going back six years, (plus ALL open claims, regardless of when they occurred).  This is stated on the cover page of our loss run:  This report contains information on all open claims; as well as closed claims limited to the current and prior six policy years.  
+1.	Should this apply only to the Claim Review report, or also to the standard loss run?  The email mentions Claim Review, but just to be sure.
+We agree that it makes sense to have it apply to both reports; the Claim Review report and the standard loss run.
 
-So instead of the report being limited to the current and prior six policy years, we want to be able to change that range on an ad hoc basis, to capture all claims from the current day, back to whatever date we limit it to.  And, of course, it must contain all open claims, even if they occurred before that limiting date we specified.
+2.	Would you prefer a filter like “Claims above 50K,” a Yes/No indicator column, or highlighted rows? We can also display the configured threshold on the report.
+The way it is currently configured on the standard loss run, as a filter, will be fine.
 
-I apologize if there was any confusion about what exactly requesting.  I hope my explanation here clarifies things.  Please let me know if you have any questions.  Thank you again for all of your work on this.
+3.	Should all eligible claims remain visible with an indicator, or should the report include only claims meeting the threshold?
+When you use the indicator on the pivot now, it filters to show just the claims meeting the threshold.  We see NO need to have a yes/no column on the pivot.
+
+4.	Should the comparison use the claim-level total incurred excluding expenses, combining all exposures for each claim?
+It should the total loss for all exposures for the claim (Loss Reserve + Total Paid Loss) and no expenses should be factored in.
+
+5.	Should a claim equal to the threshold qualify—for example, exactly $10,000 against a $10,000 threshold—or only claims exceeding it?
+It should be all claims equal to and above the threshold.  So a claim at exactly $10,000 in your example with would count.
+
+6.	How should we handle accounts where the threshold is blank or zero? Should blank values show “Threshold not configured,” and is zero a valid threshold?
+All accounts in the database should have a threshold amount specified, but if nothing is specified then sure, it would be good that we get notified that the “Threshold not configured,” as it will indicate that the database needs to be updated.
+
+Thank you for your work on this!
 
 Walt
-
-Latest draft response: configurable claim review threshold
----------------------------------------------------------
-Hi Walt,
-Yes, we can make the threshold dynamic using the account’s Claim Review Threshold setting (CRThresh) rather than a fixed $50,000 value.
-Before proceeding, could you please confirm the following?
-1. Should this apply only to the Claim Review report, or also to the standard loss run? The email mentions Claim Review, while the screenshot shows the standard report’s summary filter.
-2. Would you prefer a filter similar to “Claims above 50K,” a Yes/No indicator column, or highlighted rows? We can also display the configured threshold on the report.
-3. Should all eligible claims remain visible with an indicator, or should the report include only claims meeting the threshold?
-4. Should the comparison use the claim-level total incurred excluding expenses, combining all exposures for each claim?
-5. Should a claim equal to the threshold qualify—for example, exactly $10,000 against a $10,000 threshold—or only claims exceeding it?
-6. How should we handle accounts where the threshold is blank or zero? Should blank values show “Threshold not configured,” and is zero a valid threshold?
-Once confirmed, we can finalize the template and calculation changes. We expect to use the existing setting without requiring a new UI field.
-Thanks,
-Shubham
