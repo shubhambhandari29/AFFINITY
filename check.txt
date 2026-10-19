@@ -1,25 +1,57 @@
-Hi Shubham,
+1. 
 
-I have responses to your questions which Michelle Bond, Jenna Houle and I put together.  Please see our responses to your questions printed in red.
+TestCase	CustomerNumber	CustomerName	ThresholdAmount	ClaimCount	ClaimsMeetingThreshold	ClaimsBelowThreshold	MultiExposureClaims
+1. Non-default threshold	1523154351	GSV Holding LLC	25000.0000000000	664	15	649	618
+1. Non-default threshold	1509188239	Café Zupas LC	25000.0000000000	673	25	648	582
+1. Non-default threshold	1509470125	Goodwill Industries of Southeastern Wisconsin Inc	10000.0000000000	169	32	137	98
+1. Non-default threshold	1504131963	Harkins Administrative Services Inc	25000.0000000000	139	14	125	75
+1. Non-default threshold	1502818850	LL Bean Inc	10000.0000000000	117	17	100	48
 
-1.	Should this apply only to the Claim Review report, or also to the standard loss run?  The email mentions Claim Review, but just to be sure.
-We agree that it makes sense to have it apply to both reports; the Claim Review report and the standard loss run.
 
-2.	Would you prefer a filter like “Claims above 50K,” a Yes/No indicator column, or highlighted rows? We can also display the configured threshold on the report.
-The way it is currently configured on the standard loss run, as a filter, will be fine.
+2. 
+TestCase	CustomerNumber	CustomerName	ThresholdAmount	ClaimCount	ClaimsMeetingThreshold	ClaimsBelowThreshold	MultiExposureClaims
+2. Default $50,000 threshold	1500608123	Modineer Company Inc	50000.0000000000	399	11	388	379
+2. Default $50,000 threshold	1523238012	Cherry Hill Acquisition Holdings Inc	50000.0000000000	271	5	266	212
+2. Default $50,000 threshold	0018569125	S L Nusbaum Realty Co Inc	50000.0000000000	225	17	208	177
+2. Default $50,000 threshold	1518752612	Super C Group LLC-ASG Holdings LLC	50000.0000000000	219	4	215	161
+2. Default $50,000 threshold	1516710287	PHR Group-Professional Hospitality Resources Inc	50000.0000000000	145	2	143	145
 
-3.	Should all eligible claims remain visible with an indicator, or should the report include only claims meeting the threshold?
-When you use the indicator on the pivot now, it filters to show just the claims meeting the threshold.  We see NO need to have a yes/no column on the pivot.
+3. 
 
-4.	Should the comparison use the claim-level total incurred excluding expenses, combining all exposures for each claim?
-It should the total loss for all exposures for the claim (Loss Reserve + Total Paid Loss) and no expenses should be factored in.
+TestCase	CustomerNumber	CustomerName	ThresholdAmount
+3. No matching report records	1500773492	Charter House Holdings LLC-Canc 1-1-2021	50000.0000000000
+3. No matching report records	1523001828	BUF Foods-Pitco Foods LLC	50000.0000000000
+3. No matching report records	1523311758	BUF Foods-Central Tennessee Foods LLC	50000.0000000000
 
-5.	Should a claim equal to the threshold qualify—for example, exactly $10,000 against a $10,000 threshold—or only claims exceeding it?
-It should be all claims equal to and above the threshold.  So a claim at exactly $10,000 in your example with would count.
 
-6.	How should we handle accounts where the threshold is blank or zero? Should blank values show “Threshold not configured,” and is zero a valid threshold?
-All accounts in the database should have a threshold amount specified, but if nothing is specified then sure, it would be good that we get notified that the “Threshold not configured,” as it will indicate that the database needs to be updated.
+4.
 
-Thank you for your work on this!
+TestCase	CustomerNumber	CustomerName	ThresholdAmount	ClaimNumber	ExposureCount	ClaimTotal
+4. Claim exactly equals threshold	0041349946	Alwin Manufacturing Co Inc	50000.0000000000	85-00518278	1	50000.0000000000
+4. Claim exactly equals threshold	1500232290	Cummings Properties LLC	50000.0000000000	85-00757143	1	50000.0000000000
+4. Claim exactly equals threshold	1500957167	Havtech LLC	50000.0000000000	85-00732686	1	50000.0000000000
+4. Claim exactly equals threshold	1502818850	LL Bean Inc	10000.0000000000	19-00820704	1	10000.0000000000
+4. Claim exactly equals threshold	1502818850	LL Bean Inc	10000.0000000000	85-00135575	1	10000.0000000000
+4. Claim exactly equals threshold	1502818850	LL Bean Inc	10000.0000000000	85-00529247	2	10000.0000000000
+4. Claim exactly equals threshold	1502818850	LL Bean Inc	10000.0000000000	85-00734332	2	10000.0000000000
+4. Claim exactly equals threshold	1502818850	LL Bean Inc	10000.0000000000	85-00749607	2	10000.0000000000
+4. Claim exactly equals threshold	1504568415	Security Purchasing Group Et Al The Andrews Organization Inc	50000.0000000000	85-00480436	2	50000.0000000000
+4. Claim exactly equals threshold	1504568415	Security Purchasing Group Et Al The Andrews Organization Inc	50000.0000000000	85-00561076	1	50000.0000000000
 
-Walt
+
+5. 
+TestCase	CustomerNumber	CustomerName	StoredThreshold
+
+6.
+
+TestCase	CustomerNumber	CustomerName	ThresholdAmount	ClaimNumber	ExposureCount	LargestExposureTotal	ClaimTotal
+6. Combined exposures meet threshold	0018569125	S L Nusbaum Realty Co Inc	50000.0000000000	83-00078801	2	40998.9000000000	61110.9500000000
+6. Combined exposures meet threshold	0018569125	S L Nusbaum Realty Co Inc	50000.0000000000	83-00113450	2	29861.2900000000	50556.5400000000
+6. Combined exposures meet threshold	0018569125	S L Nusbaum Realty Co Inc	50000.0000000000	83-00127240	2	29258.0000000000	53441.6000000000
+6. Combined exposures meet threshold	0039797683	Mirbeau of Skaneateles LP	50000.0000000000	83-00167202	2	35000.0000000000	58300.0000000000
+6. Combined exposures meet threshold	1500030483	Fitness & Wellness Professional Services LLC	50000.0000000000	85-00488063	2	41000.0000000000	51000.0000000000
+6. Combined exposures meet threshold	1500071957	J Tropeano Inc	50000.0000000000	85-00869717	5	21348.5100000000	51624.2600000000
+6. Combined exposures meet threshold	1500232290	Cummings Properties LLC	50000.0000000000	85-00151530	8	26844.0100000000	84394.5600000000
+6. Combined exposures meet threshold	1500369827	Hatch Stamping Company LLC	50000.0000000000	83-00073850	2	35375.7300000000	52286.3300000000
+6. Combined exposures meet threshold	1500608123	Modineer Company Inc	50000.0000000000	83-00160723	2	46217.7200000000	81217.7200000000
+6. Combined exposures meet threshold	1500608123	Modineer Company Inc	50000.0000000000	83-00173558	2	30000.0000000000	60000.0000000000
