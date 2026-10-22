@@ -61,6 +61,39 @@ def test_get_sac_account_invalid_filters(monkeypatch):
     assert excinfo.value.detail == {"error": "bad filters"}
 
 
+@pytest.mark.parametrize("records", [[], [
+    {"CustomerNum": "1", "AcctStatus": "Retired", "Stage": "Admin", "IsSubmitted": 1},
+    {"CustomerNum": "2", "AcctStatus": "Retired", "Stage": "Retired", "IsSubmitted": 0},
+    {"CustomerNum": "3", "AcctStatus": "Retired", "Stage": None, "IsSubmitted": None},
+]])
+def test_get_retired_sac_accounts_ignores_stage_and_submission(monkeypatch, records):
+    async def fake_fetch_records_async(*, table, filters):
+        assert table == "tblAcctSpecial"
+        assert filters == {"AcctStatus": "Retired"}
+        return records
+
+    def fake_format_records_dates(rows, fields):
+        assert fields == sac_account_service._DATE_FIELDS
+        return rows
+
+    monkeypatch.setattr(sac_account_service, "fetch_records_async", fake_fetch_records_async)
+    monkeypatch.setattr(sac_account_service, "format_records_dates", fake_format_records_dates)
+
+    assert asyncio.run(sac_account_service.get_retired_sac_accounts()) == records
+
+
+def test_get_retired_sac_accounts_query_error(monkeypatch):
+    async def fake_fetch_records_async(**kwargs):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(sac_account_service, "fetch_records_async", fake_fetch_records_async)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(sac_account_service.get_retired_sac_accounts())
+
+    assert excinfo.value.status_code == 500
+
+
 def test_upsert_sac_account_inserts_without_pk(monkeypatch):
     async def fake_insert_records_async(*, table, records):
         return {"count": len(records)}

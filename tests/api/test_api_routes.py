@@ -17,6 +17,20 @@ class DummyModel:
         return dict(self._data)
 
 
+def test_retired_sac_accounts_route(monkeypatch):
+    module = importlib.import_module("api.sac.sac_account")
+    records = [{"CustomerNum": "1", "AcctStatus": "Retired"}]
+
+    async def fake_service():
+        return records
+
+    monkeypatch.setattr(module, "get_retired_sac_accounts_service", fake_service)
+    route = next(route for route in app.routes if route.path == "/sac_account/retired")
+    assert "GET" in route.methods
+    assert route.dependencies
+    assert asyncio.run(route.endpoint()) == records
+
+
 def test_sac_and_hcm_only_user_routes_are_registered():
     routes = {(route.path, frozenset(route.methods or [])) for route in app.routes}
 

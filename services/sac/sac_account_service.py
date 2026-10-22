@@ -100,6 +100,18 @@ async def get_sac_account(query_params: dict[str, Any]):
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
 
 
+async def get_retired_sac_accounts():
+    """Return retired account statuses across all stages and submission states."""
+    try:
+        records = await fetch_records_async(
+            table=TABLE_NAME, filters={"AcctStatus": "Retired"}
+        )
+        return format_records_dates(records, fields=_DATE_FIELDS)
+    except Exception as exc:
+        logger.warning(f"Error fetching retired SAC accounts - {str(exc)}")
+        raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc
+
+
 async def upsert_sac_account(data: dict[str, Any]):
     try:
         normalized_data = normalize_payload_dates(data, fields=_DATE_FIELDS)
