@@ -142,6 +142,10 @@ def test_download_loss_run_job_returns_attachment(monkeypatch):
         )()
 
     monkeypatch.setattr(loss_run, "prepare_loss_run_download", fake_prepare)
+    async def fake_get_job(received_job_id):
+        assert received_job_id == job_id
+        return {"businessType": "sac"}
+    monkeypatch.setattr(loss_run, "get_loss_run_job", fake_get_job)
 
     response = asyncio.run(loss_run.download_loss_run_job(job_id, CURRENT_USER))
 

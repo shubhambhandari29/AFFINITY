@@ -41,6 +41,7 @@ class DatabricksLossRunStorage:
 
     def download_template(self, report_type: str = "standard") -> bytes:
         filenames = {
+            "affinity": "AffinityLossRunTemplate.xlsx",
             "standard": "SACLossRunTemplate.xlsx",
             "claim_review": "SACClaimReviewTemplate.xlsx",
         }

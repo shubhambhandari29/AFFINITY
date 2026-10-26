@@ -9,7 +9,7 @@ from db import db_connection
 JOB_TABLE = "dbo.tblLossRunJob"
 ACCOUNT_TABLE = "dbo.tblLossRunJobAccount"
 JOB_COLUMNS = """
-    JobId, JobType, ReportType, TriggerSource, ScheduleId, ScheduledForDate,
+    JobId, JobType, ReportType, BusinessType, TriggerSource, ScheduleId, ScheduledForDate,
     LossDateFrom, PolicyEffectiveDateFrom, Status, Phase, RequestedCount,
     ProcessedCount, GeneratedCount, FailedCount, RequestedBy,
     CreatedAt, StartedAt, CompletedAt, ErrorMessage
@@ -27,6 +27,7 @@ def _create_job(
     customer_numbers: list[str] | None,
     report_type: str = "standard",
     loss_date_from: date | None = None,
+    business_type: str = "sac",
 ) -> tuple[UUID, bool]:
     job_id = uuid4()
 
@@ -58,9 +59,10 @@ def _create_job(
                 RequestedCount,
                 RequestedBy,
                 ReportType,
-                LossDateFrom
+                LossDateFrom,
+                BusinessType
             )
-            VALUES (?, ?, 'queued', 'waiting_for_worker', ?, ?, ?, ?)
+            VALUES (?, ?, 'queued', 'waiting_for_worker', ?, ?, ?, ?, ?)
             """,
             str(job_id),
             job_type,
@@ -68,6 +70,7 @@ def _create_job(
             requested_by,
             report_type,
             loss_date_from,
+            business_type,
         )
 
         if customer_numbers:
@@ -91,6 +94,7 @@ async def create_job(
     customer_numbers: list[str] | None,
     report_type: str = "standard",
     loss_date_from: date | None = None,
+    business_type: str = "sac",
 ) -> tuple[UUID, bool]:
     return await run_in_threadpool(
         _create_job,
@@ -99,6 +103,7 @@ async def create_job(
         customer_numbers,
         report_type,
         loss_date_from,
+        business_type,
     )
 
 
@@ -121,21 +126,23 @@ async def get_job(job_id: UUID) -> dict | None:
     return await run_in_threadpool(_get_job, job_id)
 
 
-def _get_jobs() -> list[dict]:
+def _get_jobs(business_type: str = "sac") -> list[dict]:
     with db_connection() as connection:
         cursor = connection.cursor()
         cursor.execute(
             f"""
             SELECT {JOB_COLUMNS}
             FROM {JOB_TABLE}
+            WHERE BusinessType = ?
             ORDER BY CreatedAt DESC
-            """
+            """,
+            business_type,
         )
         return _rows_to_dicts(cursor)
 
 
-async def get_jobs() -> list[dict]:
-    return await run_in_threadpool(_get_jobs)
+async def get_jobs(business_type: str = "sac") -> list[dict]:
+    return await run_in_threadpool(_get_jobs, business_type)
 
 
 def _get_failures(job_id: UUID) -> list[dict]:
@@ -268,6 +275,7 @@ def _claim_next_job(worker_id: str) -> dict | None:
                 inserted.JobId,
                 inserted.JobType,
                 inserted.ReportType,
+                inserted.BusinessType,
                 inserted.LossDateFrom,
                 inserted.PolicyEffectiveDateFrom,
                 inserted.AttemptCount;

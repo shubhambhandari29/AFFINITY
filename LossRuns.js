@@ -20,13 +20,17 @@ import { useEffect, useState } from "react";
 import api from "../../../../api/api";
 import Loader from "../../../ui/Loader";
 import Swal from "sweetalert2";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 
 export default function LossRuns() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const businessType = searchParams.get("businessType") === "affinity" ? "affinity" : "sac";
+  const isAffinity = businessType === "affinity";
+  const apiBase = isAffinity ? "affinity_loss_run" : "loss_run";
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState("");
   const [searchBy, setSearchBy] = useState("AccountName");
@@ -36,27 +40,42 @@ export default function LossRuns() {
   const [reportType, setReportType] = useState("standard");
   const [lossDateFrom, setLossDateFrom] = useState("");
   const theme = useTheme();
-  const [...selectedIds] = rowSelectionModel?.ids || "";
+  const selectedIds = Array.isArray(rowSelectionModel)
+    ? rowSelectionModel
+    : rowSelectionModel?.type === "exclude"
+      ? accounts.filter((row) => !rowSelectionModel.ids.has(row.id)).map((row) => row.id)
+      : Array.from(rowSelectionModel?.ids || []);
   const navigate = useNavigate();
 
   // Dynamic mapping exactly as it was in the original LossRuns
   const dynamicSearchBy =
-    searchBy === "AccountName"
+    isAffinity ? (searchBy === "CustomerNum" ? "Program ID" : searchBy === "ProducerCode" ? "Agent Codes" : "Program Name") : searchBy === "AccountName"
       ? "Customer Name"
       : searchBy === "PolicyNameInsured"
         ? "Name Insured on Policy"
         : searchBy.replace(/([a-z])([A-Z])/g, "$1 $2").replace("Num", "Number");
 
   useEffect(() => {
+    let active = true;
     const loadOptions = async () => {
       setLoading("fetching");
       try {
-        const res = await api.get(`/loss_run/accounts`, {
+        const res = await api.get(isAffinity ? "/affinity_loss_run/programs" : `/loss_run/accounts`, {
           params: { search_by: searchBy },
         });
 
-        if (res.status === 200) {
+        if (active && res.status === 200) {
           const formattedData = res.data.map((item) => {
+            if (isAffinity) {
+              return {
+                id: item.programId,
+                "Program ID": item.programId,
+                "Program Name": item.programName,
+                "Account Status": item.accountStatus,
+                "Loss Run Frequency": item.lossRunFrequency,
+                "Agent Codes": item.agentCodes.join(", "),
+              };
+            }
             const formattedItem = {
               ...item,
               id:
@@ -76,6 +95,7 @@ export default function LossRuns() {
           setAccounts(formattedData);
         }
       } catch (err) {
+        if (!active) return;
         console.error(err);
         Swal.fire({
           title: "Error",
@@ -90,7 +110,7 @@ export default function LossRuns() {
           buttonsStyling: false,
         });
       } finally {
-        setLoading("");
+        if (active) setLoading("");
       }
     };
 
@@ -98,8 +118,10 @@ export default function LossRuns() {
       loadOptions();
       setSearchValue("");
       setRowSelectionModel([]);
+      setAccounts([]);
     }
-  }, [searchBy, theme.palette.error.main]);
+    return () => { active = false; };
+  }, [searchBy, isAffinity, theme.palette.error.main]);
 
   // Client-side filtering logic based on ViewPolicies
   const filteredRows = accounts.filter((row) => {
@@ -126,7 +148,7 @@ export default function LossRuns() {
       : [];
 
   const handleLossRunTrigger = async () => {
-    if (lossDateFrom && !dayjs(lossDateFrom).isValid()) {
+    if (!isAffinity && lossDateFrom && !dayjs(lossDateFrom).isValid()) {
       await Swal.fire({
         title: "Invalid date",
         text: "Please select a valid loss date or clear it for default history.",
@@ -134,24 +156,26 @@ export default function LossRuns() {
       });
       return;
     }
-    const url = lossRunAll ? "loss_run/generate-all" : "loss_run/generate";
-    const payload = {
+    const url = `${apiBase}/${lossRunAll ? "generate-all" : "generate"}`;
+    const payload = isAffinity ? (lossRunAll ? undefined : { programIds: selectedIds.map(Number) }) : {
       reportType,
       // Send the selected calendar day, not a UTC timestamp from Day.js JSON.
       ...(lossDateFrom && {
         lossDateFrom: dayjs(lossDateFrom).format("YYYY-MM-DD"),
       }),
       ...(!lossRunAll && {
-        customerNumbers: selectedIds.map((i) => i.split("-")[0]),
+        customerNumbers: selectedIds.map((i) => String(i).split("-")[0]),
       }),
     };
     try {
       const res = await api.post(url, payload);
-      Swal.fire({
+      const result = await Swal.fire({
         title: !res.data.message.includes("running") ? "Success" : "Error",
         text: res.data.message,
         icon: !res.data.message.includes("running") ? "success" : "error",
         confirmButtonText: "OK",
+        showDenyButton: true,
+        denyButtonText: "View Jobs",
         iconColor: !res.data.message.includes("running")
           ? theme.palette.success.main
           : theme.palette.error.main,
@@ -161,6 +185,9 @@ export default function LossRuns() {
         },
         buttonsStyling: false,
       });
+      if (result.isDenied) {
+        navigate(`/loss-run-jobs?businessType=${res.data.businessType || businessType}`);
+      }
     } catch (error) {
       console.error(error);
       Swal.fire({
@@ -180,7 +207,29 @@ export default function LossRuns() {
 
   return (
     <Grid container spacing={2} sx={{ display: "grid", placeItems: "center" }}>
-      <Alert
+      <FormControl sx={{ minWidth: 220, alignSelf: "start" }}>
+        <InputLabel id="loss-run-business-label">Loss Run For</InputLabel>
+        <Select labelId="loss-run-business-label" label="Loss Run For" value={businessType}
+          onChange={(e) => {
+            setAccounts([]);
+            setRowSelectionModel([]);
+            setSearchBy("AccountName");
+            setSearchValue("");
+            setReportType("standard");
+            setLossDateFrom("");
+            setSearchParams({ businessType: e.target.value });
+          }}>
+          <MenuItem value="sac">SAC</MenuItem>
+          <MenuItem value="affinity">Affinity</MenuItem>
+        </Select>
+      </FormControl>
+      {isAffinity ? (
+        <Alert severity="info" variant="outlined" sx={{ width: "100%", boxSizing: "border-box" }}>
+          Affinity generates one workbook per program using its agents marked LossRunReq = Yes.
+          Selected and all-program runs are available. Scheduling, claim review and extended dates
+          are not enabled for Affinity. Use View Existing Jobs to check progress and download reports.
+        </Alert>
+      ) : <Alert
         severity="info"
         variant="outlined"
         role="note"
@@ -199,7 +248,7 @@ export default function LossRuns() {
         Use <strong>View Existing Jobs</strong> below to check progress and
         download completed reports. If another report is running, the scheduled
         run will wait.
-      </Alert>
+      </Alert>}
       <Grid container spacing={1}>
         <Grid size={2}>
           <FormControl fullWidth>
@@ -207,7 +256,8 @@ export default function LossRuns() {
             <Select
               labelId="report-type-label"
               label="Report Type"
-              value={reportType}
+              value={isAffinity ? "standard" : reportType}
+              disabled={isAffinity}
               onChange={(e) => setReportType(e.target.value)}
             >
               <MenuItem value="standard">Standard Loss Run</MenuItem>
@@ -215,7 +265,7 @@ export default function LossRuns() {
             </Select>
           </FormControl>
         </Grid>
-        <Grid size={4}>
+        {!isAffinity && <Grid size={4}>
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DatePicker
               label="Loss date from (optional)"
@@ -230,7 +280,7 @@ export default function LossRuns() {
               }}
             />
           </LocalizationProvider>
-        </Grid>
+        </Grid>}
         <Grid size={3}>
           <FormControl
             component="fieldset"
@@ -242,7 +292,7 @@ export default function LossRuns() {
             }}
           >
             <FormLabel id="LossRunAll">
-              Do you want to run for all the accounts?
+              Do you want to run for all the {isAffinity ? "programs" : "accounts"}?
             </FormLabel>
             <RadioGroup
               row
@@ -261,7 +311,7 @@ export default function LossRuns() {
         <Grid size={3} sx={{ display: "flex", gap: 1 }}>
           {!(lossRunAll || (!lossRunAll && selectedIds.length > 0)) ? (
             <Tooltip
-              title="Please select an account first"
+              title={isAffinity ? "Please select a program first" : "Please select an account first"}
               arrow
               placement="top"
             >
@@ -293,7 +343,7 @@ export default function LossRuns() {
           <Button
             variant="contained"
             color="primary"
-            onClick={() => navigate("/loss-run-jobs")}
+            onClick={() => navigate(`/loss-run-jobs?businessType=${businessType}`)}
           >
             View Existing Jobs
           </Button>
@@ -320,14 +370,14 @@ export default function LossRuns() {
                 value={searchBy}
                 onChange={(e) => setSearchBy(e.target.value)}
               >
-                <MenuItem value="AccountName">Account Name</MenuItem>
-                <MenuItem value="CustomerNum">Customer Number</MenuItem>
-                <MenuItem value="PolicyNum">Policy Number</MenuItem>
+                <MenuItem value="AccountName">{isAffinity ? "Program Name" : "Account Name"}</MenuItem>
+                <MenuItem value="CustomerNum">{isAffinity ? "Program ID" : "Customer Number"}</MenuItem>
+                {!isAffinity && <MenuItem value="PolicyNum">Policy Number</MenuItem>}
                 <MenuItem value="ProducerCode">Producer Code</MenuItem>
-                <MenuItem value="AffiliateName">Affiliate Name</MenuItem>
-                <MenuItem value="PolicyNameInsured">
+                {!isAffinity && <MenuItem value="AffiliateName">Affiliate Name</MenuItem>}
+                {!isAffinity && <MenuItem value="PolicyNameInsured">
                   Policy Name Insured
-                </MenuItem>
+                </MenuItem>}
               </Select>
             </FormControl>
           </Grid>
@@ -361,6 +411,7 @@ export default function LossRuns() {
             <Loader size={40} height={500} />
           ) : (
             <DataGrid
+              key={`${businessType}-${searchBy}-${lossRunAll}`}
               getRowId={(row) => row.id}
               rows={filteredRows}
               columns={columns}
@@ -370,13 +421,14 @@ export default function LossRuns() {
                 pagination: { paginationModel: { pageSize: 25 } },
               }}
               checkboxSelection
+              disableRowSelectionExcludeModel
               keepNonExistentRowsSelected
               selectionModel={rowSelectionModel}
               onRowSelectionModelChange={(newSelection) => {
                 setRowSelectionModel(newSelection);
               }}
               localeText={{
-                noRowsLabel: "No Accounts Found",
+                noRowsLabel: isAffinity ? "No Programs Found" : "No Accounts Found",
               }}
             />
           )}

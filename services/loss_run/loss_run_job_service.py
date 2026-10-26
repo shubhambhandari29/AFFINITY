@@ -44,6 +44,7 @@ async def create_loss_run_job(
     if created:
         return {
             "jobId": job_id,
+            "businessType": "sac",
             "status": "queued",
             "message": "Loss-run generation has been queued",
         }
@@ -51,14 +52,15 @@ async def create_loss_run_job(
     existing = await get_job(job_id)
     return {
         "jobId": job_id,
+        "businessType": existing.get("BusinessType", "sac"),
         "status": existing["Status"],
         "message": "A loss-run job is already queued or running",
     }
 
 
-async def get_loss_run_job(job_id: UUID) -> dict:
+async def get_loss_run_job(job_id: UUID, business_type: str = "sac") -> dict:
     job = await get_job(job_id)
-    if job is None:
+    if job is None or job.get("BusinessType", "sac") != business_type:
         raise HTTPException(
             status_code=404,
             detail={"error": "Loss-run job not found"},
@@ -78,8 +80,8 @@ async def get_loss_run_job(job_id: UUID) -> dict:
     return _format_job(job, failures)
 
 
-async def get_loss_run_jobs() -> list[dict]:
-    jobs = await get_jobs()
+async def get_loss_run_jobs(business_type: str = "sac") -> list[dict]:
+    jobs = await get_jobs(business_type)
     if not jobs:
         return []
 
@@ -98,6 +100,7 @@ async def get_loss_run_jobs() -> list[dict]:
 def _format_job(job: dict, failures: list[dict]) -> dict:
     return {
         "jobId": job["JobId"],
+        "businessType": job.get("BusinessType", "sac"),
         "jobType": job["JobType"],
         "reportType": job.get("ReportType", "standard"),
         "triggerSource": job.get("TriggerSource", "manual"),

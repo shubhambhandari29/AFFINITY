@@ -29,6 +29,7 @@ from api.hcm.hcm_account_associations import router as hcm_account_associations_
 from api.hcm.hcm_users import router as hcm_only_users_router
 from api.hcm.search_hcm_account import router as search_hcm_account_router
 from api.loss_run.loss_run import router as loss_run_router
+from api.affinity.affinity_loss_run import router as affinity_loss_run_router
 from api.outlook_compose import router as outlook_compose_router
 from api.sac.claim_review_distribution import router as claim_review_distribution_router
 from api.sac.claim_review_frequency import router as claim_review_frequency_router
@@ -127,6 +128,7 @@ app.include_router(
     loss_run_frequency_router, prefix="/loss_run_frequency", tags=["loss_run_frequency"]
 )
 app.include_router(loss_run_router, prefix="/loss_run", tags=["loss_run"])
+app.include_router(affinity_loss_run_router, prefix="/affinity_loss_run", tags=["affinity_loss_run"])
 app.include_router(
     claim_review_frequency_router, prefix="/claim_review_frequency", tags=["claim_review_frequency"]
 )

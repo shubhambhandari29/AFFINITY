@@ -88,6 +88,7 @@ async def download_loss_run_job(
     job_id: UUID,
     _current_user: Annotated[dict, Depends(get_current_user_from_token)],
 ):
+    await get_loss_run_job(job_id)
     download = await prepare_loss_run_download(job_id)
     return FileResponse(
         path=download.path,

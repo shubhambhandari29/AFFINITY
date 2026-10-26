@@ -1,0 +1,193 @@
+AFFINITY VIEWS: CREATE AND TEST IN SSMS
+
+Database: CLMAA_SpecialAccounts (NOT CLM_LakeHouse).
+Source tables: CLM_LakeHouse.dbo.* on the same SQL Server/managed instance.
+Deployment file: scripts/affinity_loss_run_views.sql
+This guide does not change the API. The backend still uses its existing query
+files until these views have been tested and the backend is switched later.
+
+1. CONNECT AND CHECK THE TARGET
+Open SSMS, connect to PREPROD using your usual authentication, click New Query.
+Run:
+
+USE [CLMAA_SpecialAccounts];
+GO
+SELECT @@SERVERNAME AS ServerName, DB_NAME() AS DatabaseName,
+       ORIGINAL_LOGIN() AS LoginName;
+SELECT HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CREATE VIEW') AS CanCreateView,
+       HAS_PERMS_BY_NAME('dbo', 'SCHEMA', 'ALTER') AS CanAlterDboSchema;
+
+Verify the intended PREPROD server and database. For creation, both permission
+checks should be 1. If not, ask the DB team to run the deployment file. SELECT
+access to the relevant source objects is also required. Do not change broader
+server security settings or enable cross-database ownership chaining yourself.
+If either view already exists, save its definition before replacing it:
+Object Explorer > Databases > CLMAA_SpecialAccounts > Views > right-click view
+> Script View as > CREATE To > File.
+
+2. CREATE BOTH VIEWS
+In SSMS choose File > Open > File (Ctrl+O), open affinity_loss_run_views.sql.
+Check the connection/server in this query window again.
+Clear any text selection and press F5 (Execute) to run the WHOLE file.
+No import wizard, stored procedure or table designer is needed.
+Keep the GO separators; CREATE OR ALTER VIEW must begin its own batch.
+The script changes only these definitions, not source records:
+  dbo.Affinity_Loss_Run_Claims
+  dbo.Affinity_Loss_Run_RecordOnly
+It does not grant permissions, change SAC_Loss_Run, or run Excel generation.
+
+Expected: no red errors in Messages and two rows in the final results grid.
+If a batch fails, one view may have been created and the other not. Do not
+assume the whole deployment passed just because the last query ran. Share the
+full error; after fixing it, the CREATE OR ALTER script can be rerun.
+Creation does NOT fetch all report data; a quick creation time does not prove
+that the actual report query will be fast.
+
+3. FIND THE VIEWS / CHECK COLUMNS
+Object Explorer > Databases > CLMAA_SpecialAccounts > Views > right-click Refresh.
+Expand each view > Columns. Or in a new query window run:
+
+USE [CLMAA_SpecialAccounts];
+GO
+SELECT TOP (0) * FROM dbo.Affinity_Loss_Run_Claims;
+SELECT TOP (0) * FROM dbo.Affinity_Loss_Run_RecordOnly;
+
+Expected: two empty grids with column headers (68 Claims columns, 36 Record Only
+columns). Lag Time is still calculated by Python when it builds the workbook;
+it is not an additional view column. No source records are changed.
+
+4. CONFIRM PROGRAM-TO-AGENT MAPPING
+Run this separately, before the report test:
+
+USE [CLMAA_SpecialAccounts];
+GO
+SELECT p.AcctAffinityProgramKey AS ProgramId, p.ProgramName,
+       p.AcctStatus, p.LossRunDistFreq, a.AgentCode, a.LossRunReq
+FROM dbo.tblAcctAffinityProgram p
+JOIN dbo.tblAffinityAgents a ON a.ProgramName = p.ProgramName
+WHERE a.LossRunReq = 'Yes'
+  AND NULLIF(LTRIM(RTRIM(a.AgentCode)), '') IS NOT NULL
+ORDER BY p.ProgramName, a.AgentCode;
+
+Choose one ProgramId from this output. Earlier supplied results had Subway=33
+and Carpet Cleaners/Janitorial=3; verify these in YOUR DB before using them.
+
+5. RUN A FULL ONE-PROGRAM TEST
+Use a new query window. Copy and execute the ENTIRE batch below together.
+Change ONLY @ProgramId initially. This reads each view once and stores the
+filtered results in session-local temporary tables, then examines those results.
+It does not create/update persistent business records or Excel files.
+This is a full filtered test, not TOP 10; it may still take several minutes.
+Do not run generate-all or additional report tests concurrently.
+No SHOWPLAN permission is required for the requested STATISTICS output.
+
+USE [CLMAA_SpecialAccounts];
+GO
+DECLARE @ProgramId int = 33; -- Replace with the ID confirmed in step 4.
+DECLARE @Agents table (
+    AgentCode varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS PRIMARY KEY
+);
+INSERT INTO @Agents (AgentCode)
+SELECT DISTINCT LTRIM(RTRIM(a.AgentCode))
+FROM dbo.tblAcctAffinityProgram p
+JOIN dbo.tblAffinityAgents a ON a.ProgramName = p.ProgramName
+WHERE p.AcctAffinityProgramKey = @ProgramId
+  AND a.LossRunReq = 'Yes'
+  AND NULLIF(LTRIM(RTRIM(a.AgentCode)), '') IS NOT NULL;
+
+IF NOT EXISTS (SELECT 1 FROM @Agents)
+    THROW 50001, 'No eligible agents found. Verify ProgramId and LossRunReq.', 1;
+
+-- Grid 1: selected program/agents and effective report day.
+SELECT @ProgramId AS ProgramId, AgentCode,
+       CONVERT(date, SYSUTCDATETIME() AT TIME ZONE 'UTC'
+           AT TIME ZONE 'Eastern Standard Time') AS EasternReportDate
+FROM @Agents ORDER BY AgentCode;
+
+DROP TABLE IF EXISTS #AffinityClaimsTest;
+DROP TABLE IF EXISTS #AffinityRecordOnlyTest;
+SET STATISTICS IO ON;
+SET STATISTICS TIME ON;
+
+SELECT v.* INTO #AffinityClaimsTest
+FROM dbo.Affinity_Loss_Run_Claims v
+WHERE v.[Producing Agent Code] IN (SELECT AgentCode FROM @Agents);
+
+SELECT v.* INTO #AffinityRecordOnlyTest
+FROM dbo.Affinity_Loss_Run_RecordOnly v
+WHERE v.[Producing Agent Code] IN (SELECT AgentCode FROM @Agents);
+
+SET STATISTICS TIME OFF;
+SET STATISTICS IO OFF;
+
+-- Grid 2: rows are exposure/group rows, NOT necessarily distinct claims.
+SELECT 'Claim Details' AS SheetName, COUNT_BIG(*) AS RowCount,
+       COUNT(DISTINCT [Claim Number]) AS DistinctClaims
+FROM #AffinityClaimsTest
+UNION ALL
+SELECT 'Record Only', COUNT_BIG(*), COUNT(DISTINCT [Claim Number])
+FROM #AffinityRecordOnlyTest;
+
+-- Grid 3: claims totals per agent for comparison with the generated workbook.
+SELECT [Producing Agent Code], COUNT_BIG(*) AS RowCount,
+       SUM([Current Loss Reserve]) AS CurrentLossReserve,
+       SUM([Paid Loss Net Salvage Subro]) AS PaidLossNetSalvageSubro,
+       SUM([Total Incurred]) AS TotalIncurred,
+       SUM([Total Expense]) AS TotalExpense,
+       MIN([Loss Date]) AS EarliestLossDate,
+       MAX([Loss Date]) AS LatestLossDate
+FROM #AffinityClaimsTest
+GROUP BY [Producing Agent Code]
+ORDER BY [Producing Agent Code];
+
+-- Grids 4 and 5: sample records, not the complete report.
+SELECT TOP (20) * FROM #AffinityClaimsTest
+ORDER BY [Claim Number], [Exposure];
+SELECT TOP (20) * FROM #AffinityRecordOnlyTest
+ORDER BY [Customer Number], [Claim Number], [Exposure];
+
+-- Grid 6: expected 0 (no unexpected agent codes in either result).
+SELECT COUNT_BIG(*) AS UnexpectedAgentRows
+FROM (
+    SELECT [Producing Agent Code] FROM #AffinityClaimsTest
+    UNION ALL
+    SELECT [Producing Agent Code] FROM #AffinityRecordOnlyTest
+) results
+WHERE [Producing Agent Code] IS NULL
+   OR [Producing Agent Code] NOT IN (SELECT AgentCode FROM @Agents);
+
+-- Temporary tables disappear when this connection/query window closes.
+
+6. WHAT TO SHARE BACK
+- Creation errors, if any, with the full error number/message/line.
+- ProgramId and agent codes tested.
+- All six result grids from step 5; mention explicitly if a grid is empty.
+- The Messages tab text (timings and IO), plus elapsed time shown by SSMS.
+For each grid: right-click results > Save Results As, or copy with headers to
+Excel. Enable Tools > Options > Query Results > SQL Server > Results to Grid >
+Include column headers when copying or saving results, then use a new query.
+Do not share tokens, passwords or connection strings with secrets.
+
+7. INTERPRETATION AND NEXT STEP
+Record Only may legitimately have zero rows. Empty Claims also may be valid;
+first verify the agent mapping and underlying data. A query failure is not an
+empty report. Old open/positive-reserve claims may legitimately appear in Claims.
+Claims retains the OBIEE current/prior-five closed policy-year filter plus
+open/positive-reserve exceptions; Record Only retains its separate policy cutoff
+and financial NOT EXISTS check. These are intentionally not one combined rule.
+The views accept no arguments: every caller MUST filter by the selected agent
+codes. They do not limit themselves to tblAffinityAgents or LossRunReq=Yes.
+The final SELECT must supply ORDER BY; views do not guarantee ordering.
+View creation alone does not prove filter pushdown or improved performance.
+Personal SSMS access does not prove Azure managed-identity access. The DB team
+must verify SELECT on both views and required cross-database source access for
+the application's existing SQL identity. No stored-procedure grant is needed.
+After validating these results, we will switch the backend to short SELECTs
+against the views and remove the two old runtime SQL files. Until then, leave
+them in place so the current backend remains runnable.
+
+Official references
+CREATE VIEW, permissions and batch requirements:
+https://learn.microsoft.com/en-us/sql/t-sql/statements/create-view-transact-sql
+AT TIME ZONE, including daylight-saving handling:
+https://learn.microsoft.com/en-us/sql/t-sql/queries/at-time-zone-transact-sql

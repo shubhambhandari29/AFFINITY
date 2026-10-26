@@ -1,0 +1,98 @@
+AFFINITY LOSS RUN - FIRST BACKEND VERSION
+
+Deployment order
+1. Stop all old local/Azure loss-run workers. Do not run old and new workers
+   against this queue together: old workers do not understand Affinity jobs.
+2. Run scripts/affinity_loss_run_jobs.sql in SSMS on CLMAA_SpecialAccounts.
+   This adds BusinessType with default sac; existing jobs remain SAC.
+3. Upload the revised AffinityLossRunTemplate.xlsx to:
+   /Volumes/<LOSS_RUN_DATABRICKS_CATALOG>/gold/statics/AffinityLossRunTemplate.xlsx
+4. Deploy backend including services/affinity/sql/*.sql and restart the worker.
+   Locally start the API as usual, and in another terminal:
+   python -m services.loss_run.loss_run_worker
+5. Test one program first, inspect the workbook, then test generate-all.
+
+No additional environment variables or Oracle connection are needed.
+The same local Databricks profile / Azure managed identity is used as for SAC.
+The SQL identity needs SELECT on tblAcctAffinityProgram, tblAffinityAgents and
+the LakeHouse tables named in the two query files. It also needs the existing
+loss-run job-table permissions. No source-business-table writes are performed.
+
+Only affinity_loss_run_jobs.sql is a migration to run in SSMS.
+affinity_claims.sql and affinity_record_only.sql are read-only backend queries;
+their two ? parameters are bound by Python (agent-code JSON and report date).
+Do not run these files directly in SSMS without substituting parameters.
+
+Output folder (same as SAC)
+/Volumes/<LOSS_RUN_DATABRICKS_CATALOG>/gold/external_volume/specialaccounts_lossruns_temporary
+Files start with Affinity_<programId> and have a unique run suffix to avoid
+overwriting SAC files or previous Affinity runs.
+
+API contract - use existing authentication
+GET  /affinity_loss_run/programs
+  Returns programId, programName, accountStatus, lossRunFrequency, agentCodes.
+  Uses tblAcctAffinityProgram joined to tblAffinityAgents by ProgramName.
+  Agents must have LossRunReq = Yes and a nonblank AgentCode.
+  No Active-only or frequency filter is imposed for manual generation.
+  Confirm this eligibility rule during client testing before rollout.
+
+POST /affinity_loss_run/generate
+  Body: {"programIds": [3, 33]}
+  Use IDs from /programs; these are examples, not hardcoded program mappings.
+  IDs are deduplicated. Invalid/unconfigured programs return HTTP 400.
+  Empty arrays / nonpositive IDs / unsupported options return HTTP 422.
+
+POST /affinity_loss_run/generate-all
+  No body. Includes all programs returned by /programs at execution time.
+
+Both generate endpoints respond HTTP 202 immediately:
+  {"jobId": "<uuid>", "businessType": "affinity", "status": "queued",
+   "message": "Affinity loss-run generation has been queued"}
+
+The existing global queued/processing-job guard is shared with SAC. If another
+job is active, no new job is inserted; the response identifies the existing
+job and its businessType. Use /loss_run for sac and /affinity_loss_run for
+affinity to poll it. A scheduled SAC job may still queue through the scheduler.
+
+GET /affinity_loss_run/jobs
+GET /affinity_loss_run/jobs/<jobId>
+  Same status/count/time structure as SAC. Counts are PROGRAMS, not accounts
+  or agents. failures entries are {"programId": 3, "reason": "..."}.
+  Jobs lists are segregated by businessType; cross-domain job IDs return 404.
+  Phases: waiting_for_worker, starting, loading_accounts, loading_template,
+          querying_loss_run_data, generating_reports, finished or failed.
+  Querying/generating phases repeat for each program.
+  Status: queued, processing, completed, partially_completed or failed.
+
+GET /affinity_loss_run/jobs/<jobId>/download
+  Browser attachment: one workbook, or a ZIP for multiple successful programs.
+  Same UI blob/download handling as SAC. Databricks remains the source copy.
+
+Generation rules
+- One workbook per program, querying all its eligible producer codes together.
+- Cover Page, Claim Details and Record Only using the supplied template.
+- Full date fields, calculated Lag Time (calendar days from loss to notice),
+  financial columns in existing order, and all retained columns visible.
+- Empty result sets generate a valid cover and no-claims messages.
+- A DB/query failure is a failed program, NOT a no-claims report.
+- Claim Details: supplied OBIEE closed-policy-year / open / positive-reserve rule.
+- Record Only: supplied OBIEE policy-effective-date rule and financial NOT EXISTS.
+- Original joins/financial aggregations retained; SQL dialect converted to SQL
+  Server and source changed to CLM_LakeHouse.dbo. Live totals must be checked.
+
+Scope / remaining verification
+- No Affinity scheduler, claim-review option or extended-date option in this version.
+- Existing SAC schedule and report-generation rules are unchanged.
+- Test UI integration is provided in root LossRuns.js, LossRunJobs.js and
+  JobDetails.js. Copy all three into their existing frontend locations.
+  Existing routes are reused; no new route registration or dependencies.
+  Choose Affinity in the Loss Run For selector, or open:
+  /loss-runs?businessType=affinity
+  Jobs: /loss-run-jobs?businessType=affinity
+  SAC remains the default. Affinity hides extended dates and claim review;
+  job counts/failures refer to programs and downloads use Affinity endpoints.
+  JSX/payload checks passed; full browser integration must be tested in the
+  frontend project (this repository contains only the three UI source files).
+- Tests use mocked DB/storage and the real template; no live SQL or Databricks
+  execution was possible from the implementation workstation.
+- Confirm sample program results in preprod and Excel before client acceptance.

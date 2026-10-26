@@ -50,10 +50,12 @@ const MetricBox = ({ label, value, color = "#1a365d", bgColor = "white" }) => (
   </Box>
 );
 
-export default function JobDetails({ open, onClose, jobData }) {
+export default function JobDetails({ open, onClose, jobData, businessType = "sac" }) {
   const theme = useTheme();
   const [isDownloading, setIsDownloading] = useState(false);
   if (!jobData) return null;
+  const isAffinity = (jobData.businessType || businessType) === "affinity";
+  const apiBase = isAffinity ? "affinity_loss_run" : "loss_run";
 
   // Determine status color based on the job phase/status
   const getStatusColor = (status) => {
@@ -74,7 +76,7 @@ export default function JobDetails({ open, onClose, jobData }) {
 
     try {
       const response = await api.get(
-        `/loss_run/jobs/${jobData.jobId}/download`,
+        `/${apiBase}/jobs/${jobData.jobId}/download`,
         {
           responseType: "blob",
         },
@@ -157,7 +159,7 @@ export default function JobDetails({ open, onClose, jobData }) {
             variant="h6"
             sx={{ fontWeight: "bold", color: theme.palette.background.blue }}
           >
-            Job Details
+            {isAffinity ? "Affinity Job Details" : "Job Details"}
           </Typography>
           <Typography
             variant="caption"
@@ -199,6 +201,9 @@ export default function JobDetails({ open, onClose, jobData }) {
       </DialogTitle>
 
       <DialogContent sx={{ py: 3, px: 3 }}>
+        {isAffinity && <Typography variant="body2" sx={{ mt: 2 }}>
+          Counts below refer to programs. Each generated workbook includes the program's eligible agents.
+        </Typography>}
         {/* Top Section: Core Metrics */}
         <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 4, mt: 1 }}>
           <MetricBox label="Requested" value={jobData.requestedCount} />
@@ -233,19 +238,19 @@ export default function JobDetails({ open, onClose, jobData }) {
                 Report Type
               </Typography>
               <Typography variant="body2" fontWeight="bold">
-                {jobData.reportType === "claim_review"
+                {isAffinity ? "Affinity Loss Run" : jobData.reportType === "claim_review"
                   ? "Claim Review"
                   : "Standard Loss Run"}
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            {!isAffinity && <Grid item xs={12} sm={6} md={3}>
               <Typography variant="caption" color="textSecondary" display="block">
                 Loss Date From
               </Typography>
               <Typography variant="body2" fontWeight="bold">
                 {jobData.lossDateFrom || (jobData.policyEffectiveDateFrom ? `Legacy policy cutoff: ${jobData.policyEffectiveDateFrom}` : "Default history")}
               </Typography>
-            </Grid>
+            </Grid>}
             <Grid item xs={12} sm={6} md={3}>
               <Typography
                 variant="caption"
@@ -377,7 +382,7 @@ export default function JobDetails({ open, onClose, jobData }) {
                         fontSize: "12px",
                       }}
                     >
-                      Customer Number
+                      {isAffinity ? "Program ID" : "Customer Number"}
                     </TableCell>
                     <TableCell
                       sx={{
@@ -401,7 +406,7 @@ export default function JobDetails({ open, onClose, jobData }) {
                       <TableCell
                         sx={{ fontSize: "12px", verticalAlign: "top" }}
                       >
-                        {fail.customerNumber}
+                        {isAffinity ? fail.programId : fail.customerNumber}
                       </TableCell>
                       <TableCell
                         sx={{

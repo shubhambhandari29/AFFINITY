@@ -40,6 +40,7 @@ def test_create_selected_job_normalizes_accounts_and_requester(monkeypatch):
     )
     assert result == {
         "jobId": job_id,
+        "businessType": "sac",
         "status": "queued",
         "message": "Loss-run generation has been queued",
     }
@@ -88,6 +89,7 @@ def test_create_job_returns_existing_active_job(monkeypatch):
 
     assert result == {
         "jobId": active_job_id,
+        "businessType": "sac",
         "status": "processing",
         "message": "A loss-run job is already queued or running",
     }
@@ -186,7 +188,8 @@ def test_get_all_jobs_returns_newest_jobs_with_grouped_failures(monkeypatch):
             "ErrorMessage": None,
         }
 
-    async def fake_jobs():
+    async def fake_jobs(business_type):
+        assert business_type == "sac"
         return [
             job(first_job_id, "partially_completed", 1),
             job(second_job_id, "completed", 0),

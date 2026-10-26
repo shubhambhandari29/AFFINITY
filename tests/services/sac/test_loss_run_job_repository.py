@@ -37,6 +37,7 @@ def test_create_job_persists_request_and_accounts(database, monkeypatch, custome
         "tester",
         "standard",
         cutoff,
+        "sac",
     )
     if customers:
         assert cursor.executemany.call_args.args[1] == [(str(JOB_ID), c) for c in customers]
@@ -83,7 +84,8 @@ def test_queries_map_database_results(database, method, arguments, columns, rows
     cursor.description = [(column,) for column in columns]
     cursor.fetchall.return_value = rows
     assert asyncio.run(getattr(repository, method)(*arguments)) == expected
-    assert cursor.execute.call_args.args[1:] == tuple(str(arg) for arg in arguments)
+    expected_params = ("sac",) if method == "get_jobs" else tuple(str(arg) for arg in arguments)
+    assert cursor.execute.call_args.args[1:] == expected_params
     connection.commit.assert_not_called()
 
 
