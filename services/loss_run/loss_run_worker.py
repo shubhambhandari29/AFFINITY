@@ -6,7 +6,9 @@ from contextlib import suppress
 from time import monotonic
 from uuid import UUID, uuid4
 
-from services.affinity.affinity_loss_run_service import generate_affinity_loss_runs
+from services.loss_run.affinity.affinity_loss_run_service import (
+    generate_affinity_loss_runs,
+)
 from services.loss_run.loss_run_job_repository import (
     claim_next_job,
     complete_job,

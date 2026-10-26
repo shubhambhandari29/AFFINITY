@@ -1,3 +1,5 @@
+"""Request and response models for Affinity loss-run generation."""
+
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field

@@ -6,16 +6,16 @@ from fastapi import APIRouter, Depends
 from starlette.background import BackgroundTask
 from starlette.responses import FileResponse
 
-from core.models.affinity.affinity_loss_run import (
+from core.models.loss_run.affinity.affinity_loss_run import (
     AffinityLossRunJobResponse,
     AffinityLossRunSelection,
 )
 from core.models.loss_run.loss_run_job import LossRunJobCreated
-from services.affinity.affinity_loss_run_service import (
+from services.auth_service import get_current_user_from_token
+from services.loss_run.affinity.affinity_loss_run_service import (
     create_affinity_loss_run_job,
     get_affinity_loss_run_programs,
 )
-from services.auth_service import get_current_user_from_token
 from services.loss_run.loss_run_download_service import prepare_loss_run_download
 from services.loss_run.loss_run_job_service import get_loss_run_job, get_loss_run_jobs
 

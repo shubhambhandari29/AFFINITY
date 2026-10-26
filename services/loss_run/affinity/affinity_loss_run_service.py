@@ -6,7 +6,6 @@ import re
 from copy import copy
 from datetime import datetime
 from io import BytesIO
-from pathlib import Path
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -21,9 +20,24 @@ from services.loss_run.excel_package import save_report_workbook
 from services.loss_run.loss_run_job_repository import create_job, get_job
 
 logger = logging.getLogger(__name__)
-SQL_DIRECTORY = Path(__file__).with_name("sql")
-CLAIMS_QUERY = (SQL_DIRECTORY / "affinity_claims.sql").read_text()
-RECORD_ONLY_QUERY = (SQL_DIRECTORY / "affinity_record_only.sql").read_text()
+CLAIMS_QUERY = """
+    SELECT *
+    FROM dbo.Affinity_Loss_Run_Claims
+    WHERE [Producing Agent Code] IN (
+        SELECT CAST([value] AS varchar(50)) COLLATE SQL_Latin1_General_CP1_CI_AS
+        FROM OPENJSON(?)
+    )
+    ORDER BY [Claim Number], [Exposure]
+"""
+RECORD_ONLY_QUERY = """
+    SELECT *
+    FROM dbo.Affinity_Loss_Run_RecordOnly
+    WHERE [Producing Agent Code] IN (
+        SELECT CAST([value] AS varchar(50)) COLLATE SQL_Latin1_General_CP1_CI_AS
+        FROM OPENJSON(?)
+    )
+    ORDER BY [Customer Number], [Claim Number], [Exposure]
+"""
 DATE_COLUMNS = {
     "Policy Effective Date",
     "Policy Expiration Date",
@@ -210,7 +224,7 @@ async def generate_affinity_loss_runs(
         key = str(program["programId"])
         try:
             await on_phase("querying_loss_run_data")
-            params = [json.dumps(program["agentCodes"]), report_date]
+            params = [json.dumps(program["agentCodes"])]
             claims = await run_raw_query_async(CLAIMS_QUERY, params)
             record_only = await run_raw_query_async(RECORD_ONLY_QUERY, params)
             await on_phase("generating_reports")

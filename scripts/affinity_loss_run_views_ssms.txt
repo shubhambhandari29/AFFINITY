@@ -3,8 +3,8 @@ AFFINITY VIEWS: CREATE AND TEST IN SSMS
 Database: CLMAA_SpecialAccounts (NOT CLM_LakeHouse).
 Source tables: CLM_LakeHouse.dbo.* on the same SQL Server/managed instance.
 Deployment file: scripts/affinity_loss_run_views.sql
-This guide does not change the API. The backend still uses its existing query
-files until these views have been tested and the backend is switched later.
+The backend now queries these views; deploy them before starting the new code
+in any environment. This guide describes standalone SSMS validation.
 
 1. CONNECT AND CHECK THE TARGET
 Open SSMS, connect to PREPROD using your usual authentication, click New Query.
@@ -121,7 +121,7 @@ SET STATISTICS TIME OFF;
 SET STATISTICS IO OFF;
 
 -- Grid 2: rows are exposure/group rows, NOT necessarily distinct claims.
-SELECT 'Claim Details' AS SheetName, COUNT_BIG(*) AS RowCount,
+SELECT 'Claim Details' AS SheetName, COUNT_BIG(*) AS [RowCount],
        COUNT(DISTINCT [Claim Number]) AS DistinctClaims
 FROM #AffinityClaimsTest
 UNION ALL
@@ -129,7 +129,7 @@ SELECT 'Record Only', COUNT_BIG(*), COUNT(DISTINCT [Claim Number])
 FROM #AffinityRecordOnlyTest;
 
 -- Grid 3: claims totals per agent for comparison with the generated workbook.
-SELECT [Producing Agent Code], COUNT_BIG(*) AS RowCount,
+SELECT [Producing Agent Code], COUNT_BIG(*) AS [RowCount],
        SUM([Current Loss Reserve]) AS CurrentLossReserve,
        SUM([Paid Loss Net Salvage Subro]) AS PaidLossNetSalvageSubro,
        SUM([Total Incurred]) AS TotalIncurred,
@@ -182,9 +182,9 @@ View creation alone does not prove filter pushdown or improved performance.
 Personal SSMS access does not prove Azure managed-identity access. The DB team
 must verify SELECT on both views and required cross-database source access for
 the application's existing SQL identity. No stored-procedure grant is needed.
-After validating these results, we will switch the backend to short SELECTs
-against the views and remove the two old runtime SQL files. Until then, leave
-them in place so the current backend remains runnable.
+The backend now uses short SELECTs against these views; the two old runtime SQL
+files have been removed. Next test program 16 from UI and compare its workbook
+with the SSMS counts and totals (allowing for any source-data updates).
 
 Official references
 CREATE VIEW, permissions and batch requirements:

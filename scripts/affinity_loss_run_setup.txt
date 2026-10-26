@@ -5,23 +5,29 @@ Deployment order
    against this queue together: old workers do not understand Affinity jobs.
 2. Run scripts/affinity_loss_run_jobs.sql in SSMS on CLMAA_SpecialAccounts.
    This adds BusinessType with default sac; existing jobs remain SAC.
+   Also deploy scripts/affinity_loss_run_views.sql in that database if the two
+   views do not already exist in this environment. PREPROD views were tested.
 3. Upload the revised AffinityLossRunTemplate.xlsx to:
    /Volumes/<LOSS_RUN_DATABRICKS_CATALOG>/gold/statics/AffinityLossRunTemplate.xlsx
-4. Deploy backend including services/affinity/sql/*.sql and restart the worker.
+4. Deploy the updated backend and restart the worker. Affinity loss-run files
+   now live under api/loss_run/affinity/, services/loss_run/affinity/ and
+   core/models/loss_run/affinity/. Public API URLs remain unchanged.
    Locally start the API as usual, and in another terminal:
    python -m services.loss_run.loss_run_worker
 5. Test one program first, inspect the workbook, then test generate-all.
 
 No additional environment variables or Oracle connection are needed.
 The same local Databricks profile / Azure managed identity is used as for SAC.
-The SQL identity needs SELECT on tblAcctAffinityProgram, tblAffinityAgents and
-the LakeHouse tables named in the two query files. It also needs the existing
+The SQL identity needs SELECT on tblAcctAffinityProgram, tblAffinityAgents,
+dbo.Affinity_Loss_Run_Claims and dbo.Affinity_Loss_Run_RecordOnly, plus required
+cross-database access to their LakeHouse source tables. It also needs the existing
 loss-run job-table permissions. No source-business-table writes are performed.
 
-Only affinity_loss_run_jobs.sql is a migration to run in SSMS.
-affinity_claims.sql and affinity_record_only.sql are read-only backend queries;
-their two ? parameters are bound by Python (agent-code JSON and report date).
-Do not run these files directly in SSMS without substituting parameters.
+Run affinity_loss_run_jobs.sql and affinity_loss_run_views.sql in SSMS as needed
+per environment. The old affinity_claims.sql / affinity_record_only.sql runtime
+files have been removed. Python uses short SELECTs against the two DB views,
+binding the selected agent-code JSON as a parameter. The views calculate their
+current Eastern report date. No stored procedure or new setting is required.
 
 Output folder (same as SAC)
 /Volumes/<LOSS_RUN_DATABRICKS_CATALOG>/gold/external_volume/specialaccounts_lossruns_temporary
@@ -79,6 +85,12 @@ Generation rules
 - Record Only: supplied OBIEE policy-effective-date rule and financial NOT EXISTS.
 - Original joins/financial aggregations retained; SQL dialect converted to SQL
   Server and source changed to CLM_LakeHouse.dbo. Live totals must be checked.
+- PREPROD SSMS baseline for program 16 (Kana Hotels), agent 1802809, on
+  2026-10-26: 99 Claims rows (78 claims), 16 Record Only rows (8 claims).
+  Reserve 241057.91; paid loss 331520.27; incurred 572578.18; expense 73220.78.
+  Full test took about 30 minutes; all-program generation may take much longer.
+  The views were tested using a personal SQL login; API identity access and
+  end-to-end workbook generation still need verification. Source data may change.
 
 Scope / remaining verification
 - No Affinity scheduler, claim-review option or extended-date option in this version.

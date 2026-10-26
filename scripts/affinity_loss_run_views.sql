@@ -1,7 +1,7 @@
 -- Deploy BOTH Affinity views in CLMAA_SpecialAccounts on the intended server.
 -- No stored procedure, source-data updates, schedule or permission changes.
 -- Re-running updates these two views in place (do not DROP them).
--- Backend remains on parameterized SQL files until view tests are accepted.
+-- Backend queries these views using parameterized agent-code filters.
 -- Source: client OBIEE Affinity SQL, translated to SQL Server/LakeHouse.
 -- Agent/program selection is applied by the caller using [Producing Agent Code].
 -- Claims and Record Only retain DIFFERENT history rules from the supplied SQL.

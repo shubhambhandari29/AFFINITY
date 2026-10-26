@@ -29,7 +29,7 @@ from api.hcm.hcm_account_associations import router as hcm_account_associations_
 from api.hcm.hcm_users import router as hcm_only_users_router
 from api.hcm.search_hcm_account import router as search_hcm_account_router
 from api.loss_run.loss_run import router as loss_run_router
-from api.affinity.affinity_loss_run import router as affinity_loss_run_router
+from api.loss_run.affinity.affinity_loss_run import router as affinity_loss_run_router
 from api.outlook_compose import router as outlook_compose_router
 from api.sac.claim_review_distribution import router as claim_review_distribution_router
 from api.sac.claim_review_frequency import router as claim_review_frequency_router

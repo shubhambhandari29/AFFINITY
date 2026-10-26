@@ -11,13 +11,13 @@ from fastapi import HTTPException
 from openpyxl import load_workbook
 from pydantic import ValidationError
 
-from core.models.affinity.affinity_loss_run import AffinityLossRunSelection
-from services.affinity import affinity_loss_run_service as service
+from core.models.loss_run.affinity.affinity_loss_run import AffinityLossRunSelection
 from services.loss_run import loss_run_job_repository as repository
 from services.loss_run import loss_run_job_service as jobs
 from services.loss_run import loss_run_worker as worker_module
+from services.loss_run.affinity import affinity_loss_run_service as service
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[4]
 PROGRAM = {
     "programId": 3,
     "programName": "Example Program",
@@ -84,10 +84,14 @@ def test_selection_rejects_invalid_or_unsupported_options(payload):
 
 def test_template_headers_match_query_outputs():
     workbook = load_workbook(ROOT / "AffinityLossRunTemplate.xlsx")
-    for sheet_name, query in [
-        ("Claim Details", service.CLAIMS_QUERY),
-        ("Record Only", service.RECORD_ONLY_QUERY),
+    deployment = (ROOT / "scripts" / "affinity_loss_run_views.sql").read_text()
+    for sheet_name, view_name, runtime_query in [
+        ("Claim Details", "Affinity_Loss_Run_Claims", service.CLAIMS_QUERY),
+        ("Record Only", "Affinity_Loss_Run_RecordOnly", service.RECORD_ONLY_QUERY),
     ]:
+        query = deployment.split(f"CREATE OR ALTER VIEW dbo.{view_name}\nAS\n")[
+            1
+        ].split("\nGO")[0]
         select = re.search(
             r"SELECT\s+D.PMS_CUSTMR_NBR.*?(?=GROUP BY\s+D.PMS_CUSTMR_NBR)", query, re.S
         ).group()
@@ -95,14 +99,19 @@ def test_template_headers_match_query_outputs():
         aliases |= set(re.findall(r"D\.(CLMNT_\w+)\s*,", select))
         expected = {cell.value for cell in workbook[sheet_name][1]} - {"Lag Time"}
         assert expected <= aliases, expected - aliases
-        assert query.count("?") == 2
+        assert "?" not in query
+        assert f"FROM dbo.{view_name}" in runtime_query
+        assert runtime_query.count("?") == 1
+        assert "WHERE [Producing Agent Code] IN" in runtime_query
+        assert "OPENJSON(?)" in runtime_query
+        assert "ORDER BY" in runtime_query
         assert not re.search(
             r"\b(NVL|TRUNC|ADD_MONTHS|TO_CHAR|EXTRACT)\s*\(", query, re.I
         )
         assert "CLM_LakeHouse.dbo.DW_FINCL_LOSS_FTR_SS_F" in query
-    assert "DATEADD(MONTH, -60" in service.CLAIMS_QUERY
-    assert "NOT EXISTS" in service.RECORD_ONLY_QUERY
-    assert ") - 6, 1, 1)" in service.RECORD_ONLY_QUERY
+    assert "DATEADD(MONTH, -60" in deployment
+    assert "NOT EXISTS" in deployment
+    assert ") - 6, 1, 1)" in deployment
 
 
 def test_workbook_fills_revised_template_and_no_claims():
@@ -163,7 +172,14 @@ def test_generation_queries_selected_agents_and_uploads(monkeypatch):
         )
     )
     assert query.await_count == 2
-    assert query.call_args.args[1][0] == '["5701083", "5701212"]'
+    assert query.call_args_list[0].args == (
+        service.CLAIMS_QUERY,
+        ['["5701083", "5701212"]'],
+    )
+    assert query.call_args_list[1].args == (
+        service.RECORD_ONLY_QUERY,
+        ['["5701083", "5701212"]'],
+    )
     storage.download_template.assert_called_once_with("affinity")
     assert storage.upload_report.call_args.args[0].startswith(
         "Affinity_3_Example Program_"

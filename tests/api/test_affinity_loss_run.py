@@ -5,7 +5,7 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from api.affinity import affinity_loss_run as api
+from api.loss_run.affinity import affinity_loss_run as api
 
 
 @pytest.fixture
