@@ -1,27 +1,14 @@
-Hi Shubham! We’d like to move some columns around to match the current SAC runs and add one column:
+USE [CLMAA_SpecialAccounts];
+GO
 
-Cust #
-Policy Insured Name
-Clm #
-Exposure
-Clmt Name
-Acct Loc ID
-Accident state
-Pol Sym
-Pol #
-Pol Mod
-Pol Eff Date
-Pol Exp Date
-Producing Agent Code
-Loss Date
-Date of Notice (Report Date)
-ADD Lag Time
-Claim Status
-Clm Clsd Date
-Coverage
-ALL financials in order currently there
-Cause of Loss
-Desc of Loss
-Contrib Factor
-
-Let me know if there are any further questions! Thnx, Mich
+SELECT
+    p.AcctAffinityProgramKey AS ProgramId,
+    p.ProgramName,
+    a.AgentCode,
+    a.LossRunReq
+FROM dbo.tblAcctAffinityProgram p
+JOIN dbo.tblAffinityAgents a
+    ON a.ProgramName = p.ProgramName
+WHERE a.LossRunReq = 'Yes'
+  AND NULLIF(LTRIM(RTRIM(a.AgentCode)), '') IS NOT NULL
+ORDER BY p.ProgramName, a.AgentCode;
