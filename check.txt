@@ -1,10 +1,43 @@
-Msg 207, Level 16, State 1, Line 12
-Invalid column name 'BusinessType'.
-Msg 207, Level 16, State 1, Line 12
-Invalid column name 'BusinessType'.
-Msg 207, Level 16, State 1, Line 20
-Invalid column name 'BusinessType'.
-Msg 207, Level 16, State 1, Line 20
-Invalid column name 'BusinessType'.
+USE [CLMAA_SpecialAccounts];
+GO
 
-Completion time: 2026-10-26T20:10:53.4816275+05:30
+SET XACT_ABORT ON;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    IF COL_LENGTH('dbo.tblLossRunJob', 'BusinessType') IS NULL
+    BEGIN
+        ALTER TABLE dbo.tblLossRunJob
+        ADD BusinessType varchar(10) NOT NULL
+            CONSTRAINT DF_tblLossRunJob_BusinessType
+            DEFAULT ('sac') WITH VALUES;
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.check_constraints
+        WHERE parent_object_id = OBJECT_ID('dbo.tblLossRunJob')
+          AND name = 'CK_tblLossRunJob_BusinessType'
+    )
+    BEGIN
+        EXEC sys.sp_executesql N'
+            ALTER TABLE dbo.tblLossRunJob WITH CHECK
+            ADD CONSTRAINT CK_tblLossRunJob_BusinessType
+            CHECK (BusinessType IN (''sac'', ''affinity''));
+        ';
+    END;
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0
+        ROLLBACK TRANSACTION;
+
+    THROW;
+END CATCH;
+GO
+
+SELECT BusinessType, COUNT(*) AS JobCount
+FROM dbo.tblLossRunJob
+GROUP BY BusinessType;
