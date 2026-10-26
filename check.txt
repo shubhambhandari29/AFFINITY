@@ -1,12 +1,27 @@
-ProgramName	AgentCode	AgentName	LossRunReq	AcctAffinityProgramKey	AcctStatus	LossRunDistFreq
-Carpet Cleaners and Janitorial Programs	5701083	HALLMARK INS. ASSOCIATES	Yes	3	Active	2.Quarterly
-Carpet Cleaners and Janitorial Programs	5701212	HALLMARK INS. ASSOCIATES	Yes	3	Active	2.Quarterly
-Subway Affinity Program	1502070	L H BRENNER	Yes	33	Active	1.Monthly
+Hi Shubham! We’d like to move some columns around to match the current SAC runs and add one column:
 
+Cust #
+Policy Insured Name
+Clm #
+Exposure
+Clmt Name
+Acct Loc ID
+Accident state
+Pol Sym
+Pol #
+Pol Mod
+Pol Eff Date
+Pol Exp Date
+Producing Agent Code
+Loss Date
+Date of Notice (Report Date)
+ADD Lag Time
+Claim Status
+Clm Clsd Date
+Coverage
+ALL financials in order currently there
+Cause of Loss
+Desc of Loss
+Contrib Factor
 
-
-
-ServerName	AgentCode	CurrentPolicyCount	CurrentClaimCount	ClaimsWithFinancialSnapshot	ClaimsWithFinancialTransactions
-clms-preprd-sqlmanagedinstance.3b98dc354c37.database.windows.net	1502070	1561	107	97	97
-clms-preprd-sqlmanagedinstance.3b98dc354c37.database.windows.net	5701083	4909	178	168	168
-clms-preprd-sqlmanagedinstance.3b98dc354c37.database.windows.net	5701212	378	13	12	12
+Let me know if there are any further questions! Thnx, Mich
