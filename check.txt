@@ -88,3 +88,66 @@ Customer Number	Policy Insured Name	Account Location Identifier	Accident State	P
 1527252714	WILKA DOWNTOWN LLC	Home2 Suites/Tru Dual Brand Nashville/Downtown, TN	TN	W25	J556335	03	2025-09-28	2026-09-28	NULL	1802809	MCGRIFF, A MARSH &            	83-00173111	02	WC Coverage -Med Only	2026-02-14	NULL	NULL	NULL	NULL	NULL	NULL	NULL	2026-02-14	closed	2026-03-05	Saturday	Davis, Kay	kadavis@hanover.com	8006280250	HCS	Y	N	2026-10-26	Flores Hernandez, Maria	Housekeeping
 1530772118	PIGEON FORGE HOTEL PARTNERS	Embassy Suites Pigeon Forge Hotel/Pigeon Forge, TN	TN	W25	J960793	00	2025-02-24	2025-09-28	NULL	1802809	MCGRIFF, A MARSH &            	83-00155825	01	WC Coverage - Other than Med	2025-04-01	NULL	NULL	NULL	NULL	NULL	NULL	NULL	2025-04-01	closed	2025-04-08	Tuesday	Piper, Olivia	opiper@hanover.com	8006280250	HCS	Y	N	2026-10-26	Borjas Ramirez, Keidy	Housekeeping
 1530772118	PIGEON FORGE HOTEL PARTNERS	Embassy Suites Pigeon Forge Hotel/Pigeon Forge, TN	TN	W25	J960793	00	2025-02-24	2025-09-28	NULL	1802809	MCGRIFF, A MARSH &            	83-00155825	02	WC Coverage -Med Only	2025-04-01	NULL	NULL	NULL	NULL	NULL	NULL	NULL	2025-04-01	closed	2025-04-08	Tuesday	Piper, Olivia	opiper@hanover.com	8006280250	HCS	Y	N	2026-10-26	Borjas Ramirez, Keidy	Housekeeping
+
+
+
+
+
+
+(1 row affected)
+
+(1 row affected)
+
+ SQL Server Execution Times:
+   CPU time = 0 ms,  elapsed time = 0 ms.
+SQL Server parse and compile time: 
+   CPU time = 5984 ms, elapsed time = 7202 ms.
+Table 'DW_FINCL_LOSS_FTR_SS_F'. Scan count 18, logical reads 6962445, physical reads 27, page server reads 0, read-ahead reads 3459362, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_FINCL_LOSS_TXN_SS_F'. Scan count 9, logical reads 2576701, physical reads 3, page server reads 0, read-ahead reads 2571544, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_REF_MAJ_PERIL'. Scan count 9, logical reads 133, physical reads 1, page server reads 0, read-ahead reads 44, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_CLMS_CLM_CNTCT_DIMNSN'. Scan count 9, logical reads 1725477, physical reads 3, page server reads 0, read-ahead reads 1722376, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_CLMS_LGL_FACT'. Scan count 18, logical reads 23344, physical reads 3, page server reads 0, read-ahead reads 11110, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_CLMS_FTR_DIMNSN'. Scan count 18, logical reads 5010875, physical reads 3, page server reads 0, read-ahead reads 2477964, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_POL_DIMNSN'. Scan count 9, logical reads 6227046, physical reads 3, page server reads 0, read-ahead reads 6216516, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_CLMS_CLM_DIMNSN'. Scan count 9, logical reads 7182257, physical reads 3, page server reads 0, read-ahead reads 7171032, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table '#A33E0E2E'. Scan count 9, logical reads 4, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_CLMS_VEH_DIMNSN'. Scan count 99, logical reads 396, physical reads 4, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_CLMS_DRVR_DIMNSN'. Scan count 99, logical reads 396, physical reads 4, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_CLMS_CLMNT_DIMNSN'. Scan count 99, logical reads 401, physical reads 156, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DM_RETNTN_PRDCNG_AGNT_HR_D'. Scan count 0, logical reads 594, physical reads 1, page server reads 0, read-ahead reads 2, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_CLMS_LGL_DIMNSN'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'Worktable'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'Worktable'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+
+ SQL Server Execution Times:
+   CPU time = 348125 ms,  elapsed time = 1003426 ms.
+
+(99 rows affected)
+SQL Server parse and compile time: 
+   CPU time = 235 ms, elapsed time = 713 ms.
+Table 'DW_CLMS_CLMNT_DIMNSN'. Scan count 9, logical reads 336803, physical reads 2, page server reads 0, read-ahead reads 335705, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_FINCL_LOSS_FTR_SS_F'. Scan count 9, logical reads 3445679, physical reads 1, page server reads 0, read-ahead reads 3368567, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_CLMS_FTR_DIMNSN'. Scan count 9, logical reads 2481960, physical reads 0, page server reads 0, read-ahead reads 2461589, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_CLMS_CLM_DIMNSN'. Scan count 9, logical reads 7181141, physical reads 41, page server reads 0, read-ahead reads 7147379, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DW_POL_DIMNSN'. Scan count 9, logical reads 6225820, physical reads 0, page server reads 0, read-ahead reads 6165148, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table '#A33E0E2E'. Scan count 3, logical reads 4, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'DM_RETNTN_PRDCNG_AGNT_HR_D'. Scan count 0, logical reads 48, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table '-1556214226'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'Worktable'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'Worktable'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+
+ SQL Server Execution Times:
+   CPU time = 183938 ms,  elapsed time = 811122 ms.
+
+(16 rows affected)
+
+(2 rows affected)
+
+(1 row affected)
+
+(20 rows affected)
+
+(16 rows affected)
+
+Completion time: 2026-10-26T19:44:26.5428265+05:30
+
