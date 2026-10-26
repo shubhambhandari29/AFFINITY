@@ -1,14 +1,88 @@
 USE [CLMAA_SpecialAccounts];
 GO
 
-SELECT
-    p.AcctAffinityProgramKey AS ProgramId,
-    p.ProgramName,
-    a.AgentCode,
-    a.LossRunReq
+DECLARE @ProgramId int = 33; -- Change this
+
+DECLARE @Agents TABLE (
+    AgentCode varchar(50)
+        COLLATE SQL_Latin1_General_CP1_CI_AS PRIMARY KEY
+);
+
+INSERT INTO @Agents (AgentCode)
+SELECT DISTINCT LTRIM(RTRIM(a.AgentCode))
 FROM dbo.tblAcctAffinityProgram p
 JOIN dbo.tblAffinityAgents a
     ON a.ProgramName = p.ProgramName
-WHERE a.LossRunReq = 'Yes'
-  AND NULLIF(LTRIM(RTRIM(a.AgentCode)), '') IS NOT NULL
-ORDER BY p.ProgramName, a.AgentCode;
+WHERE p.AcctAffinityProgramKey = @ProgramId
+  AND a.LossRunReq = 'Yes'
+  AND NULLIF(LTRIM(RTRIM(a.AgentCode)), '') IS NOT NULL;
+
+IF NOT EXISTS (SELECT 1 FROM @Agents)
+    THROW 50001, 'No eligible agents found for this program.', 1;
+
+-- Result 1: confirm selected agents
+SELECT @ProgramId AS ProgramId, AgentCode
+FROM @Agents
+ORDER BY AgentCode;
+
+DROP TABLE IF EXISTS #AffinityClaimsTest;
+DROP TABLE IF EXISTS #AffinityRecordOnlyTest;
+
+SET STATISTICS TIME ON;
+SET STATISTICS IO ON;
+
+SELECT v.*
+INTO #AffinityClaimsTest
+FROM dbo.Affinity_Loss_Run_Claims v
+WHERE v.[Producing Agent Code] IN (
+    SELECT AgentCode FROM @Agents
+);
+
+SELECT v.*
+INTO #AffinityRecordOnlyTest
+FROM dbo.Affinity_Loss_Run_RecordOnly v
+WHERE v.[Producing Agent Code] IN (
+    SELECT AgentCode FROM @Agents
+);
+
+SET STATISTICS TIME OFF;
+SET STATISTICS IO OFF;
+
+-- Result 2: row counts and distinct claim counts
+SELECT
+    'Claim Details' AS SheetName,
+    COUNT_BIG(*) AS RowCount,
+    COUNT(DISTINCT [Claim Number]) AS DistinctClaims
+FROM #AffinityClaimsTest
+
+UNION ALL
+
+SELECT
+    'Record Only',
+    COUNT_BIG(*),
+    COUNT(DISTINCT [Claim Number])
+FROM #AffinityRecordOnlyTest;
+
+-- Result 3: financial totals and date range by agent
+SELECT
+    [Producing Agent Code],
+    COUNT_BIG(*) AS RowCount,
+    SUM([Current Loss Reserve]) AS CurrentLossReserve,
+    SUM([Paid Loss Net Salvage Subro]) AS PaidLoss,
+    SUM([Total Incurred]) AS TotalIncurred,
+    SUM([Total Expense]) AS TotalExpense,
+    MIN([Loss Date]) AS EarliestLossDate,
+    MAX([Loss Date]) AS LatestLossDate
+FROM #AffinityClaimsTest
+GROUP BY [Producing Agent Code]
+ORDER BY [Producing Agent Code];
+
+-- Result 4: sample claim records
+SELECT TOP (20) *
+FROM #AffinityClaimsTest
+ORDER BY [Claim Number], [Exposure];
+
+-- Result 5: sample record-only records
+SELECT TOP (20) *
+FROM #AffinityRecordOnlyTest
+ORDER BY [Customer Number], [Claim Number], [Exposure];
