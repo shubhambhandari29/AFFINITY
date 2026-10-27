@@ -3,6 +3,7 @@ import re
 from typing import Any
 
 from fastapi import HTTPException
+from pydantic import TypeAdapter
 
 from core.date_utils import format_records_dates, normalize_payload_dates
 from core.db_helpers import (
@@ -34,19 +35,23 @@ async def get_affinity_program(query_params: dict[str, Any]):
     """
 
     try:
+        query_params = dict(query_params)
+        include_retired = TypeAdapter(bool).validate_python(query_params.pop("include_retired", False))
         filters = sanitize_filters(query_params)
         branch_filter = filters.pop("BranchVal", None)
 
         if not branch_filter:
             records = await fetch_records_async(table=TABLE_NAME, filters=filters)
-            records = _exclude_retired_stage(records)
+            if not include_retired:
+                records = _exclude_retired_stage(records)
             return format_records_dates(records)
 
         branch_terms = [term for term in re.split(r"[ ,&]+", str(branch_filter)) if term.strip()]
 
         if not branch_terms:
             records = await fetch_records_async(table=TABLE_NAME, filters=filters)
-            records = _exclude_retired_stage(records)
+            if not include_retired:
+                records = _exclude_retired_stage(records)
             return format_records_dates(records)
 
         clauses: list[str] = []
@@ -65,14 +70,14 @@ async def get_affinity_program(query_params: dict[str, Any]):
             query += " WHERE " + " AND ".join(clauses)
 
         records = await run_raw_query_async(query, list(params))
-        records = _exclude_retired_stage(records)
+        if not include_retired:
+            records = _exclude_retired_stage(records)
         return format_records_dates(records)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
     except Exception as e:
         logger.warning(f"Error fetching Affinity Program List - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
-
 
 async def get_retired_affinity_programs():
     """Return records with Stage Retired, regardless of status or submission state."""
