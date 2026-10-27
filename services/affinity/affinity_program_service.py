@@ -74,6 +74,16 @@ async def get_affinity_program(query_params: dict[str, Any]):
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
 
 
+async def get_retired_affinity_programs():
+    """Return records with Stage Retired, regardless of status or submission state."""
+    try:
+        records = await fetch_records_async(table=TABLE_NAME, filters={"Stage": "Retired"})
+        return format_records_dates(records)
+    except Exception as exc:
+        logger.warning(f"Error fetching retired Affinity programs - {str(exc)}")
+        raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc
+
+
 async def upsert_affinity_program(data: dict[str, Any]):
     """
     Update row if already exists, else insert row into tblAcctAffinityProgram.

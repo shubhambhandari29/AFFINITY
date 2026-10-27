@@ -101,10 +101,10 @@ async def get_sac_account(query_params: dict[str, Any]):
 
 
 async def get_retired_sac_accounts():
-    """Return retired account statuses across all stages and submission states."""
+    """Return accounts with Stage Retired, regardless of status or submission state."""
     try:
         records = await fetch_records_async(
-            table=TABLE_NAME, filters={"AcctStatus": "Retired"}
+            table=TABLE_NAME, filters={"Stage": "Retired"}
         )
         return format_records_dates(records, fields=_DATE_FIELDS)
     except Exception as exc:

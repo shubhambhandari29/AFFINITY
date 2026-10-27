@@ -3,7 +3,12 @@ from fastapi import APIRouter, Depends, Request
 from core.models.hcm_account import HCMAccountUpsert
 from services.auth_service import get_current_user_from_token
 from services.hcm.hcm_account_service import get_hcm_account as get_hcm_account_service
-from services.hcm.hcm_account_service import upsert_hcm_account as upsert_hcm_account_service
+from services.hcm.hcm_account_service import (
+    get_retired_hcm_accounts as get_retired_hcm_accounts_service,
+)
+from services.hcm.hcm_account_service import (
+    upsert_hcm_account as upsert_hcm_account_service,
+)
 
 router = APIRouter(dependencies=[Depends(get_current_user_from_token)])
 
@@ -11,6 +16,12 @@ router = APIRouter(dependencies=[Depends(get_current_user_from_token)])
 @router.get("/")
 async def get_hcm_account(request: Request):
     return await get_hcm_account_service(dict(request.query_params))
+
+
+@router.get("/retired")
+async def get_retired_hcm_accounts():
+    """Get records with Stage Retired, regardless of AcctStatus or IsSubmitted."""
+    return await get_retired_hcm_accounts_service()
 
 
 @router.post("/upsert")

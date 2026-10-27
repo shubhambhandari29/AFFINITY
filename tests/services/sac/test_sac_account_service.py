@@ -62,14 +62,14 @@ def test_get_sac_account_invalid_filters(monkeypatch):
 
 
 @pytest.mark.parametrize("records", [[], [
-    {"CustomerNum": "1", "AcctStatus": "Retired", "Stage": "Admin", "IsSubmitted": 1},
+    {"CustomerNum": "1", "AcctStatus": "Active", "Stage": "Retired", "IsSubmitted": 1},
     {"CustomerNum": "2", "AcctStatus": "Retired", "Stage": "Retired", "IsSubmitted": 0},
-    {"CustomerNum": "3", "AcctStatus": "Retired", "Stage": None, "IsSubmitted": None},
+    {"CustomerNum": "3", "AcctStatus": None, "Stage": "Retired", "IsSubmitted": None},
 ]])
-def test_get_retired_sac_accounts_ignores_stage_and_submission(monkeypatch, records):
+def test_get_retired_sac_accounts_ignores_status_and_submission(monkeypatch, records):
     async def fake_fetch_records_async(*, table, filters):
         assert table == "tblAcctSpecial"
-        assert filters == {"AcctStatus": "Retired"}
+        assert filters == {"Stage": "Retired"}
         return records
 
     def fake_format_records_dates(rows, fields):

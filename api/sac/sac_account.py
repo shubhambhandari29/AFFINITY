@@ -20,7 +20,7 @@ async def get_sac_account(request: Request):
 
 @router.get("/retired")
 async def get_retired_sac_accounts():
-    """Get accounts with AcctStatus Retired, regardless of Stage or IsSubmitted."""
+    """Get accounts with Stage Retired, regardless of AcctStatus or IsSubmitted."""
     return await get_retired_sac_accounts_service()
 
 

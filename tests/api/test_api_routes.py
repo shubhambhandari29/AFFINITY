@@ -17,15 +17,20 @@ class DummyModel:
         return dict(self._data)
 
 
-def test_retired_sac_accounts_route(monkeypatch):
-    module = importlib.import_module("api.sac.sac_account")
-    records = [{"CustomerNum": "1", "AcctStatus": "Retired"}]
+@pytest.mark.parametrize("module_path, path, service_attr", [
+    ("api.sac.sac_account", "/sac_account/retired", "get_retired_sac_accounts_service"),
+    ("api.hcm.hcm_account", "/hcm_account/retired", "get_retired_hcm_accounts_service"),
+    ("api.affinity.affinity_program", "/affinity_program/retired", "get_retired_affinity_programs_service"),
+])
+def test_retired_accounts_route(monkeypatch, module_path, path, service_attr):
+    module = importlib.import_module(module_path)
+    records = [{"Stage": "Retired"}]
 
     async def fake_service():
         return records
 
-    monkeypatch.setattr(module, "get_retired_sac_accounts_service", fake_service)
-    route = next(route for route in app.routes if route.path == "/sac_account/retired")
+    monkeypatch.setattr(module, service_attr, fake_service)
+    route = next(route for route in app.routes if route.path == path)
     assert "GET" in route.methods
     assert route.dependencies
     assert asyncio.run(route.endpoint()) == records

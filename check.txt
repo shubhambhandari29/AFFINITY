@@ -1,25 +1,14 @@
-Hi Walt, Michelle and Jenna,
+-- SAC
+SELECT *
+FROM tblAcctSpecial
+WHERE Stage = 'Retired';
 
-We have completed the threshold changes for both the standard loss run and Claim Review reports. They are available for testing in PREPROD.
+-- Affinity
+SELECT *
+FROM tblAcctAffinityProgram
+WHERE Stage = 'Retired';
 
-Both reports now use the account’s configured Claim Review Threshold. The comparison combines Loss Reserve + Paid Loss across all exposures of each claim, excludes expenses, and includes claims equal to or above the threshold. All claims remain available, with a pivot filter to display those meeting the threshold.
-
-Please download the reports from these two jobs on the Loss Run Jobs page:
-
-- **Standard loss run:** `[Standard Job ID]`
-- **Claim Review:** `[Claim Review Job ID]`
-
-Suggested examples to review:
-
-| Account | What to check |
-|---|---|
-| **LL Bean Inc** — `1502818850` | Uses its $10,000 threshold. Claim `85-00529247` has two exposures totaling exactly $10,000 and qualifies. |
-| **S L Nusbaum Realty Co Inc** — `0018569125` | Uses its $50,000 threshold. Claim `83-00078801` totals $61,110.95 across two exposures and qualifies, although neither exposure individually reaches $50,000. |
-| **BUF Foods-Pitco Foods LLC** — `1523001828` | Shows the account details, configured threshold and no-claims messages. |
-
-Selecting **“Meets threshold”** should show 17 distinct qualifying claims for both LL Bean and S L Nusbaum in each report type. You are also welcome to review any other accounts in the downloads.
-
-Please let us know whether the reports and filter behaviour meet your expectations.
-
-Thanks,  
-Shubham
+-- HCM Only
+SELECT *
+FROM tblHcmAccount
+WHERE Stage = 'Retired';
