@@ -72,9 +72,8 @@ def test_get_retired_sac_accounts_ignores_status_and_submission(monkeypatch, rec
         assert filters == {"Stage": "Retired"}
         return records
 
-    def fake_format_records_dates(rows, fields, datetime_fields):
-        assert datetime_fields == {"UpdateDateTime", "UpdatDateTime"}
-        assert fields == sac_account_service._DATE_FIELDS
+    def fake_format_records_dates(rows, fields):
+        assert fields == sac_account_service._DATE_FIELDS | {"UpdateDateTime", "UpdatDateTime"}
         return rows
 
     monkeypatch.setattr(sac_account_service, "fetch_records_async", fake_fetch_records_async)

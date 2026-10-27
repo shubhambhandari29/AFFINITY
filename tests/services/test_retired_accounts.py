@@ -43,8 +43,8 @@ def test_retired_filter_and_date_formatting(monkeypatch, retired_service, empty)
         assert row["AcctStatus"] == original["AcctStatus"]
         assert row["IsSubmitted"] == original["IsSubmitted"]
         assert isinstance(row["OnBoardDate"], str)
-        assert row["UpdateDateTime"] == "10-27-2026 02:35:42 PM"
-        assert row["UpdatDateTime"] == "10-27-2026 02:35:42 PM"
+        assert row["UpdateDateTime"] == "10-27-2026"
+        assert row["UpdatDateTime"] == "10-27-2026"
 
 
 def test_retired_database_error(monkeypatch, retired_service):

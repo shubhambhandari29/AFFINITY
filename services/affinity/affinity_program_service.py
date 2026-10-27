@@ -79,7 +79,7 @@ async def get_retired_affinity_programs():
     try:
         records = await fetch_records_async(table=TABLE_NAME, filters={"Stage": "Retired"})
         return format_records_dates(
-            records, datetime_fields={"UpdateDateTime", "UpdatDateTime"}
+            records
         )
     except Exception as exc:
         logger.warning(f"Error fetching retired Affinity programs - {str(exc)}")

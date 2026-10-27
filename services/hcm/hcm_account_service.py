@@ -49,7 +49,7 @@ async def get_retired_hcm_accounts():
     try:
         records = await fetch_records_async(table=TABLE_NAME, filters={"Stage": "Retired"})
         return format_records_dates(
-            records, fields=_DATE_FIELDS, datetime_fields={"UpdateDateTime", "UpdatDateTime"}
+            records, fields=_DATE_FIELDS | {"UpdateDateTime", "UpdatDateTime"}
         )
     except Exception as exc:
         logger.warning(f"Error fetching retired HCM accounts - {str(exc)}")

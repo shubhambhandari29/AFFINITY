@@ -27,19 +27,14 @@ def format_records_dates(
     records: list[dict[str, Any]],
     *,
     fields: Iterable[str] | None = None,
-    datetime_fields: Iterable[str] | None = None,
 ) -> list[dict[str, Any]]:
     if not records:
         return records
 
     field_set = set(fields) if fields is not None else None
-    datetime_field_set = set(datetime_fields or ())
 
     for record in records:
         for key in list(record.keys()):
-            if key in datetime_field_set:
-                record[key] = format_datetime_value(record.get(key))
-                continue
             if field_set is not None:
                 if key not in field_set:
                     continue
