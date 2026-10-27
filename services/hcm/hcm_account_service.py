@@ -48,7 +48,9 @@ async def get_retired_hcm_accounts():
     """Return records with Stage Retired, regardless of status or submission state."""
     try:
         records = await fetch_records_async(table=TABLE_NAME, filters={"Stage": "Retired"})
-        return format_records_dates(records, fields=_DATE_FIELDS)
+        return format_records_dates(
+            records, fields=_DATE_FIELDS, datetime_fields={"UpdateDateTime", "UpdatDateTime"}
+        )
     except Exception as exc:
         logger.warning(f"Error fetching retired HCM accounts - {str(exc)}")
         raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc

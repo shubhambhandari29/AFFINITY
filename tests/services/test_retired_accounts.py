@@ -24,7 +24,9 @@ def test_retired_filter_and_date_formatting(monkeypatch, retired_service, empty)
     module, service, expected_table = retired_service
     records = [] if empty else [
         {"Stage": "Retired", "AcctStatus": status, "IsSubmitted": submitted,
-         "OnBoardDate": datetime(2026, 10, 27)}
+         "OnBoardDate": datetime(2026, 10, 27),
+         "UpdateDateTime": "2026-10-27 14:35:42.1234567 +05:30",
+         "UpdatDateTime": "2026-10-27 14:35:42.1234567 +05:30"}
         for status, submitted in [("Active", 0), ("Inactive", 1), (None, None)]
     ]
 
@@ -41,6 +43,8 @@ def test_retired_filter_and_date_formatting(monkeypatch, retired_service, empty)
         assert row["AcctStatus"] == original["AcctStatus"]
         assert row["IsSubmitted"] == original["IsSubmitted"]
         assert isinstance(row["OnBoardDate"], str)
+        assert row["UpdateDateTime"] == "10-27-2026 02:35:42 PM"
+        assert row["UpdatDateTime"] == "10-27-2026 02:35:42 PM"
 
 
 def test_retired_database_error(monkeypatch, retired_service):

@@ -78,7 +78,9 @@ async def get_retired_affinity_programs():
     """Return records with Stage Retired, regardless of status or submission state."""
     try:
         records = await fetch_records_async(table=TABLE_NAME, filters={"Stage": "Retired"})
-        return format_records_dates(records)
+        return format_records_dates(
+            records, datetime_fields={"UpdateDateTime", "UpdatDateTime"}
+        )
     except Exception as exc:
         logger.warning(f"Error fetching retired Affinity programs - {str(exc)}")
         raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc
