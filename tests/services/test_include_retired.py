@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 
 @pytest.fixture(params=[
+    ("hcm.hcm_account_service", "get_hcm_account", None),
     ("sac.sac_account_service", "get_sac_account", "BranchName"),
     ("affinity.affinity_program_service", "get_affinity_program", "BranchVal"),
 ])
@@ -19,6 +20,8 @@ def account_service(request):
 @pytest.mark.parametrize("branch", [None, "NY, LA", " , & "])
 def test_include_retired_filter(monkeypatch, account_service, flag, branch):
     module, service, branch_field = account_service
+    if branch_field is None and branch is not None:
+        pytest.skip("HCM does not use branch prefix searches")
     records = [
         {"CustomerNum": "1223", "Stage": " Retired "},
         {"CustomerNum": "1223", "Stage": "Admin"},
@@ -37,7 +40,8 @@ def test_include_retired_filter(monkeypatch, account_service, flag, branch):
         return [dict(row) for row in records]
 
     monkeypatch.setattr(module, "fetch_records_async", fake_fetch)
-    monkeypatch.setattr(module, "run_raw_query_async", fake_query)
+    if branch_field is not None:
+        monkeypatch.setattr(module, "run_raw_query_async", fake_query)
     params = {"CustomerNum": "1223"}
     if flag is not None:
         params["include_retired"] = flag

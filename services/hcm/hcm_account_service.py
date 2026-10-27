@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from fastapi import HTTPException
+from pydantic import TypeAdapter
 
 from core.date_utils import format_records_dates, normalize_payload_dates
 from core.db_helpers import (
@@ -34,8 +35,15 @@ def _sanitize_account_record(record: dict[str, Any]) -> dict[str, Any]:
 
 async def get_hcm_account(query_params: dict[str, Any]):
     try:
+        query_params = dict(query_params)
+        include_retired = TypeAdapter(bool).validate_python(query_params.pop("include_retired", False))
         filters = sanitize_filters(query_params)
         records = await fetch_records_async(table=TABLE_NAME, filters=filters)
+        if not include_retired:
+            records = [
+                record for record in records
+                if str(record.get("Stage", "")).strip().lower() != "retired"
+            ]
         return format_records_dates(records, fields=_DATE_FIELDS)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
