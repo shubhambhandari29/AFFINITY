@@ -46,11 +46,15 @@ from api.sac.search_sac_account import router as search_sac_account_router
 from core.config import settings
 from services.loss_run.loss_run_worker import LossRunWorker
 
+# Temporary UAT build: keep API endpoints available, but let the local worker
+# process the shared queue. Also disables this app's automatic scheduler.
+APP_LOSS_RUN_WORKER_ENABLED = False
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     worker = None
-    if settings.ENVIRONMENT.strip().lower() != "local":
+    if APP_LOSS_RUN_WORKER_ENABLED and settings.ENVIRONMENT.strip().lower() != "local":
         worker = LossRunWorker()
         worker.start()
 
