@@ -84,7 +84,7 @@ def test_selection_rejects_invalid_or_unsupported_options(payload):
 
 def test_template_headers_match_query_outputs():
     workbook = load_workbook(ROOT / "AffinityLossRunTemplate.xlsx")
-    deployment = (ROOT / "scripts" / "affinity_loss_run_views.sql").read_text()
+    deployment = (ROOT / "services" / "sql" / "affinity_loss_run_views.sql").read_text()
     for sheet_name, view_name, runtime_query in [
         ("Claim Details", "Affinity_Loss_Run_Claims", service.CLAIMS_QUERY),
         ("Record Only", "Affinity_Loss_Run_RecordOnly", service.RECORD_ONLY_QUERY),

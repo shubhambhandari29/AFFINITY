@@ -2,7 +2,7 @@ AFFINITY VIEWS: CREATE AND TEST IN SSMS
 
 Database: CLMAA_SpecialAccounts (NOT CLM_LakeHouse).
 Source tables: CLM_LakeHouse.dbo.* on the same SQL Server/managed instance.
-Deployment file: scripts/affinity_loss_run_views.sql
+Deployment file: services/sql/affinity_loss_run_views.sql
 The backend now queries these views; deploy them before starting the new code
 in any environment. This guide describes standalone SSMS validation.
 

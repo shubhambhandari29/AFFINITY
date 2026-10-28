@@ -1,4 +1,5 @@
 -- Deploy BOTH Affinity views in CLMAA_SpecialAccounts on the intended server.
+-- Manual SSMS deployment script; not loaded or executed by the application.
 -- No stored procedure, source-data updates, schedule or permission changes.
 -- Re-running updates these two views in place (do not DROP them).
 -- Backend queries these views using parameterized agent-code filters.

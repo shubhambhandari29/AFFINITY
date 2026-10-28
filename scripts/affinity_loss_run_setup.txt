@@ -3,9 +3,9 @@ AFFINITY LOSS RUN - FIRST BACKEND VERSION
 Deployment order
 1. Stop all old local/Azure loss-run workers. Do not run old and new workers
    against this queue together: old workers do not understand Affinity jobs.
-2. Run scripts/affinity_loss_run_jobs.sql in SSMS on CLMAA_SpecialAccounts.
+2. Run services/sql/affinity_loss_run_jobs.sql in SSMS on CLMAA_SpecialAccounts.
    This adds BusinessType with default sac; existing jobs remain SAC.
-   Also deploy scripts/affinity_loss_run_views.sql in that database if the two
+   Also deploy services/sql/affinity_loss_run_views.sql in that database if the two
    views do not already exist in this environment. PREPROD views were tested.
 3. Upload the revised AffinityLossRunTemplate.xlsx to:
    /Volumes/<LOSS_RUN_DATABRICKS_CATALOG>/gold/statics/AffinityLossRunTemplate.xlsx
