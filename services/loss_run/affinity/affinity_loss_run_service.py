@@ -7,6 +7,7 @@ from copy import copy
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
+from time import perf_counter
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -255,19 +256,35 @@ async def generate_affinity_loss_runs(
     if not programs:
         return
     await on_phase("loading_template")
+    template_started = perf_counter()
     storage = await run_in_threadpool(DatabricksLossRunStorage)
     template = await run_in_threadpool(storage.download_template, "affinity")
+    # Temporary diagnostic output: visible in standalone-worker terminals too,
+    # without changing application-wide logging levels or environment settings.
+    print(f"[AFFINITY TIMING] stage=template seconds={perf_counter() - template_started:.2f}", flush=True)
     report_date = datetime.now(ZoneInfo("America/New_York")).date()
-    # Unique run suffix prevents later manual runs overwriting earlier downloads.
-    run_suffix = uuid4().hex
+    # Keep run uniqueness in storage, not in the user-facing Excel filename.
+    run_directory = uuid4().hex
     for program in programs:
         key = str(program["programId"])
+        program_started = perf_counter()
+        stage = "claims_query"
+        stage_started = program_started
         try:
             await on_phase("querying_loss_run_data")
             params = [json.dumps(program["agentCodes"])]
+            stage_started = perf_counter()
+            print(f"[AFFINITY TIMING] program={key} stage={stage} started", flush=True)
             claims = await run_raw_query_async(CLAIMS_QUERY, params)
+            print(f"[AFFINITY TIMING] program={key} stage={stage} seconds={perf_counter() - stage_started:.2f} rows={len(claims)}", flush=True)
+            stage = "record_only_query"
+            stage_started = perf_counter()
+            print(f"[AFFINITY TIMING] program={key} stage={stage} started", flush=True)
             record_only = await run_raw_query_async(RECORD_ONLY_QUERY, params)
+            print(f"[AFFINITY TIMING] program={key} stage={stage} seconds={perf_counter() - stage_started:.2f} rows={len(record_only)}", flush=True)
             await on_phase("generating_reports")
+            stage = "workbook"
+            stage_started = perf_counter()
             content = await run_in_threadpool(
                 create_affinity_workbook,
                 template,
@@ -276,14 +293,19 @@ async def generate_affinity_loss_runs(
                 record_only,
                 report_date,
             )
+            print(f"[AFFINITY TIMING] program={key} stage={stage} seconds={perf_counter() - stage_started:.2f}", flush=True)
             safe_name = re.sub(
                 r'[<>:"/\\|?*\x00-\x1f]', "_", program["programName"]
             ).strip(" .")[:100]
-            filename = (
-                f"Affinity_{key}_{safe_name}_{report_date:%Y_%m_%d}_{run_suffix}.xlsx"
+            filename = f"{key}_{safe_name}_{report_date:%Y_%m_%d}.xlsx"
+            stage = "upload"
+            stage_started = perf_counter()
+            path = await run_in_threadpool(
+                storage.upload_report, filename, content, subdirectory=run_directory
             )
-            path = await run_in_threadpool(storage.upload_report, filename, content)
+            print(f"[AFFINITY TIMING] program={key} stage={stage} seconds={perf_counter() - stage_started:.2f}", flush=True)
         except Exception:
+            print(f"[AFFINITY TIMING] program={key} stage={stage} failed_after={perf_counter() - stage_started:.2f}s", flush=True)
             logger.exception("Affinity loss run failed for program %s", key)
             await on_result(
                 key,
@@ -293,3 +315,5 @@ async def generate_affinity_loss_runs(
             )
         else:
             await on_result(key, True, None, path)
+        finally:
+            print(f"[AFFINITY TIMING] program={key} stage=program_total seconds={perf_counter() - program_started:.2f}", flush=True)

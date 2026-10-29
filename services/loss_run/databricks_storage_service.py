@@ -59,8 +59,24 @@ class DatabricksLossRunStorage:
         self._raise_for_databricks_error(response, "template download")
         return response.content
 
-    def upload_report(self, filename: str, workbook_bytes: bytes) -> str:
-        output_path = f"{self.output_directory}/{filename}"
+    def upload_report(
+        self, filename: str, workbook_bytes: bytes, *, subdirectory: str | None = None
+    ) -> str:
+        directory = self.output_directory
+        if subdirectory:
+            if not subdirectory.isalnum():
+                raise ValueError("Report subdirectory must be a single alphanumeric name")
+            directory = f"{directory}/{subdirectory}"
+            if self.client:
+                self.client.files.create_directory(directory)
+            else:
+                response = requests.put(
+                    f"{self.host}/api/2.0/fs/directories{quote(directory, safe='/')}",
+                    headers=self._authorization_header(),
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                )
+                self._raise_for_databricks_error(response, "report directory creation")
+        output_path = f"{directory}/{filename}"
 
         if self.client:
             self.client.files.upload(

@@ -236,7 +236,7 @@ def test_workbook_fills_revised_template_and_no_claims():
     assert empty["Claim Details"]["A2"].value == "No claims found"
 
 
-def test_generation_queries_selected_agents_and_uploads(monkeypatch):
+def test_generation_queries_selected_agents_and_uploads(monkeypatch, capsys):
     monkeypatch.setattr(
         service, "get_affinity_loss_run_programs", AsyncMock(return_value=[PROGRAM])
     )
@@ -264,10 +264,17 @@ def test_generation_queries_selected_agents_and_uploads(monkeypatch):
         ['["5701083", "5701212"]'],
     )
     storage.download_template.assert_called_once_with("affinity")
-    assert storage.upload_report.call_args.args[0].startswith(
-        "Affinity_3_Example Program_"
+    assert re.fullmatch(
+        r"3_Example Program_\d{4}_\d{2}_\d{2}\.xlsx",
+        storage.upload_report.call_args.args[0],
     )
+    assert re.fullmatch(r"[a-f0-9]{32}", storage.upload_report.call_args.kwargs["subdirectory"])
     result.assert_awaited_once_with("3", True, None, "/Volumes/report.xlsx")
+    output = capsys.readouterr().out
+    for stage in ("template", "claims_query", "record_only_query", "workbook", "upload", "program_total"):
+        assert f"stage={stage} seconds=" in output
+    assert "rows=0" in output
+    assert "Example Program" not in output
 
 
 def test_sac_job_is_not_visible_through_affinity(monkeypatch):

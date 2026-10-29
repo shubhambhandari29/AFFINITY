@@ -1,8 +1,36 @@
 from io import BytesIO
+from unittest.mock import MagicMock
 
 import pytest
 
 from services.loss_run import databricks_storage_service
+
+
+@pytest.mark.parametrize("local", [True, False])
+def test_run_subfolders_keep_clean_names_and_distinct_paths(monkeypatch, local):
+    storage = object.__new__(databricks_storage_service.DatabricksLossRunStorage)
+    storage.output_directory = "/Volumes/catalog/gold/reports"
+    storage.host = "https://workspace.azuredatabricks.net"
+    storage.client = MagicMock() if local else None
+    storage.credential = MagicMock()
+    storage.credential.get_token.return_value.token = "test-token"
+    put = MagicMock(return_value=MagicMock(ok=True))
+    monkeypatch.setattr(databricks_storage_service.requests, "put", put)
+    filename = "19_Local 409 WC Program_2026_10_29.xlsx"
+    first = storage.upload_report(filename, b"first", subdirectory="run1")
+    second = storage.upload_report(filename, b"second", subdirectory="run2")
+    assert first != second
+    assert first.endswith(f"/run1/{filename}")
+    assert second.endswith(f"/run2/{filename}")
+    if local:
+        assert storage.client.files.create_directory.call_count == 2
+        assert storage.client.files.upload.call_args.args[0] == second
+    else:
+        assert put.call_count == 4
+        assert "/fs/directories/" in put.call_args_list[0].args[0]
+        assert "/fs/files/" in put.call_args_list[1].args[0]
+    with pytest.raises(ValueError):
+        storage.upload_report(filename, b"invalid", subdirectory="../other")
 
 
 def _configure(monkeypatch, *, environment: str) -> None:
