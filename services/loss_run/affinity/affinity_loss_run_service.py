@@ -5,6 +5,7 @@ import logging
 import re
 from copy import copy
 from datetime import datetime
+from decimal import Decimal
 from io import BytesIO
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -52,7 +53,7 @@ DATE_COLUMNS = {
 async def get_affinity_loss_run_programs() -> list[dict]:
     rows = await run_raw_query_async("""
         SELECT p.AcctAffinityProgramKey AS ProgramId, p.ProgramName,
-               p.AcctStatus, p.LossRunDistFreq, a.AgentCode
+               p.AcctStatus, p.LossRunDistFreq, a.AgentCode, a.AgentName
         FROM dbo.tblAcctAffinityProgram p
         INNER JOIN dbo.tblAffinityAgents a ON a.ProgramName = p.ProgramName
         WHERE a.LossRunReq = 'Yes'
@@ -70,11 +71,15 @@ async def get_affinity_loss_run_programs() -> list[dict]:
                 "accountStatus": row["AcctStatus"],
                 "lossRunFrequency": row["LossRunDistFreq"],
                 "agentCodes": [],
+                "agentNames": [],
             },
         )
         code = str(row["AgentCode"]).strip()
         if code not in program["agentCodes"]:
             program["agentCodes"].append(code)
+        name = str(row.get("AgentName") or "").strip()
+        if name and f"{code}: {name}" not in program["agentNames"]:
+            program["agentNames"].append(f"{code}: {name}")
     return list(programs.values())
 
 
@@ -118,10 +123,41 @@ def create_affinity_workbook(template_bytes, program, claims, record_only, repor
     try:
         cover = workbook["Cover Page"]
         cover["B2"] = ", ".join(program["agentCodes"])
-        cover["B3"] = program["programName"]
-        cover["B3"].data_type = "s"
-        cover["B4"] = report_date
-        cover["B4"].number_format = "mm/dd/yyyy"
+        cover["B2"].data_type = "s"
+        revised = cover["A3"].value == "Producing Agent Name"
+        if revised:
+            cover["B3"] = "\n".join(program.get("agentNames", []))
+            cover["B3"].data_type = "s"
+            alignment = copy(cover["B3"].alignment)
+            alignment.wrap_text = True
+            cover["B3"].alignment = alignment
+            cover.row_dimensions[3].height = 15 * max(1, len(program.get("agentNames", [])))
+        program_cell, date_cell = ("B4", "B5") if revised else ("B3", "B4")
+        cover[program_cell] = program["programName"]
+        cover[program_cell].data_type = "s"
+        cover[date_cell] = report_date
+        cover[date_cell].number_format = "mm/dd/yyyy"
+        claim_totals = {}
+        if revised:
+            # Require the aligned financial field; never substitute the old
+            # Affinity Total Incurred calculation or silently fill missing values.
+            exposures = {}
+            for row in claims:
+                claim = str(row.get("Claim Number") or "").strip()
+                exposure = str(row.get("Exposure") or "").strip()
+                if re.fullmatch(r"\d+(?:\.0+)?", exposure):
+                    exposure = str(int(Decimal(exposure)))
+                amount = row.get("Incurred w/o ALAE")
+                if not claim or not exposure or amount is None:
+                    raise ValueError("Revised Affinity report requires claim, exposure and Incurred w/o ALAE from the updated view")
+                key = (claim, exposure)
+                amount = Decimal(str(amount))
+                if key in exposures:
+                    # A repeated exposure can indicate join fan-out. Do not
+                    # silently double-count or guess which financial row is valid.
+                    raise ValueError(f"Duplicate Affinity claim/exposure: {claim}/{exposure}; verify view aggregation")
+                exposures[key] = amount
+                claim_totals[claim] = claim_totals.get(claim, Decimal("0")) + amount
         for name, records in (("Claim Details", claims), ("Record Only", record_only)):
             sheet = workbook[name]
             headers = [cell.value for cell in sheet[1]]
@@ -133,6 +169,10 @@ def create_affinity_workbook(template_bytes, program, claims, record_only, repor
             sheet.delete_rows(2, max(1, sheet.max_row - 1))
             for row_number, source in enumerate(records, 2):
                 row = dict(source)
+                if revised and name == "Claim Details":
+                    total = claim_totals[str(row["Claim Number"]).strip()]
+                    row["Whole Claim Incurred w/o ALAE"] = total
+                    row["Claims Above $50k"] = "Yes" if total > Decimal("50000") else "No"
                 missing = set(headers) - set(row) - {"Lag Time"}
                 if missing:
                     raise ValueError(

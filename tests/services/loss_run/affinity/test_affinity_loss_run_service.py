@@ -25,6 +25,38 @@ PROGRAM = {
 }
 
 
+@pytest.mark.parametrize("amounts,expected", [([19000, 21000, 18000], "Yes"), ([25000, 25000], "No"), ([30000, -10000], "No")])
+def test_revised_workbook_claim_totals_and_cover(amounts, expected):
+    template = (ROOT / "AffinityLossRunTemplate_Revised.xlsx").read_bytes()
+    workbook = load_workbook(BytesIO(template))
+    headers = [cell.value for cell in workbook["Claim Details"][1]]
+    workbook.close()
+    records = []
+    for exposure, amount in enumerate(amounts, 1):
+        row = dict.fromkeys(headers)
+        row.update({"Claim Number": "claim-1", "Exposure": exposure,
+                    "Incurred w/o ALAE": amount})
+        records.append(row)
+    program = dict(PROGRAM, agentNames=["5701083: First Agent", "5701212: Second Agent"])
+    output = load_workbook(BytesIO(service.create_affinity_workbook(
+        template, program, records, [], date(2026, 10, 29)
+    )))
+    assert output["Cover Page"]["B3"].value == "5701083: First Agent\n5701212: Second Agent"
+    assert output["Cover Page"]["B4"].value == PROGRAM["programName"]
+    assert output["Cover Page"]["B5"].value.date() == date(2026, 10, 29)
+    assert len(output["Cover Page"]._images) == 1
+    for values in output["Claim Details"].iter_rows(min_row=2, values_only=True):
+        row = dict(zip(headers, values))
+        assert row["Whole Claim Incurred w/o ALAE"] == sum(amounts)
+        assert row["Claims Above $50k"] == expected
+    output.close()
+    with pytest.raises(ValueError, match="Duplicate Affinity"):
+        service.create_affinity_workbook(template, program, [records[0], records[0]], [], date.today())
+    records[0]["Incurred w/o ALAE"] = None
+    with pytest.raises(ValueError, match="updated view"):
+        service.create_affinity_workbook(template, program, records, [], date.today())
+
+
 def test_programs_group_and_deduplicate_agents(monkeypatch):
     row = dict(
         ProgramId=3,
@@ -83,7 +115,7 @@ def test_selection_rejects_invalid_or_unsupported_options(payload):
 
 
 def test_template_headers_match_query_outputs():
-    workbook = load_workbook(ROOT / "AffinityLossRunTemplate.xlsx")
+    workbook = load_workbook(ROOT / "AffinityLossRunTemplate_Revised.xlsx")
     deployment = (ROOT / "services" / "sql" / "affinity_loss_run_views.sql").read_text()
     for sheet_name, view_name, runtime_query in [
         ("Claim Details", "Affinity_Loss_Run_Claims", service.CLAIMS_QUERY),
@@ -97,7 +129,9 @@ def test_template_headers_match_query_outputs():
         ).group()
         aliases = set(re.findall(r"\[([^]]+)\]", select))
         aliases |= set(re.findall(r"D\.(CLMNT_\w+)\s*,", select))
-        expected = {cell.value for cell in workbook[sheet_name][1]} - {"Lag Time"}
+        expected = {cell.value for cell in workbook[sheet_name][1]} - {
+            "Lag Time", "Whole Claim Incurred w/o ALAE", "Claims Above $50k"
+        }
         assert expected <= aliases, expected - aliases
         assert "?" not in query
         assert f"FROM dbo.{view_name}" in runtime_query
@@ -114,8 +148,22 @@ def test_template_headers_match_query_outputs():
     assert ") - 6, 1, 1)" in deployment
 
 
+def test_revised_financial_sql_keeps_lakehouse_and_aggregates_expense_once():
+    deployment = (ROOT / "services/sql/affinity_loss_run_views.sql").read_text()
+    claims = deployment.split("CREATE OR ALTER VIEW dbo.Affinity_Loss_Run_RecordOnly")[0]
+    assert "CLMAA_SpecialAccounts.dbo.DW_FINCL_LOSS_FTR_SS_F_FILTERED" not in claims
+    assert "FINCL.CHNG_IN_ALAE_RSRV_AMT" in claims
+    assert "TXN.COST_CATGRY_DESC <> 'State Penalties'" in claims
+    assert "OR TXN.COST_CATGRY_DESC IS NULL" in claims
+    assert "THEN MAX(D.SAC_ALAE_EXPENSE)" in claims
+    assert "SUM(D.SAC_ALAE_EXPENSE)" not in claims
+    # Legacy aliases remain available during the staged template rollout.
+    for alias in ("Current Loss Reserve", "Paid Loss Net Salvage Subro", "Total Incurred"):
+        assert f"AS [{alias}]" in claims
+
+
 def test_workbook_fills_revised_template_and_no_claims():
-    template = (ROOT / "AffinityLossRunTemplate.xlsx").read_bytes()
+    template = (ROOT / "AffinityLossRunTemplate_Revised.xlsx").read_bytes()
     workbook = load_workbook(BytesIO(template))
     record = dict.fromkeys(cell.value for cell in workbook["Claim Details"][1])
     record.update(
@@ -124,7 +172,7 @@ def test_workbook_fills_revised_template_and_no_claims():
             "Exposure": 1.0,
             "Loss Date": date(2020, 1, 1),
             "Date of Notice (Report Date)": datetime(2020, 1, 4, 12),
-            "Total Incurred": 123.45,
+            "Incurred w/o ALAE": 123.45,
             "Description Of Loss": "=not-a-formula",
         }
     )
@@ -134,14 +182,14 @@ def test_workbook_fills_revised_template_and_no_claims():
     output = load_workbook(BytesIO(result))
     assert len(output["Cover Page"]._images) == 1
     assert output["Cover Page"]["B2"].value == "5701083, 5701212"
-    assert output["Cover Page"]["B3"].value == PROGRAM["programName"]
+    assert output["Cover Page"]["B4"].value == PROGRAM["programName"]
     sheet = output["Claim Details"]
     cells = {
         sheet.cell(1, i).value: sheet.cell(2, i) for i in range(1, sheet.max_column + 1)
     }
     assert cells["Lag Time"].value == 3
     assert cells["Exposure"].value == "01"
-    assert cells["Total Incurred"].value == 123.45
+    assert cells["Incurred w/o ALAE"].value == 123.45
     assert cells["Description Of Loss"].data_type == "s"
     assert output["Record Only"]["A2"].value == "No record-only claims found"
     assert all(not column.hidden for column in sheet.column_dimensions.values())
@@ -161,7 +209,7 @@ def test_generation_queries_selected_agents_and_uploads(monkeypatch):
     monkeypatch.setattr(service, "run_raw_query_async", query)
     storage = MagicMock()
     storage.download_template.return_value = (
-        ROOT / "AffinityLossRunTemplate.xlsx"
+        ROOT / "AffinityLossRunTemplate_Revised.xlsx"
     ).read_bytes()
     storage.upload_report.return_value = "/Volumes/report.xlsx"
     monkeypatch.setattr(service, "DatabricksLossRunStorage", lambda: storage)
@@ -248,7 +296,7 @@ def test_query_failure_is_not_no_claims_and_other_program_continues(monkeypatch)
     )
     storage = MagicMock()
     storage.download_template.return_value = (
-        ROOT / "AffinityLossRunTemplate.xlsx"
+        ROOT / "AffinityLossRunTemplate_Revised.xlsx"
     ).read_bytes()
     storage.upload_report.return_value = "/Volumes/second.xlsx"
     monkeypatch.setattr(service, "DatabricksLossRunStorage", lambda: storage)

@@ -1,0 +1,62 @@
+AFFINITY REVISED REPORT - PREPROD VALIDATION
+
+Financial source remains CLM_LakeHouse, not SAC's filtered tables. Local 409
+returned no matches in those filtered tables. The revised report follows the
+requested SAC-style financial calculations, not an identical data source.
+
+1. Stop the local worker and ensure no Azure worker is consuming the same queue.
+   Let any active generation finish before changing the template/view.
+
+2. In SSMS connected to PREPROD, open services/sql/affinity_loss_run_views.sql.
+   Execute the complete file. Check Messages for errors in EVERY batch.
+   This updates the two existing views; it does not change source records,
+   job tables, schedules, permissions, or the SAC view.
+   Record Only's definition is unchanged. Claims gains seven financial aliases.
+   Old aliases remain temporarily so the old deployed template remains usable.
+
+3. Verify the new fields without running a full report:
+   USE [CLMAA_SpecialAccounts];
+   SELECT TOP (0)
+       [Outstanding Loss Reserve],
+       [Total Paid Loss Net Salvage/Subro/Loss Recovery],
+       [Incurred w/o ALAE], [ALAE Reserve], [ALAE Paid],
+       [Total Incurred + ALAE], [Expense Recovery]
+   FROM dbo.Affinity_Loss_Run_Claims;
+
+4. Back up the current Databricks AffinityLossRunTemplate.xlsx outside the
+   runtime filename. Upload the repo's AffinityLossRunTemplate_Revised.xlsx
+   to the same statics volume, named EXACTLY AffinityLossRunTemplate.xlsx.
+   The backend still reads that existing name. No new environment variable.
+   Do not replace either SAC template.
+
+5. Deploy/restart the updated API and the worker. Both need the same code.
+   Test a single Local 409 program first through the existing Affinity UI.
+   There are no endpoint, request payload, UI or scheduler changes.
+
+6. Download the generated workbook. Check:
+   - Cover: producer code/name, program, date and logo.
+   - Financial column order matches the revised template.
+   - Incurred w/o ALAE = reserve + paid (paid already subtracts deductible).
+   - Total Incurred + ALAE = incurred w/o ALAE + ALAE reserve + ALAE paid.
+   - ALAE paid uses net expense payments; when zero, it uses expense transactions
+     excluding State Penalties. The pre-aggregated fallback is not re-summed
+     for every joined financial-history row.
+   - Whole-claim total sums the report's exposures for that claim and repeats
+     on each exposure row. Do not sum that repeated column for program totals.
+   - Above $50k is Yes only when the claim total is strictly above 50,000.
+   - Duplicate claim/exposure rows fail explicitly for review, not double-count.
+   - Litigation follows financials; orange Record Only columns are absent.
+   - Empty programs still produce a cover and no-claims messages.
+
+Historical baseline: Local 409 had 70 exposure rows / 45 claims and no Record
+Only rows. Source data may since have changed. Compare the financial values
+against LakeHouse and obtain client approval before PROD. Python tests validate
+workbook mapping/calculation but do not execute SQL Server or prove source sums.
+
+Do not rerun affinity_financial_source_check.sql for this rollout: it checks the
+SAC filtered sources we have decided NOT to use and previously took 65 minutes.
+The new view has not been benchmarked on the live DB; no speedup is promised.
+
+Rollback: restore the previous Databricks template and deploy the previous
+backend version together. The additional view columns can remain; old column
+names and expressions are preserved. Do not drop the views or source tables.
