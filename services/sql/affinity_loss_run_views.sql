@@ -172,18 +172,26 @@ SELECT
   D.ACDNT_ST_ABBR AS [Accident State],
   -- Revised template fields. Expense transactions are already aggregated per
   -- feature: use MAX, not SUM, so joining financial history cannot repeat them.
-  SUM(D.FTR_CHNG_IN_OSLS_AMT) AS [Outstanding Loss Reserve],
-  SUM(D.FTR_PDLS_INCL_SLVG_SUBRO_AMT) - SUM(D.DEDTBL_RECOVRY_AMT)
+  -- SUM(decimal) widens to precision 38. Narrow EACH operand before CASE or
+  -- arithmetic: casting only the final result cannot recover rounded cents.
+  CAST(SUM(D.FTR_CHNG_IN_OSLS_AMT) AS decimal(28,2)) AS [Outstanding Loss Reserve],
+  CAST(SUM(D.FTR_PDLS_INCL_SLVG_SUBRO_AMT) AS decimal(28,2))
+      - CAST(SUM(D.DEDTBL_RECOVRY_AMT) AS decimal(28,2))
       AS [Total Paid Loss Net Salvage/Subro/Loss Recovery],
-  SUM(D.FTR_CHNG_IN_OSLS_AMT) + SUM(D.FTR_PDLS_INCL_SLVG_SUBRO_AMT)
-      - SUM(D.DEDTBL_RECOVRY_AMT) AS [Incurred w/o ALAE],
-  SUM(D.CHNG_IN_ALAE_RSRV_AMT) AS [ALAE Reserve],
-  CASE WHEN SUM(D.FTR_ALAE_AMT2) = 0 THEN MAX(D.SAC_ALAE_EXPENSE)
-       ELSE SUM(D.FTR_ALAE_AMT2) END AS [ALAE Paid],
-  SUM(D.FTR_CHNG_IN_OSLS_AMT) + SUM(D.FTR_PDLS_INCL_SLVG_SUBRO_AMT)
-      - SUM(D.DEDTBL_RECOVRY_AMT) + SUM(D.CHNG_IN_ALAE_RSRV_AMT)
-      + CASE WHEN SUM(D.FTR_ALAE_AMT2) = 0 THEN MAX(D.SAC_ALAE_EXPENSE)
-             ELSE SUM(D.FTR_ALAE_AMT2) END AS [Total Incurred + ALAE],
+  CAST(SUM(D.FTR_CHNG_IN_OSLS_AMT) AS decimal(28,2))
+      + CAST(SUM(D.FTR_PDLS_INCL_SLVG_SUBRO_AMT) AS decimal(28,2))
+      - CAST(SUM(D.DEDTBL_RECOVRY_AMT) AS decimal(28,2)) AS [Incurred w/o ALAE],
+  CAST(SUM(D.CHNG_IN_ALAE_RSRV_AMT) AS decimal(28,2)) AS [ALAE Reserve],
+  CASE WHEN SUM(D.FTR_ALAE_AMT2) = 0
+       THEN CAST(MAX(D.SAC_ALAE_EXPENSE) AS decimal(28,2))
+       ELSE CAST(SUM(D.FTR_ALAE_AMT2) AS decimal(28,2)) END AS [ALAE Paid],
+  CAST(SUM(D.FTR_CHNG_IN_OSLS_AMT) AS decimal(28,2))
+      + CAST(SUM(D.FTR_PDLS_INCL_SLVG_SUBRO_AMT) AS decimal(28,2))
+      - CAST(SUM(D.DEDTBL_RECOVRY_AMT) AS decimal(28,2))
+      + CAST(SUM(D.CHNG_IN_ALAE_RSRV_AMT) AS decimal(28,2))
+      + CASE WHEN SUM(D.FTR_ALAE_AMT2) = 0
+             THEN CAST(MAX(D.SAC_ALAE_EXPENSE) AS decimal(28,2))
+             ELSE CAST(SUM(D.FTR_ALAE_AMT2) AS decimal(28,2)) END AS [Total Incurred + ALAE],
   SUM(D.expnse_recovry_amt) AS [Expense Recovery],
   -- Legacy aliases below are not displayed by the revised template.
   SUM(D.FTR_CHNG_IN_OSLS_AMT) AS [Current Loss Reserve],
@@ -458,5 +466,26 @@ FROM sys.views
 WHERE schema_id = SCHEMA_ID('dbo')
   AND name IN ('Affinity_Loss_Run_Claims', 'Affinity_Loss_Run_RecordOnly')
 ORDER BY name;
+GO
+
+-- Cheap metadata check: do not run the expensive report to verify decimal scale.
+SELECT name AS FinancialColumn, precision AS NumericPrecision, scale AS DecimalPlaces
+FROM sys.columns
+WHERE object_id = OBJECT_ID('dbo.Affinity_Loss_Run_Claims')
+  AND name IN ('Outstanding Loss Reserve',
+               'Total Paid Loss Net Salvage/Subro/Loss Recovery',
+               'Incurred w/o ALAE', 'ALAE Reserve', 'ALAE Paid',
+               'Total Incurred + ALAE')
+ORDER BY column_id;
+IF EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID('dbo.Affinity_Loss_Run_Claims')
+      AND name IN ('Outstanding Loss Reserve',
+                   'Total Paid Loss Net Salvage/Subro/Loss Recovery',
+                   'Incurred w/o ALAE', 'ALAE Reserve', 'ALAE Paid',
+                   'Total Incurred + ALAE')
+      AND scale < 2
+)
+    THROW 50001, 'Affinity financial columns must preserve at least two decimal places.', 1;
 GO
 

@@ -155,11 +155,46 @@ def test_revised_financial_sql_keeps_lakehouse_and_aggregates_expense_once():
     assert "FINCL.CHNG_IN_ALAE_RSRV_AMT" in claims
     assert "TXN.COST_CATGRY_DESC <> 'State Penalties'" in claims
     assert "OR TXN.COST_CATGRY_DESC IS NULL" in claims
-    assert "THEN MAX(D.SAC_ALAE_EXPENSE)" in claims
+    assert "THEN CAST(MAX(D.SAC_ALAE_EXPENSE) AS decimal(28,2))" in claims
     assert "SUM(D.SAC_ALAE_EXPENSE)" not in claims
     # Legacy aliases remain available during the staged template rollout.
     for alias in ("Current Loss Reserve", "Paid Loss Net Salvage Subro", "Total Incurred"):
         assert f"AS [{alias}]" in claims
+
+
+def test_financial_operands_are_cast_before_arithmetic_and_case():
+    sql = (ROOT / "services/sql/affinity_loss_run_views.sql").read_text()
+    block = sql.split("-- SUM(decimal) widens", 1)[1].split("AS [Total Incurred + ALAE]", 1)[0]
+    # Remove safe CASTs and comparison-only SUMs. No unbounded decimal(38,s)
+    # aggregates may feed arithmetic or CASE branches in this financial block.
+    remaining = re.sub(
+        r"CAST\((?:SUM|MAX)\(D\.\w+\) AS decimal\(28,2\)\)", "safe_amount", block
+    )
+    remaining = remaining.replace("SUM(D.FTR_ALAE_AMT2) = 0", "is_zero")
+    assert not re.search(r"(?:SUM|MAX)\(D\.", remaining)
+
+
+def test_workbook_preserves_financial_cents():
+    from decimal import Decimal
+
+    template = (ROOT / "AffinityLossRunTemplate_Revised.xlsx").read_bytes()
+    workbook = load_workbook(BytesIO(template))
+    row = dict.fromkeys(cell.value for cell in workbook["Claim Details"][1])
+    workbook.close()
+    row.update({
+        "Claim Number": "test-claim", "Exposure": "01",
+        "Incurred w/o ALAE": Decimal("17518.71"),
+        "ALAE Reserve": Decimal("0.00"), "ALAE Paid": Decimal("4286.27"),
+        "Total Incurred + ALAE": Decimal("21804.98"),
+    })
+    result = load_workbook(BytesIO(service.create_affinity_workbook(
+        template, PROGRAM, [row], [], date.today()
+    )), data_only=True)
+    sheet = result["Claim Details"]
+    values = dict(zip([cell.value for cell in sheet[1]], [cell.value for cell in sheet[2]]))
+    for name in ("Incurred w/o ALAE", "ALAE Reserve", "ALAE Paid", "Total Incurred + ALAE"):
+        assert Decimal(str(values[name])) == row[name]
+    result.close()
 
 
 def test_workbook_fills_revised_template_and_no_claims():

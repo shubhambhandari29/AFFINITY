@@ -1,5 +1,16 @@
 AFFINITY REVISED REPORT - PREPROD VALIDATION
 
+DECIMAL PRECISION FIX (after initial revised-template rollout)
+Re-execute services/sql/affinity_loss_run_views.sql in PREPROD. The final grid
+must show DecimalPlaces = 2 for all six financial fields. Check Messages for
+errors. No template replacement, Python deployment or worker restart is required
+for this SQL-only fix if the revised backend/template are already installed.
+Generate a NEW Local 409 report; previously generated files are not rewritten.
+The fix casts aggregate operands and BOTH ALAE CASE branches before combining
+them. Casting only the final value cannot recover cents already rounded away.
+Local tests cover the SQL cast contract and workbook preservation of cents;
+actual SQL Server execution and source financial values still need validation.
+
 Financial source remains CLM_LakeHouse, not SAC's filtered tables. Local 409
 returned no matches in those filtered tables. The revised report follows the
 requested SAC-style financial calculations, not an identical data source.
