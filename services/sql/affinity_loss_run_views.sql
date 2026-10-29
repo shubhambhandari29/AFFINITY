@@ -314,7 +314,21 @@ WITH ReportParameters AS (
     SELECT CONVERT(date,
         SYSUTCDATETIME() AT TIME ZONE 'UTC' AT TIME ZONE 'Eastern Standard Time'
     ) AS ReportDate
-), DATA
+), ELIGIBLE_POLICIES AS (
+    SELECT POL.*
+    FROM CLM_LakeHouse.dbo.DW_POL_DIMNSN POL
+    WHERE POL.POL_CURR_VERSN_IND = 'Y'
+      -- Preserve CAST(POL_EFF_DT AS date) > Jan 1 exactly, including times
+      -- on Jan 1. Leave the source column bare for a possible range seek.
+      AND POL.POL_EFF_DT >= DATEADD(DAY, 1,
+          DATEFROMPARTS(YEAR((SELECT ReportDate FROM ReportParameters)) - 6, 1, 1))
+), RECORD_ONLY_CLAIMS AS (
+    SELECT CD.*
+    FROM CLM_LakeHouse.dbo.DW_CLMS_CLM_DIMNSN CD
+    WHERE CD.CURR_VERSN_IND = 'Y'
+      AND CD.INCID_RPT_IND = 'Y'
+      AND UPPER(ISNULL(CD.ACCT_LOSS_LOC_ID, 'NA')) NOT LIKE '%REKEY%'
+), CANDIDATE_ROWS
      AS (SELECT
            CD.CLM_NBR,
            FD.CLM_FTR_NBR,
@@ -327,7 +341,6 @@ WITH ReportParameters AS (
            CAST(POL.POL_EFF_DT AS date) POL_EFF_DT,
            CAST(POL.POL_EXP_DT AS date) POL_EXP_DT,
            POL.PRDCNG_AGNT_CD,
-           RPA.CUR_PA_FULL_NM,
            CD.CLM_KEY,
            CASE
              WHEN UPPER(CD.POL_HLDR_CLM_NBR) = 'TRUE' THEN ''
@@ -359,26 +372,27 @@ WITH ReportParameters AS (
            FD.FTR_TYPE_DESC,
            FD.FTR_COVG_TYPE_CD,
            FD.FTR_COVG_TYPE_DESC,
-           CLMNT.CLMNT_FULL_NM,
-           CLMNT.CLMNT_CO_NM,
-           ISNULL(CLMNT.OCUPTN_TXT, ' ') OCUPTN_TXT
+           FD.CLMNT_HCS_SYS_ID
 FROM
-CLM_LakeHouse.dbo.DW_POL_DIMNSN POL
-INNER JOIN CLM_LakeHouse.dbo.DW_CLMS_CLM_DIMNSN CD ON POL.POL_SYM = CD.POL_SYM AND POL.POL_NBR = CD.POL_NBR AND POL.POL_MOD = CD.POL_MOD AND CD.CURR_VERSN_IND = 'Y'
+ELIGIBLE_POLICIES POL
+INNER JOIN RECORD_ONLY_CLAIMS CD ON POL.POL_SYM = CD.POL_SYM AND POL.POL_NBR = CD.POL_NBR AND POL.POL_MOD = CD.POL_MOD
 LEFT OUTER JOIN CLM_LakeHouse.dbo.DW_CLMS_FTR_DIMNSN FD ON CD.CLM_NBR = FD.CLM_NBR AND FD.CURR_VERSN_IND = 'Y'
-LEFT OUTER JOIN CLM_LakeHouse.dbo.DM_RETNTN_PRDCNG_AGNT_HR_D RPA ON POL.PRDCNG_AGNT_CD = RPA.CUR_ENTR_PA_CD
-
-LEFT OUTER JOIN CLM_LakeHouse.dbo.DW_CLMS_CLMNT_DIMNSN CLMNT ON CLMNT.CLMNT_HCS_SYS_ID = FD.CLMNT_HCS_SYS_ID AND CLMNT.CURR_VERSN_IND='Y'
-WHERE CD.INCID_RPT_IND = 'Y'
-AND UPPER(ISNULL(CD.ACCT_LOSS_LOC_ID, 'NA')) NOT LIKE '%REKEY%'
-
-
-AND POL.POL_CURR_VERSN_IND = 'Y'
-
-AND CAST(POL.POL_EFF_DT AS date) > DATEFROMPARTS(YEAR((SELECT ReportDate FROM ReportParameters)) - 6, 1, 1)
-AND NOT EXISTS (SELECT 1 FROM CLM_LakeHouse.dbo.DW_FINCL_LOSS_FTR_SS_F FINCL WHERE
-
-FINCL.CLM_NBR = CD.CLM_NBR AND FINCL.CLM_FTR_NBR=FD.CLM_FTR_NBR))
+-- Keep this anti-join AFTER the LEFT JOIN to features: filtering features in
+-- isolation would turn excluded features into null features and leak claims.
+WHERE NOT EXISTS (
+    SELECT 1 FROM CLM_LakeHouse.dbo.DW_FINCL_LOSS_FTR_SS_F FINCL
+    WHERE FINCL.CLM_NBR = CD.CLM_NBR AND FINCL.CLM_FTR_NBR = FD.CLM_FTR_NBR
+)), DATA AS (
+    -- Enrich qualifying candidates only. These CTEs are not materialized;
+    -- SQL Server still chooses the physical plan, so benchmark after deployment.
+    SELECT C.*, RPA.CUR_PA_FULL_NM, CLMNT.CLMNT_FULL_NM, CLMNT.CLMNT_CO_NM,
+           ISNULL(CLMNT.OCUPTN_TXT, ' ') AS OCUPTN_TXT
+    FROM CANDIDATE_ROWS C
+    LEFT OUTER JOIN CLM_LakeHouse.dbo.DM_RETNTN_PRDCNG_AGNT_HR_D RPA
+        ON C.PRDCNG_AGNT_CD = RPA.CUR_ENTR_PA_CD
+    LEFT OUTER JOIN CLM_LakeHouse.dbo.DW_CLMS_CLMNT_DIMNSN CLMNT
+        ON CLMNT.CLMNT_HCS_SYS_ID = C.CLMNT_HCS_SYS_ID AND CLMNT.CURR_VERSN_IND = 'Y'
+)
 SELECT
   D.PMS_CUSTMR_NBR AS [Customer Number],
     D.POL_NAMED_INSRD_TXT AS [Policy Insured Name],
