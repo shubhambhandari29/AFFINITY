@@ -1,183 +1,19 @@
-from contextlib import asynccontextmanager
+Hi Shubham,
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+I have made some changes to the Affinity Loss Run design.  I have attached a version for you to see.
 
-from api.affinity.affinity_agents import router as affinity_agents_router
-from api.affinity.affinity_policy_types import router as affinity_policy_types_router
-from api.affinity.affinity_program import router as affinity_program_router
-from api.affinity.claim_review_distribution import (
-    router as claim_review_distribution_affinity_router,
-)
-from api.affinity.claim_review_frequency import (
-    router as claim_review_frequency_affinity_router,
-)
-from api.affinity.loss_run_distribution import (
-    router as loss_run_distribution_affinity_router,
-)
-from api.affinity.loss_run_frequency import router as loss_run_frequency_affinity_router
-from api.affinity.policy_type_distribution import (
-    router as policy_type_distribution_affinity_router,
-)
-from api.affinity.search_affinity_program import (
-    router as search_affinity_program_router,
-)
-from api.auth import router as auth_router
-from api.dropdowns import router as dropdowns_router
-from api.hcm.hcm_account import router as hcm_account_router
-from api.hcm.hcm_account_associations import router as hcm_account_associations_router
-from api.hcm.hcm_users import router as hcm_only_users_router
-from api.hcm.search_hcm_account import router as search_hcm_account_router
-from api.loss_run.loss_run import router as loss_run_router
-from api.loss_run.affinity.affinity_loss_run import router as affinity_loss_run_router
-from api.outlook_compose import router as outlook_compose_router
-from api.sac.claim_review_distribution import router as claim_review_distribution_router
-from api.sac.claim_review_frequency import router as claim_review_frequency_router
-from api.sac.deduct_bill_distribution import router as deduct_bill_distribution_router
-from api.sac.deduct_bill_frequency import router as deduct_bill_frequency_router
-from api.sac.hcm_users import router as hcm_users_router
-from api.sac.loss_run_distribution import router as loss_run_distribution_router
-from api.sac.loss_run_frequency import router as loss_run_frequency_router
-from api.sac.sac_account import router as sac_account_router
-from api.sac.sac_account_associations import router as sac_account_associations_router
-from api.sac.sac_affiliates import router as sac_affiliates_router
-from api.sac.sac_policies import router as sac_policies_router
-from api.sac.search_sac_account import router as search_sac_account_router
-from core.config import settings
-from services.loss_run.loss_run_worker import LossRunWorker
+First – Cover page.  Rather than us wasting an entire column on the spreadsheet listing the Producing Agent name, can that be moved to the cover page?  I highlighted this in light blue.
 
-# Temporary UAT build: keep API endpoints available, but let the local worker
-# process the shared queue. Also disables this app's automatic scheduler.
-APP_LOSS_RUN_WORKER_ENABLED = False
+Next, all columns I show in green, seem to be fine in both location and title.
 
+All columns in red I feel can be eliminated unless they serve a purpose for the loss run itself, such as the Record Only indicator and such, then those columns can be included at the end.
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    worker = None
-    if APP_LOSS_RUN_WORKER_ENABLED and settings.ENVIRONMENT.strip().lower() != "local":
-        worker = LossRunWorker()
-        worker.start()
+Financials -- All the financial columns in the Affinity Loss run should be the same order, title, and data source as the ones in our regular loss run.
 
-    yield
+Litigation Status column.  It should be moved from is column AU here, to immediately following the financials, as it does on our regular loss run.
 
-    if worker:
-        await worker.stop()
+Claims above $25k column.  We want to keep it, but change it to a “Claims Above $50k”, but it needs to be based on the Claim as a whole (just the Incurred without ALAE), and not just each exposure.  Also, please move it out of its position right in the middle of the financials to another location.  As I am writing this to you, I am wondering if for the purpose of making this feature work, would it be easier to have a column that is simply a per claim total (without ALAE)?
 
+Thank you for all of your work on this.  Please let me know if you have any questions about our requests.
 
-app = FastAPI(lifespan=lifespan)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
-)
-
-
-@app.get("/", tags=["home page"])
-async def home():
-    return {"message": "Welcome to SAC"}
-
-
-@app.get("/health", tags=["health"])
-async def health_check():
-    return {"status": "ok"}
-
-
-app.include_router(auth_router, prefix="/auth", tags=["auth"])
-app.include_router(dropdowns_router, prefix="/dropdowns", tags=["dropdowns"])
-
-# hcm
-app.include_router(hcm_account_router, prefix="/hcm_account", tags=["hcm_account"])
-app.include_router(hcm_only_users_router, prefix="/hcm_only_users", tags=["hcm_only_users"])
-app.include_router(
-    hcm_account_associations_router,
-    prefix="/hcm_account_associations",
-    tags=["hcm_account_associations"],
-)
-app.include_router(
-    search_hcm_account_router, prefix="/search_hcm_account", tags=["search_hcm_account"]
-)
-
-# sac
-app.include_router(sac_account_router, prefix="/sac_account", tags=["sac_account"])
-app.include_router(
-    sac_account_associations_router,
-    prefix="/sac_account_associations",
-    tags=["sac_account_associations"],
-)
-app.include_router(sac_policies_router, prefix="/sac_policies", tags=["sac_policies"])
-app.include_router(hcm_users_router, prefix="/hcm_users", tags=["hcm_users"])
-app.include_router(sac_affiliates_router, prefix="/sac_affiliates", tags=["sac_affiliates"])
-app.include_router(
-    search_sac_account_router, prefix="/search_sac_account", tags=["search_sac_account"]
-)
-
-app.include_router(
-    loss_run_distribution_router, prefix="/loss_run_distribution", tags=["loss_run_distribution"]
-)
-app.include_router(
-    claim_review_distribution_router,
-    prefix="/claim_review_distribution",
-    tags=["claim_review_distribution"],
-)
-app.include_router(
-    deduct_bill_distribution_router,
-    prefix="/deduct_bill_distribution",
-    tags=["deduct_bill_distribution"],
-)
-
-app.include_router(
-    loss_run_frequency_router, prefix="/loss_run_frequency", tags=["loss_run_frequency"]
-)
-app.include_router(loss_run_router, prefix="/loss_run", tags=["loss_run"])
-app.include_router(affinity_loss_run_router, prefix="/affinity_loss_run", tags=["affinity_loss_run"])
-app.include_router(
-    claim_review_frequency_router, prefix="/claim_review_frequency", tags=["claim_review_frequency"]
-)
-app.include_router(
-    deduct_bill_frequency_router, prefix="/deduct_bill_frequency", tags=["deduct_bill_frequency"]
-)
-
-# outlook compose
-app.include_router(outlook_compose_router, prefix="/outlook", tags=["outlook"])
-
-# affinity
-app.include_router(affinity_program_router, prefix="/affinity_program", tags=["affinity_program"])
-app.include_router(affinity_agents_router, prefix="/affinity_agents", tags=["affinity_agents"])
-app.include_router(
-    affinity_policy_types_router, prefix="/affinity_policy_types", tags=["affinity_policy_types"]
-)
-app.include_router(
-    search_affinity_program_router,
-    prefix="/search_affinity_program",
-    tags=["search_affinity_program"],
-)
-
-app.include_router(
-    loss_run_distribution_affinity_router,
-    prefix="/loss_run_distribution_affinity",
-    tags=["loss_run_distribution_affinity"],
-)
-app.include_router(
-    claim_review_distribution_affinity_router,
-    prefix="/claim_review_distribution_affinity",
-    tags=["claim_review_distribution_affinity"],
-)
-app.include_router(
-    policy_type_distribution_affinity_router,
-    prefix="/policy_type_distribution_affinity",
-    tags=["policy_type_distribution_affinity"],
-)
-
-app.include_router(
-    loss_run_frequency_affinity_router,
-    prefix="/loss_run_frequency_affinity",
-    tags=["loss_run_frequency_affinity"],
-)
-app.include_router(
-    claim_review_frequency_affinity_router,
-    prefix="/claim_review_frequency_affinity",
-    tags=["claim_review_frequency_affinity"],
-)
+Walt
