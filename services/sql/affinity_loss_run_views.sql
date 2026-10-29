@@ -8,6 +8,9 @@
 -- Claims and Record Only retain DIFFERENT history rules from the supplied SQL.
 -- Eastern Standard Time is the Windows zone name and includes US daylight saving.
 -- No ORDER BY in views: callers must supply their own ordering.
+-- Revised financial columns use SAC-style calculations on LAKEHOUSE sources.
+-- SAC's *_FILTERED tables do not cover the tested Affinity claims.
+-- Legacy financial aliases remain for compatibility during template rollout.
 USE [CLMAA_SpecialAccounts];
 GO
 SET ANSI_NULLS ON;
@@ -24,6 +27,10 @@ WITH ReportParameters AS (
 ), LAST_DRIVER AS (SELECT CCNT.CLM_NBR, MAX(CCNT.CLM_CNTCT_KEY) LAST_DRIVER_KEY FROM CLM_LakeHouse.dbo.DW_CLMS_CLM_CNTCT_DIMNSN CCNT WHERE CCNT.CURR_VERSN_IND = 'Y' AND CCNT.INVLV_PARTY_ROLE_CD = 'ID' AND UPPER(CCNT.CLM_CNTCT_ROLE_CD) = 'DRIVER' GROUP BY CCNT.CLM_NBR),
      LAST_TXN AS (SELECT FF.CLM_NBR, FF.CLM_FTR_NBR, MAX(FF.FTR_KEY) LAST_FTR_KEY,MAX(FF.LOSS_TXN_PRCSS_DT_DIMKEY) LAST_TXN_PRCSS_DT_DIMKEY FROM CLM_LakeHouse.dbo.DW_FINCL_LOSS_FTR_SS_F FF GROUP BY FF.CLM_NBR, FF.CLM_FTR_NBR),
      EXPENSE_TRANSACTIONS AS (SELECT TXN.CLM_NBR,TXN.CLM_FTR_NBR,
+                               SUM(CASE WHEN TXN.LOSS_TXN_TYPE_DESC LIKE '%Expense%'
+                                             AND (TXN.COST_CATGRY_DESC <> 'State Penalties'
+                                                  OR TXN.COST_CATGRY_DESC IS NULL)
+                                        THEN ISNULL(TXN.CLM_TXN_AMT, 0) ELSE 0 END) AS SAC_ALAE_EXPENSE,
                                SUM(CASE WHEN UPPER(TXN.LOSS_TXN_TYPE_DESC) LIKE '%EXPENSE%' AND
                                              UPPER(TXN.LOSS_TXN_TYPE_DESC) NOT LIKE '%RECOVERY%' THEN
                                              TXN.CLM_TXN_AMT ELSE 0 END) AS EXPENSE,
@@ -100,6 +107,8 @@ ELSE cd.CLM_JRSDTN_ST_ABBR END ACDNT_ST_ABBR,
            ISNULL(FINCL.LOSS_RECOVRY_AMT,0) LOSS_RECOVRY_AMT,
            ISNULL(FINCL.DEDTBL_RECOVRY_AMT, 0) DEDTBL_RECOVRY_AMT,
            ISNULL(FINCL.FTR_ALAE_AMT, 0) FTR_ALAE_AMT,
+           ISNULL(FINCL.CHNG_IN_ALAE_RSRV_AMT, 0) AS CHNG_IN_ALAE_RSRV_AMT,
+           ISNULL(ETXN.SAC_ALAE_EXPENSE, 0) AS SAC_ALAE_EXPENSE,
            ISNULL(ETXN.EXPENSE,0) AS EXPENSE,
            ISNULL(ETXN.EXPENSE_RECOVERY,0) AS EXPENSE_RECOVERY,
 
@@ -161,6 +170,22 @@ SELECT
   D.FTR_COVG_TYPE_DESC AS [Coverage],
   D.DT_OF_LOSS AS [Loss Date],
   D.ACDNT_ST_ABBR AS [Accident State],
+  -- Revised template fields. Expense transactions are already aggregated per
+  -- feature: use MAX, not SUM, so joining financial history cannot repeat them.
+  SUM(D.FTR_CHNG_IN_OSLS_AMT) AS [Outstanding Loss Reserve],
+  SUM(D.FTR_PDLS_INCL_SLVG_SUBRO_AMT) - SUM(D.DEDTBL_RECOVRY_AMT)
+      AS [Total Paid Loss Net Salvage/Subro/Loss Recovery],
+  SUM(D.FTR_CHNG_IN_OSLS_AMT) + SUM(D.FTR_PDLS_INCL_SLVG_SUBRO_AMT)
+      - SUM(D.DEDTBL_RECOVRY_AMT) AS [Incurred w/o ALAE],
+  SUM(D.CHNG_IN_ALAE_RSRV_AMT) AS [ALAE Reserve],
+  CASE WHEN SUM(D.FTR_ALAE_AMT2) = 0 THEN MAX(D.SAC_ALAE_EXPENSE)
+       ELSE SUM(D.FTR_ALAE_AMT2) END AS [ALAE Paid],
+  SUM(D.FTR_CHNG_IN_OSLS_AMT) + SUM(D.FTR_PDLS_INCL_SLVG_SUBRO_AMT)
+      - SUM(D.DEDTBL_RECOVRY_AMT) + SUM(D.CHNG_IN_ALAE_RSRV_AMT)
+      + CASE WHEN SUM(D.FTR_ALAE_AMT2) = 0 THEN MAX(D.SAC_ALAE_EXPENSE)
+             ELSE SUM(D.FTR_ALAE_AMT2) END AS [Total Incurred + ALAE],
+  SUM(D.expnse_recovry_amt) AS [Expense Recovery],
+  -- Legacy aliases below are not displayed by the revised template.
   SUM(D.FTR_CHNG_IN_OSLS_AMT) AS [Current Loss Reserve],
   (SUM(D.FTR_PDLS_INCL_SLVG_SUBRO_AMT)-sum(d.DEDTBL_RECOVRY_AMT)) AS [Paid Loss Net Salvage Subro],
   (SUM(d.FTR_INCUR_INCL_SLVG_SUBRO_AMT)-sum(d.DEDTBL_RECOVRY_AMT)) AS [Total Incurred],
