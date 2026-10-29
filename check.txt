@@ -132,3 +132,17 @@ messages tab:
 (70 rows affected)
 
 Completion time: 2026-10-29T14:29:52.5555178+05:30
+
+
+
+SELECT TOP (20)
+    CLM_NBR,
+    CLM_FTR_NBR,
+    FTR_CHNG_IN_OSLS_AMT,
+    FTR_PDLS_INCL_SLVG_SUBRO_AMT
+FROM dbo.DW_FINCL_LOSS_FTR_SS_F_FILTERED
+WHERE CLM_NBR IN (
+    '83-00083174',
+    '83-00092761',
+    '83-00174380'
+);
