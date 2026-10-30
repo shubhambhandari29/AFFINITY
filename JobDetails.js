@@ -18,6 +18,7 @@ import {
   useTheme,
   CircularProgress,
   Alert,
+  GlobalStyles,
 } from "@mui/material";
 import { useState } from "react";
 import { MdSync } from "react-icons/md";
@@ -36,7 +37,9 @@ const MetricBox = ({ label, value, color = "#1a365d", bgColor = "white" }) => (
       borderRadius: "6px",
       p: 1.5,
       bgcolor: bgColor,
-      minWidth: "120px",
+      minWidth: 0,
+      boxSizing: "border-box",
+      overflowWrap: "anywhere",
     }}
   >
     <Typography variant="caption" sx={{ fontWeight: "bold", color: "#666" }}>
@@ -175,9 +178,19 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
       maxWidth="md"
       fullWidth
       slotProps={{
-        paper: { borderradius: "8px" },
+        paper: {
+          sx: {
+            borderRadius: "8px",
+            m: { xs: 1, sm: 4 },
+            width: { xs: "calc(100% - 16px)", sm: "calc(100% - 64px)" },
+            maxHeight: { xs: "calc(100dvh - 16px)", sm: "calc(100dvh - 64px)" },
+          },
+        },
       }}
     >
+      <GlobalStyles
+        styles={{ ".swal2-container": { zIndex: theme.zIndex.modal + 1 } }}
+      />
       {/* Modal Header */}
       <DialogTitle
         sx={{
@@ -186,11 +199,15 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flexWrap: "wrap",
+          gap: 1,
+          px: { xs: 2, sm: 3 },
         }}
       >
-        <Box>
+        <Box sx={{ minWidth: 0, flex: "1 1 220px" }}>
           <Typography
             variant="h6"
+            component="div"
             sx={{ fontWeight: "bold", color: theme.palette.background.blue }}
           >
             Job Details
@@ -219,10 +236,10 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
                   color: theme.palette.background.green,
                 }}
               >
-                <span style={{ color: "black", marginRight: "10px" }}>
+                <span style={{ color: theme.palette.text.primary, marginRight: "10px" }}>
                   {cancellationPending ? "CANCELLING" : jobData.status?.replace("_", " ").toUpperCase()}
                 </span>
-                <MdSync size={20} />
+                <MdSync size={20} style={{ flexShrink: 0 }} />
               </Box>
             ) : (
               <Box>{jobData.status?.replace("_", " ").toUpperCase()}</Box>
@@ -230,11 +247,11 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
           }
           color={getStatusColor(jobData.status)}
           size="small"
-          sx={{ fontWeight: "bold", borderRadius: "4px" }}
+          sx={{ fontWeight: "bold", borderRadius: "4px", maxWidth: "100%", flexShrink: 0 }}
         />
       </DialogTitle>
 
-      <DialogContent sx={{ py: 3, px: 3 }}>
+      <DialogContent sx={{ py: 3, px: { xs: 2, sm: 3 }, overflowWrap: "anywhere" }}>
         {(jobData.progressMessage || cancellationPending) && (
           <Alert severity={cancellationPending ? "warning" : "info"} sx={{ mt: 1, mb: 2 }}>
             {cancellationPending
@@ -243,7 +260,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
           </Alert>
         )}
         {/* Top Section: Core Metrics */}
-        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 4, mt: 1 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(4, minmax(0, 1fr))" }, gap: 2, mb: 4, mt: 1 }}>
           <MetricBox label="Requested" value={jobData.requestedCount} />
           <MetricBox label="Processed" value={jobData.processedCount} />
           <MetricBox
@@ -270,8 +287,8 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
             mb: jobData.failedCount > 0 ? 4 : 0,
           }}
         >
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
+          <Grid container spacing={2} sx={{ minWidth: 0 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ minWidth: 0 }}>
               <Typography variant="caption" color="textSecondary" display="block">
                 Report Type
               </Typography>
@@ -281,7 +298,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
                   : "Standard Loss Run"}
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ minWidth: 0 }}>
               <Typography variant="caption" color="textSecondary" display="block">
                 Loss Date From
               </Typography>
@@ -289,7 +306,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
                 {jobData.lossDateFrom || (jobData.policyEffectiveDateFrom ? `Legacy policy cutoff: ${jobData.policyEffectiveDateFrom}` : "Default history")}
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ minWidth: 0 }}>
               <Typography
                 variant="caption"
                 color="textSecondary"
@@ -301,7 +318,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
                 {jobData.requestedBy}
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ minWidth: 0 }}>
               <Typography
                 variant="caption"
                 color="textSecondary"
@@ -317,7 +334,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
                 {jobData.jobType}
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ minWidth: 0 }}>
               <Typography
                 variant="caption"
                 color="textSecondary"
@@ -333,7 +350,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
                 {jobData.phase}
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6 }} sx={{ minWidth: 0 }}>
               <Typography
                 variant="caption"
                 color="textSecondary"
@@ -349,7 +366,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
                 {jobData.errorMessage || "None"}
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }} sx={{ minWidth: 0 }}>
               <Typography
                 variant="caption"
                 color="textSecondary"
@@ -359,7 +376,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
               </Typography>
               <Typography variant="body2">{jobData.createdAt}</Typography>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }} sx={{ minWidth: 0 }}>
               <Typography
                 variant="caption"
                 color="textSecondary"
@@ -369,7 +386,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
               </Typography>
               <Typography variant="body2">{jobData.startedAt}</Typography>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }} sx={{ minWidth: 0 }}>
               <Typography
                 variant="caption"
                 color="textSecondary"
@@ -399,9 +416,9 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
             <TableContainer
               component={Paper}
               variant="outlined"
-              sx={{ maxHeight: 250, overflowY: "auto" }}
+              sx={{ maxHeight: 250, overflow: "auto", width: "100%" }}
             >
-              <Table size="small" stickyHeader>
+              <Table size="small" stickyHeader sx={{ minWidth: 380 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell
@@ -469,6 +486,10 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
           p: 2,
           bgcolor: theme.palette.background.offWhite,
           borderTop: "1px solid #e0e0e0",
+          flexWrap: "wrap",
+          gap: 1,
+          "& > :not(style) ~ :not(style)": { ml: 0 },
+          "& .MuiButton-root": { minHeight: 36, whiteSpace: "nowrap" },
         }}
       >
         {isActive && (
@@ -491,7 +512,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
             !["completed", "partially_completed", "cancelled"].includes(jobData.status)
           }
           onClick={handleDownload}
-          sx={{ width: 100 }}
+          sx={{ minWidth: 100 }}
         >
           {isDownloading ? <CircularProgress size={16} /> : "Download"}
         </Button>
