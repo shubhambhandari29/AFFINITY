@@ -1,23 +1,58 @@
-Hi Walt, Michelle and Jenna,
+USE [CLMAA_SpecialAccounts];
+GO
+SET XACT_ABORT ON;
 
-Thank you for bringing these points together. Here is our update on each:
+-- Stop the API worker(s) first. Run this migration before deploying the new code.
+-- Adds one flag and extends status checks; existing job rows are preserved.
+BEGIN TRY
+    BEGIN TRANSACTION;
 
-1. **No-claims reports**  
-   Thank you for confirming that the format meets your needs. We will retain this functionality.
+    IF OBJECT_ID('dbo.tblLossRunJob', 'U') IS NULL
+       OR OBJECT_ID('dbo.tblLossRunJobAccount', 'U') IS NULL
+        THROW 50001, 'Loss-run job tables must exist before this migration.', 1;
 
-2. **Claim Review Threshold on the cover page**  
-   We have updated the code to remove the threshold from both report cover pages. It remains available through the filter on **Summary By Policy Year** for standard loss runs and **Review** for Claim Review reports.
+    IF COL_LENGTH('dbo.tblLossRunJob', 'CancelRequested') IS NULL
+        ALTER TABLE dbo.tblLossRunJob ADD CancelRequested bit NOT NULL
+            CONSTRAINT DF_tblLossRunJob_CancelRequested DEFAULT (0) WITH VALUES;
 
-3. **Chart and Summary By Policy Year layouts**  
-   Could you please share the standard loss-run workbook whose layout we should reproduce, ideally alongside one of our generated reports with the differences highlighted? A short walkthrough would also help us confirm the expected formatting.
+    -- Existing installations can have different names for their status checks.
+    -- Refuse to replace checks that also constrain another column.
+    IF EXISTS (
+        SELECT 1
+        FROM sys.check_constraints c
+        JOIN sys.sql_expression_dependencies d ON d.referencing_id = c.object_id
+        JOIN sys.columns col ON col.object_id = d.referenced_id
+                            AND col.column_id = d.referenced_minor_id
+        WHERE c.parent_object_id IN (OBJECT_ID('dbo.tblLossRunJob'), OBJECT_ID('dbo.tblLossRunJobAccount'))
+          AND LOWER(c.definition) LIKE '%status%'
+          AND col.name <> 'Status'
+    )
+        THROW 50002, 'A status check also constrains another column. Ask the DB team to extend it to allow cancelled.', 1;
 
-4. **Inactive accounts**  
-   We reviewed the code and query and successfully generated a report for an inactive account. Eligibility is based on the Loss Run Distribution Frequency, without requiring Active status. The claim-data retrieval step can take several minutes, during which the job remains “In process.” If the Aubuchon issue occurs again, please share the job ID and approximate trigger time so we can investigate.
+    DECLARE @DropChecks nvarchar(max) = N'';
+    SELECT @DropChecks = @DropChecks + N'ALTER TABLE '
+        + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id)) + N'.'
+        + QUOTENAME(OBJECT_NAME(parent_object_id)) + N' DROP CONSTRAINT '
+        + QUOTENAME(name) + N';'
+    FROM sys.check_constraints
+    WHERE parent_object_id IN (OBJECT_ID('dbo.tblLossRunJob'), OBJECT_ID('dbo.tblLossRunJobAccount'))
+      AND LOWER(definition) LIKE '%status%';
+    IF @DropChecks <> N'' EXEC sys.sp_executesql @DropChecks;
 
-5. **Cancel Job and progress visibility**  
-   We have implemented a Cancel Job button and clearer progress messages. Queued jobs can be cancelled immediately; running jobs request cancellation of the SQL query or stop after the current account finishes processing. Files already generated remain available for download. This change still needs deployment and SQL-driver cancellation verification in PREPROD before it is ready for your testing.
+    ALTER TABLE dbo.tblLossRunJob WITH CHECK ADD CONSTRAINT CK_tblLossRunJob_Status
+        CHECK (Status IN ('queued', 'processing', 'completed', 'partially_completed', 'failed', 'cancelled'));
+    ALTER TABLE dbo.tblLossRunJobAccount WITH CHECK ADD CONSTRAINT CK_tblLossRunJobAccount_Status
+        CHECK (Status IN ('queued', 'processing', 'completed', 'failed', 'cancelled'));
 
-We will let you know once these updates are available in PREPROD. In the meantime, the reference workbook/comparison will help us address the remaining layout differences.
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    THROW;
+END CATCH;
+GO
 
-Thanks,  
-Shubham
+SELECT name, definition FROM sys.check_constraints
+WHERE parent_object_id IN (OBJECT_ID('dbo.tblLossRunJob'), OBJECT_ID('dbo.tblLossRunJobAccount'));
+SELECT name, TYPE_NAME(user_type_id) AS DataType, is_nullable
+FROM sys.columns WHERE object_id = OBJECT_ID('dbo.tblLossRunJob') AND name = 'CancelRequested';
