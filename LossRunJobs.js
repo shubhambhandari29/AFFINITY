@@ -97,7 +97,7 @@ export default function LossRunJobs() {
               }}
             >
               <span style={{ color: "black", marginRight: "10px" }}>
-                {params.value}
+                {params.row.cancelRequested ? "Cancelling" : params.value}
               </span>
               <MdSync size={20} />
             </Box>
@@ -109,7 +109,12 @@ export default function LossRunJobs() {
     {
       field: "phase",
       headerName: "Phase",
-      width: 100,
+      width: 300,
+      renderCell: (params) => (
+        <span title={params.row.progressMessage || params.value}>
+          {params.row.progressMessage || params.value}
+        </span>
+      ),
     },
     {
       field: "createdAt",
@@ -147,7 +152,8 @@ export default function LossRunJobs() {
     }
   };
 
-  const manualRefresh = useIntervalFetch(fetchData, 300000); // 300,000ms = 5 mins
+  const hasActiveJob = jobs.some((job) => ["queued", "processing"].includes(job.status));
+  const manualRefresh = useIntervalFetch(fetchData, hasActiveJob ? 10000 : 300000);
 
   return (
     <>
@@ -156,6 +162,7 @@ export default function LossRunJobs() {
         open={!!openJob}
         onClose={() => setOpenJob("")}
         jobData={jobs.find((job) => job.jobId === openJob)}
+        onRefresh={manualRefresh}
       />
 
       <Grid sx={{ flexGrow: 1, minWidth: 0 }}>

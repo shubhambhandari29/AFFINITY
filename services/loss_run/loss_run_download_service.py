@@ -27,7 +27,7 @@ async def prepare_loss_run_download(job_id: UUID) -> LossRunDownload:
             detail={"error": "Loss-run job not found"},
         )
 
-    if job["Status"] not in {"completed", "partially_completed"}:
+    if job["Status"] not in {"completed", "partially_completed", "cancelled"}:
         raise HTTPException(
             status_code=409,
             detail={"error": "Loss-run job is not ready for download"},

@@ -17,6 +17,7 @@ import {
   Paper,
   useTheme,
   CircularProgress,
+  Alert,
 } from "@mui/material";
 import { useState } from "react";
 import { MdSync } from "react-icons/md";
@@ -50,10 +51,44 @@ const MetricBox = ({ label, value, color = "#1a365d", bgColor = "white" }) => (
   </Box>
 );
 
-export default function JobDetails({ open, onClose, jobData }) {
+export default function JobDetails({ open, onClose, jobData, onRefresh }) {
   const theme = useTheme();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelRequestedJobId, setCancelRequestedJobId] = useState(null);
   if (!jobData) return null;
+  const isActive = ["queued", "processing"].includes(jobData.status);
+  const cancellationPending = isActive && (
+    jobData.cancelRequested || cancelRequestedJobId === jobData.jobId
+  );
+
+  const handleCancel = async () => {
+    const jobId = jobData.jobId;
+    const confirmation = await Swal.fire({
+      title: "Cancel this loss run?",
+      text: "Processing will stop when the current operation ends. Files already generated will remain available.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Cancel job",
+      cancelButtonText: "Keep running",
+    });
+    if (!confirmation.isConfirmed) return;
+    setIsCancelling(true);
+    try {
+      const response = await api.post(`/loss_run/jobs/${jobId}/cancel`);
+      setCancelRequestedJobId(jobId);
+      await Swal.fire({ title: "Cancellation", text: response.data.message, icon: "info" });
+    } catch (error) {
+      await Swal.fire({
+        title: "Unable to cancel",
+        text: error.response?.data?.detail?.error || "Unable to request cancellation. Please refresh the job status.",
+        icon: "error",
+      });
+    } finally {
+      setIsCancelling(false);
+      if (onRefresh) await onRefresh();
+    }
+  };
 
   // Determine status color based on the job phase/status
   const getStatusColor = (status) => {
@@ -61,6 +96,7 @@ export default function JobDetails({ open, onClose, jobData }) {
       case "completed":
         return "success";
       case "partially_completed":
+      case "cancelled":
         return "warning";
       case "failed":
         return "error";
@@ -184,7 +220,7 @@ export default function JobDetails({ open, onClose, jobData }) {
                 }}
               >
                 <span style={{ color: "black", marginRight: "10px" }}>
-                  {jobData.status?.replace("_", " ").toUpperCase()}
+                  {cancellationPending ? "CANCELLING" : jobData.status?.replace("_", " ").toUpperCase()}
                 </span>
                 <MdSync size={20} />
               </Box>
@@ -199,6 +235,13 @@ export default function JobDetails({ open, onClose, jobData }) {
       </DialogTitle>
 
       <DialogContent sx={{ py: 3, px: 3 }}>
+        {(jobData.progressMessage || cancellationPending) && (
+          <Alert severity={cancellationPending ? "warning" : "info"} sx={{ mt: 1, mb: 2 }}>
+            {cancellationPending
+              ? "Cancellation requested. Waiting for the current operation to stop."
+              : jobData.progressMessage}
+          </Alert>
+        )}
         {/* Top Section: Core Metrics */}
         <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 4, mt: 1 }}>
           <MetricBox label="Requested" value={jobData.requestedCount} />
@@ -428,13 +471,24 @@ export default function JobDetails({ open, onClose, jobData }) {
           borderTop: "1px solid #e0e0e0",
         }}
       >
+        {isActive && (
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            disabled={isCancelling || cancellationPending}
+            onClick={handleCancel}
+          >
+            {isCancelling || cancellationPending ? "Cancelling…" : "Cancel Job"}
+          </Button>
+        )}
         <Button
           variant="contained"
           size="small"
           disabled={
             isDownloading ||
             jobData.generatedCount === 0 ||
-            !["completed", "partially_completed"].includes(jobData.status)
+            !["completed", "partially_completed", "cancelled"].includes(jobData.status)
           }
           onClick={handleDownload}
           sx={{ width: 100 }}

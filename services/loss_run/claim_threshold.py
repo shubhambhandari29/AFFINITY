@@ -60,9 +60,11 @@ def configure_threshold_workbook(workbook, threshold: Decimal | None) -> None:
             amount = amount[:-3]
         label = f"Claims at/above ${amount}"
     cover = workbook["Cover Page"]
-    cover["A8"] = "Claim review threshold"
-    cover["B8"] = threshold if threshold is not None else THRESHOLD_NOT_CONFIGURED
-    cover["B8"].number_format = '"$"#,##0.00'
+    # Thresholds are internal review settings, displayed only on report filters.
+    # Clear older template copies that already have the former cover row.
+    if cover["A8"].value == "Claim review threshold":
+        cover["A8"] = None
+        cover["B8"] = None
 
     for sheet in workbook:
         for pivot in sheet._pivots:

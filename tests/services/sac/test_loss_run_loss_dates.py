@@ -75,6 +75,7 @@ def test_query_date_boundaries_use_occurrence_not_policy_start():
 def test_old_queued_policy_job_requires_resubmission(monkeypatch):
     generate = AsyncMock()
     fail = AsyncMock()
+    monkeypatch.setattr(loss_run_worker, "get_cancellation_state", AsyncMock(return_value=False))
     monkeypatch.setattr(loss_run_worker, "generate_loss_runs", generate)
     monkeypatch.setattr(loss_run_worker, "fail_job", fail)
     worker = loss_run_worker.LossRunWorker()

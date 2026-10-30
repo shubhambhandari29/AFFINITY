@@ -9,6 +9,7 @@ LossRunJobStatus = Literal[
     "completed",
     "partially_completed",
     "failed",
+    "cancelled",
 ]
 
 
@@ -21,6 +22,10 @@ class LossRunJobCreated(BaseModel):
 class LossRunFailure(BaseModel):
     customerNumber: str
     reason: str
+
+
+class LossRunJobCancellation(LossRunJobCreated):
+    cancelRequested: bool
 
 
 class LossRunJobResponse(BaseModel):
@@ -44,3 +49,5 @@ class LossRunJobResponse(BaseModel):
     completedAt: str | None
     errorMessage: str | None
     failures: list[LossRunFailure]
+    cancelRequested: bool = False
+    progressMessage: str = ""

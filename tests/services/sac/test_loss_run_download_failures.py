@@ -16,6 +16,7 @@ from services.loss_run import loss_run_download_service as downloads
         ({"Status": "processing"}, [], 409),
         ({"Status": "failed"}, [], 409),
         ({"Status": "completed"}, [], 404),
+        ({"Status": "cancelled"}, [], 404),
     ],
 )
 def test_download_rejects_missing_or_unready_reports(monkeypatch, job, outputs, status):
@@ -65,3 +66,15 @@ def test_duplicate_filenames_are_unique_even_for_same_customer():
     names = [downloads._unique_filename("report.xlsx", "001", used) for _ in range(4)]
     assert names == ["report.xlsx", "report_001.xlsx", "report_001_2.xlsx", "report_001_3.xlsx"]
     assert used == set(names)
+
+
+def test_cancelled_job_can_download_files_already_generated(monkeypatch):
+    monkeypatch.setattr(downloads, "get_job", AsyncMock(return_value={"Status": "cancelled"}))
+    outputs = [{"OutputPath": "/saved/report.xlsx", "CustomerNumber": "001"}]
+    monkeypatch.setattr(downloads, "get_completed_outputs", AsyncMock(return_value=outputs))
+    expected = downloads.LossRunDownload("/tmp/report.xlsx", "report.xlsx", "application/octet-stream")
+    prepare = MagicMock(return_value=expected)
+    monkeypatch.setattr(downloads, "_prepare_download_file", prepare)
+    job_id = uuid4()
+    assert asyncio.run(downloads.prepare_loss_run_download(job_id)) == expected
+    prepare.assert_called_once_with(job_id, outputs)

@@ -10,6 +10,7 @@ from services.loss_run.loss_run_job_repository import (
     get_failures,
     get_job,
     get_jobs,
+    request_cancellation,
 )
 
 
@@ -78,6 +79,21 @@ async def get_loss_run_job(job_id: UUID) -> dict:
     return _format_job(job, failures)
 
 
+async def cancel_loss_run_job(job_id: UUID) -> dict:
+    job = await request_cancellation(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail={"error": "Loss-run job not found"})
+    if job["Status"] not in {"queued", "processing", "cancelled"}:
+        raise HTTPException(status_code=409, detail={"error": "This loss-run job has already finished"})
+    return {
+        "jobId": job_id,
+        "status": job["Status"],
+        "cancelRequested": job["CancelRequested"],
+        "message": "Loss-run job cancelled" if job["Status"] == "cancelled"
+        else "Cancellation requested. Waiting for the current operation to stop.",
+    }
+
+
 async def get_loss_run_jobs() -> list[dict]:
     jobs = await get_jobs()
     if not jobs:
@@ -96,6 +112,19 @@ async def get_loss_run_jobs() -> list[dict]:
 
 
 def _format_job(job: dict, failures: list[dict]) -> dict:
+    messages = {
+        "waiting_for_worker": "Waiting for the report worker to start.",
+        "starting": "Starting report generation.",
+        "downloading_template": "Loading the Excel template.",
+        "querying_loss_run_data": "Retrieving claim data. This step may take several minutes.",
+        "generating_reports": "Generating and saving Excel reports.",
+        "finished": "Report generation finished.",
+        "failed": "Report generation failed. See the error details.",
+        "cancelled": "Job cancelled. Any files already generated are available for download.",
+    }
+    progress = messages.get(job["Phase"], "Processing the loss-run request.")
+    if job.get("CancelRequested") and job["Status"] == "processing":
+        progress = "Cancellation requested. Waiting for the current operation to stop."
     return {
         "jobId": job["JobId"],
         "jobType": job["JobType"],
@@ -117,4 +146,6 @@ def _format_job(job: dict, failures: list[dict]) -> dict:
         "completedAt": format_loss_run_timestamp(job["CompletedAt"]),
         "errorMessage": job["ErrorMessage"],
         "failures": failures,
+        "cancelRequested": bool(job.get("CancelRequested", False)),
+        "progressMessage": progress,
     }

@@ -96,9 +96,8 @@ def test_both_workbooks_have_account_threshold_and_filter(review, threshold, emp
     )
     workbook = load_workbook(BytesIO(output))
     try:
-        assert workbook["Cover Page"]["B8"].value == (
-            threshold if threshold is not None else THRESHOLD_NOT_CONFIGURED
-        )
+        assert workbook["Cover Page"]["A8"].value is None
+        assert workbook["Cover Page"]["B8"].value is None
         sheet = workbook["Review" if review else "Summary By Policy Year"]
         caption = (
             THRESHOLD_NOT_CONFIGURED

@@ -26,6 +26,10 @@ from services.loss_run.claim_threshold import (
 )
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
 from services.loss_run.excel_package import save_report_workbook
+from services.loss_run.loss_run_cancellation import (
+    LossRunCancellation,
+    LossRunCancelled,
+)
 from services.loss_run.standard_report_summary import populate_standard_summaries
 from services.loss_run.workbook_template import (
     create_no_claims_workbook,
@@ -203,10 +207,14 @@ async def generate_loss_runs(
     on_phase: PhaseCallback | None = None,
     on_customers: CustomersCallback | None = None,
     on_result: ResultCallback | None = None,
+    cancellation: LossRunCancellation | None = None,
 ) -> dict:
     if report_type not in {"standard", "claim_review"}:
         raise ValueError("Unsupported loss-run report type")
     try:
+        query = cancellation.run_query if cancellation else run_raw_query_async
+        if cancellation:
+            cancellation.check()
         if on_phase:
             await on_phase("downloading_template")
         report_date = datetime.now(ZoneInfo("America/New_York")).date()
@@ -214,7 +222,7 @@ async def generate_loss_runs(
         template_bytes = await run_in_threadpool(storage.download_template, report_type)
 
         if customer_nums is None:
-            customers = await run_raw_query_async(
+            customers = await query(
                 """
                 SELECT CustomerNum, CustomerName, CRThresh
                 FROM dbo.tblAcctSpecial
@@ -242,7 +250,7 @@ async def generate_loss_runs(
                 )
 
             placeholders = ", ".join("?" for _ in requested_numbers)
-            customers = await run_raw_query_async(
+            customers = await query(
                 f"""
                 SELECT CustomerNum, CustomerName, CRThresh
                 FROM dbo.tblAcctSpecial
@@ -258,7 +266,7 @@ async def generate_loss_runs(
             await on_phase("querying_loss_run_data")
 
         if loss_date_from is not None:
-            records = await run_raw_query_async(
+            records = await query(
                 EXTENDED_HISTORY_QUERY,
                 [
                     json.dumps(requested_numbers)
@@ -269,9 +277,9 @@ async def generate_loss_runs(
                 ],
             )
         elif customer_nums is None:
-            records = await run_raw_query_async("SELECT * FROM dbo.SAC_Loss_Run")
+            records = await query("SELECT * FROM dbo.SAC_Loss_Run")
         else:
-            records = await run_raw_query_async(
+            records = await query(
                 f"""
                 SELECT *
                 FROM dbo.SAC_Loss_Run
@@ -306,6 +314,8 @@ async def generate_loss_runs(
         history_label = f"_From_{loss_date_from:%Y_%m_%d}" if loss_date_from is not None else ""
 
         for customer_num in requested_numbers:
+            if cancellation:
+                cancellation.check()
             customer_name = customer_names.get(customer_num)
             customer_records = records_by_customer.get(customer_num, [])
 
@@ -362,7 +372,7 @@ async def generate_loss_runs(
             "failedCount": len(failures),
             "failures": failures,
         }
-    except HTTPException:
+    except (HTTPException, LossRunCancelled):
         raise
     except Exception as exc:
         logger.exception("Failed to generate loss-run reports")

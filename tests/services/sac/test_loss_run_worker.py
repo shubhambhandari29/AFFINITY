@@ -12,6 +12,7 @@ from services.loss_run import loss_run_worker
 def mock_scheduler(monkeypatch):
     check = AsyncMock()
     monkeypatch.setattr(loss_run_worker, "enqueue_due_loss_run_job", check)
+    monkeypatch.setattr(loss_run_worker, "get_cancellation_state", AsyncMock(return_value=False))
     return check
 
 
@@ -86,6 +87,7 @@ def test_worker_processes_selected_job_and_records_progress(monkeypatch, expecte
         on_result,
         report_type="standard",
         loss_date_from=None,
+        cancellation=None,
     ):
         assert customer_numbers == ["00123"]
         assert report_type == expected_type
@@ -261,9 +263,10 @@ def test_heartbeat_retries_after_transient_failure(monkeypatch):
     heartbeat = AsyncMock(side_effect=[RuntimeError("temporary outage"), None])
     monkeypatch.setattr(loss_run_worker.asyncio, "sleep", sleep)
     monkeypatch.setattr(loss_run_worker, "update_heartbeat", heartbeat)
+    monkeypatch.setattr(loss_run_worker, "HEARTBEAT_INTERVAL_SECONDS", 0)
     worker = loss_run_worker.LossRunWorker()
     job_id = uuid4()
     with pytest.raises(asyncio.CancelledError):
-        asyncio.run(worker._heartbeat(job_id))
+        asyncio.run(worker._heartbeat(job_id, loss_run_worker.LossRunCancellation()))
     assert heartbeat.await_count == 2
     heartbeat.assert_awaited_with(job_id, worker.worker_id)
