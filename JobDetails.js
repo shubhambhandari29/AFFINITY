@@ -74,18 +74,42 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
       showCancelButton: true,
       confirmButtonText: "Cancel job",
       cancelButtonText: "Keep running",
+      iconColor: theme.palette.warning.main,
+      customClass: {
+        confirmButton: "swal-confirm-button",
+        cancelButton: "swal-cancel-button",
+      },
+      buttonsStyling: false,
     });
     if (!confirmation.isConfirmed) return;
     setIsCancelling(true);
     try {
       const response = await api.post(`/loss_run/jobs/${jobId}/cancel`);
       setCancelRequestedJobId(jobId);
-      await Swal.fire({ title: "Cancellation", text: response.data.message, icon: "info" });
+      await Swal.fire({
+        title: "Cancellation",
+        text: response.data.message,
+        icon: "info",
+        confirmButtonText: "OK",
+        iconColor: theme.palette.info.main,
+        customClass: {
+          confirmButton: "swal-confirm-button",
+          cancelButton: "swal-cancel-button",
+        },
+        buttonsStyling: false,
+      });
     } catch (error) {
       await Swal.fire({
         title: "Unable to cancel",
         text: error.response?.data?.detail?.error || "Unable to request cancellation. Please refresh the job status.",
         icon: "error",
+        confirmButtonText: "OK",
+        iconColor: theme.palette.error.main,
+        customClass: {
+          confirmButton: "swal-confirm-button",
+          cancelButton: "swal-cancel-button",
+        },
+        buttonsStyling: false,
       });
     } finally {
       setIsCancelling(false);
