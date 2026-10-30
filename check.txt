@@ -1,14 +1,23 @@
--- SAC
-SELECT *
-FROM tblAcctSpecial
-WHERE Stage = 'Retired';
+Hi Walt, Michelle and Jenna,
 
--- Affinity
-SELECT *
-FROM tblAcctAffinityProgram
-WHERE Stage = 'Retired';
+Thank you for bringing these points together. Here is our update on each:
 
--- HCM Only
-SELECT *
-FROM tblHcmAccount
-WHERE Stage = 'Retired';
+1. **No-claims reports**  
+   Thank you for confirming that the format meets your needs. We will retain this functionality.
+
+2. **Claim Review Threshold on the cover page**  
+   We have updated the code to remove the threshold from both report cover pages. It remains available through the filter on **Summary By Policy Year** for standard loss runs and **Review** for Claim Review reports.
+
+3. **Chart and Summary By Policy Year layouts**  
+   Could you please share the standard loss-run workbook whose layout we should reproduce, ideally alongside one of our generated reports with the differences highlighted? A short walkthrough would also help us confirm the expected formatting.
+
+4. **Inactive accounts**  
+   We reviewed the code and query and successfully generated a report for an inactive account. Eligibility is based on the Loss Run Distribution Frequency, without requiring Active status. The claim-data retrieval step can take several minutes, during which the job remains “In process.” If the Aubuchon issue occurs again, please share the job ID and approximate trigger time so we can investigate.
+
+5. **Cancel Job and progress visibility**  
+   We have implemented a Cancel Job button and clearer progress messages. Queued jobs can be cancelled immediately; running jobs request cancellation of the SQL query or stop after the current account finishes processing. Files already generated remain available for download. This change still needs deployment and SQL-driver cancellation verification in PREPROD before it is ready for your testing.
+
+We will let you know once these updates are available in PREPROD. In the meantime, the reference workbook/comparison will help us address the remaining layout differences.
+
+Thanks,  
+Shubham
