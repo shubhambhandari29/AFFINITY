@@ -12,7 +12,7 @@ JOB_COLUMNS = """
     JobId, JobType, ReportType, BusinessType, TriggerSource, ScheduleId, ScheduledForDate,
     LossDateFrom, PolicyEffectiveDateFrom, Status, Phase, RequestedCount,
     ProcessedCount, GeneratedCount, FailedCount, RequestedBy,
-    CreatedAt, StartedAt, CompletedAt, ErrorMessage
+    CreatedAt, StartedAt, CompletedAt, ErrorMessage, CancelRequested
 """
 
 
@@ -223,6 +223,69 @@ async def get_completed_outputs(job_id: UUID) -> list[dict]:
     return await run_in_threadpool(_get_completed_outputs, job_id)
 
 
+def _request_cancellation(job_id: UUID) -> dict | None:
+    with db_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            f"SELECT Status, CancelRequested FROM {JOB_TABLE} WITH (UPDLOCK, HOLDLOCK) WHERE JobId = ?",
+            str(job_id),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            connection.commit()
+            return None
+        status, requested = row
+        if status in {"queued", "processing"}:
+            cursor.execute(
+                f"""
+                UPDATE {JOB_TABLE}
+                SET CancelRequested = 1,
+                    Status = CASE WHEN Status = 'queued' THEN 'cancelled' ELSE Status END,
+                    Phase = CASE WHEN Status = 'queued' THEN 'cancelled' ELSE 'cancellation_requested' END,
+                    CompletedAt = CASE WHEN Status = 'queued' THEN SYSUTCDATETIME() ELSE CompletedAt END,
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE JobId = ?
+                """,
+                str(job_id),
+            )
+            if status == "queued":
+                _cancel_pending_accounts(cursor, job_id)
+                status = "cancelled"
+            requested = True
+        connection.commit()
+        return {"JobId": job_id, "Status": status, "CancelRequested": bool(requested)}
+
+
+async def request_cancellation(job_id: UUID) -> dict | None:
+    return await run_in_threadpool(_request_cancellation, job_id)
+
+
+def _get_cancellation_state(job_id: UUID, worker_id: str) -> bool | None:
+    with db_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            f"""SELECT CancelRequested FROM {JOB_TABLE}
+                WHERE JobId = ? AND WorkerId = ? AND Status = 'processing'""",
+            str(job_id), worker_id,
+        )
+        row = cursor.fetchone()
+        # None means the worker no longer owns this job; stop its work as well.
+        return bool(row[0]) if row is not None else None
+
+
+async def get_cancellation_state(job_id: UUID, worker_id: str) -> bool | None:
+    return await run_in_threadpool(_get_cancellation_state, job_id, worker_id)
+
+
+def _cancel_pending_accounts(cursor, job_id: UUID) -> None:
+    cursor.execute(
+        f"""UPDATE {ACCOUNT_TABLE}
+            SET Status = 'cancelled', CompletedAt = SYSUTCDATETIME(), UpdatedAt = SYSUTCDATETIME()
+            WHERE JobId = ? AND Status NOT IN ('completed', 'failed', 'cancelled')""",
+        str(job_id),
+    )
+
+
 def _claim_next_job(worker_id: str) -> dict | None:
     allow_scheduled = settings.ENVIRONMENT.strip().lower() != "local"
     with db_connection() as connection:
@@ -240,6 +303,7 @@ def _claim_next_job(worker_id: str) -> dict | None:
             WHERE Status = 'processing'
               AND LeaseUntil < SYSUTCDATETIME()
               AND AttemptCount >= 3
+              AND CancelRequested = 0
               AND (TriggerSource = 'manual' OR ? = 1)
             """,
             allow_scheduled,
@@ -256,7 +320,7 @@ def _claim_next_job(worker_id: str) -> dict | None:
                     (
                         Status = 'processing'
                         AND LeaseUntil < SYSUTCDATETIME()
-                        AND AttemptCount < 3
+                        AND (AttemptCount < 3 OR CancelRequested = 1)
                     ))
                     AND (TriggerSource = 'manual' OR ? = 1)
                 ORDER BY CreatedAt
@@ -320,7 +384,8 @@ def _update_phase(job_id: UUID, worker_id: str, phase: str) -> None:
         connection.execute(
             f"""
             UPDATE {JOB_TABLE}
-            SET Phase = ?, UpdatedAt = SYSUTCDATETIME()
+            SET Phase = CASE WHEN CancelRequested = 1 THEN 'cancellation_requested' ELSE ? END,
+                UpdatedAt = SYSUTCDATETIME()
             WHERE JobId = ?
               AND WorkerId = ?
               AND Status = 'processing'
@@ -418,6 +483,7 @@ def _record_account_result(
               AND CustomerNumber = ?
               AND Status <> 'completed'
               AND Status <> 'failed'
+              AND Status <> 'cancelled'
             """,
             status,
             reason,
@@ -461,58 +527,50 @@ async def record_account_result(
     )
 
 
-def _complete_job(job_id: UUID, worker_id: str) -> None:
+def _finish_job(job_id: UUID, worker_id: str, message: str | None = None, cancel_only: bool = False) -> None:
     with db_connection() as connection:
-        connection.execute(
+        cursor = connection.cursor()
+        cursor.execute(
             f"""
             UPDATE {JOB_TABLE}
             SET
                 Status = CASE
+                    WHEN CancelRequested = 1 THEN 'cancelled'
+                    WHEN ? = 1 THEN 'failed'
                     WHEN FailedCount = 0 THEN 'completed'
                     ELSE 'partially_completed'
                 END,
-                Phase = 'finished',
+                Phase = CASE WHEN CancelRequested = 1 THEN 'cancelled'
+                             WHEN ? = 1 THEN 'failed' ELSE 'finished' END,
+                ErrorMessage = CASE WHEN CancelRequested = 1 THEN NULL ELSE ? END,
                 CompletedAt = SYSUTCDATETIME(),
                 UpdatedAt = SYSUTCDATETIME(),
                 LeaseUntil = NULL,
                 LastHeartbeatAt = SYSUTCDATETIME()
+            OUTPUT inserted.Status
             WHERE JobId = ?
               AND WorkerId = ?
               AND Status = 'processing'
+              AND (? = 0 OR CancelRequested = 1)
             """,
+            message is not None, message is not None, message,
             str(job_id),
             worker_id,
+            cancel_only,
         )
+        row = cursor.fetchone()
+        if row is not None and row[0] == "cancelled":
+            _cancel_pending_accounts(cursor, job_id)
         connection.commit()
 
 
 async def complete_job(job_id: UUID, worker_id: str) -> None:
-    await run_in_threadpool(_complete_job, job_id, worker_id)
-
-
-def _fail_job(job_id: UUID, worker_id: str, message: str) -> None:
-    with db_connection() as connection:
-        connection.execute(
-            f"""
-            UPDATE {JOB_TABLE}
-            SET
-                Status = 'failed',
-                Phase = 'failed',
-                ErrorMessage = ?,
-                CompletedAt = SYSUTCDATETIME(),
-                UpdatedAt = SYSUTCDATETIME(),
-                LeaseUntil = NULL,
-                LastHeartbeatAt = SYSUTCDATETIME()
-            WHERE JobId = ?
-              AND WorkerId = ?
-              AND Status = 'processing'
-            """,
-            message,
-            str(job_id),
-            worker_id,
-        )
-        connection.commit()
+    await run_in_threadpool(_finish_job, job_id, worker_id)
 
 
 async def fail_job(job_id: UUID, worker_id: str, message: str) -> None:
-    await run_in_threadpool(_fail_job, job_id, worker_id, message)
+    await run_in_threadpool(_finish_job, job_id, worker_id, message)
+
+
+async def cancel_job(job_id: UUID, worker_id: str) -> None:
+    await run_in_threadpool(_finish_job, job_id, worker_id, None, True)

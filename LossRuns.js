@@ -206,7 +206,7 @@ export default function LossRuns() {
   };
 
   return (
-    <Grid container spacing={2} sx={{ display: "grid", placeItems: "center" }}>
+    <Grid container spacing={2} sx={{ width: "100%", minWidth: 0 }}>
       <FormControl sx={{ minWidth: 220, alignSelf: "start" }}>
         <InputLabel id="loss-run-business-label">Loss Run For</InputLabel>
         <Select labelId="loss-run-business-label" label="Loss Run For" value={businessType}
@@ -249,8 +249,8 @@ export default function LossRuns() {
         download completed reports. If another report is running, the scheduled
         run will wait.
       </Alert>}
-      <Grid container spacing={1}>
-        <Grid size={2}>
+      <Grid container spacing={2} size={12} sx={{ alignItems: "flex-start", minWidth: 0 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 2 }} sx={{ minWidth: 0 }}>
           <FormControl fullWidth>
             <InputLabel id="report-type-label">Report Type</InputLabel>
             <Select
@@ -265,7 +265,7 @@ export default function LossRuns() {
             </Select>
           </FormControl>
         </Grid>
-        {!isAffinity && <Grid size={4}>
+        {!isAffinity && <Grid size={{ xs: 12, sm: 6, lg: 4 }} sx={{ minWidth: 0 }}>
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DatePicker
               label="Loss date from (optional)"
@@ -273,6 +273,7 @@ export default function LossRuns() {
               onChange={(newValue) => setLossDateFrom(newValue)}
               slotProps={{
                 textField: {
+                  fullWidth: true,
                   helperText:
                     "Includes losses from this date through the report date, plus older open claims and claims with outstanding loss reserves. Applies to all accounts in this request. Leave blank for default history.",
                 },
@@ -281,13 +282,13 @@ export default function LossRuns() {
             />
           </LocalizationProvider>
         </Grid>}
-        <Grid size={3}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }} sx={{ minWidth: 0 }}>
           <FormControl
             component="fieldset"
             sx={{
               display: "flex",
               flexDirection: "column",
-              alignItems: "center",
+              alignItems: { xs: "flex-start", lg: "center" },
               gap: 1,
             }}
           >
@@ -308,7 +309,7 @@ export default function LossRuns() {
             </RadioGroup>
           </FormControl>
         </Grid>
-        <Grid size={3} sx={{ display: "flex", gap: 1 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }} sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "flex-start", "& .MuiButton-root": { minHeight: 40 } }}>
           {!(lossRunAll || (!lossRunAll && selectedIds.length > 0)) ? (
             <Tooltip
               title={isAffinity ? "Please select a program first" : "Please select an account first"}
@@ -357,12 +358,12 @@ export default function LossRuns() {
           size={12}
           sx={{
             display: "flex",
-            direction: "row",
+            flexDirection: "row",
             justifyContent: "center",
             mt: 1,
           }}
         >
-          <Grid size={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <FormControl fullWidth>
               <InputLabel>Search By</InputLabel>
               <Select
@@ -382,7 +383,7 @@ export default function LossRuns() {
             </FormControl>
           </Grid>
 
-          <Grid size={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <TextField
               fullWidth
               label={`Filter by ${dynamicSearchBy}`}
@@ -396,9 +397,12 @@ export default function LossRuns() {
 
       {!lossRunAll && (
         <Grid
+          size={12}
           sx={{
             height: 380,
             width: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -408,7 +412,7 @@ export default function LossRuns() {
           }}
         >
           {loading === "fetching" ? (
-            <Loader size={40} height={500} />
+            <Loader size={40} height={360} />
           ) : (
             <DataGrid
               key={`${businessType}-${searchBy}-${lossRunAll}`}

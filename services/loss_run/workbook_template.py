@@ -9,6 +9,10 @@ from openpyxl import load_workbook
 from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, TwoCellAnchor
 from openpyxl.utils.cell import get_column_letter, range_boundaries
 
+from services.loss_run.claim_threshold import (
+    THRESHOLD_FIELD,
+    configure_threshold_workbook,
+)
 from services.loss_run.excel_package import save_report_workbook
 
 NO_CLAIMS_MESSAGE = "No claims found for the selected reporting criteria"
@@ -57,9 +61,11 @@ def create_no_claims_workbook(
     report_type: str,
     loss_date_from: date | None,
     report_date: date | None,
+    claim_review_threshold=None,
 ) -> bytes:
     workbook = load_workbook(BytesIO(template_bytes))
     try:
+        configure_threshold_workbook(workbook, claim_review_threshold)
         headers = (
             {"Review": 4, "Claims Details": 1}
             if report_type == "claim_review"
@@ -80,6 +86,10 @@ def create_no_claims_workbook(
             sheet = workbook[name]
             sheet._pivots.clear()
             sheet._charts.clear()
+            for cell in sheet[header_row]:
+                if cell.value in {"Claims above 50K", "Claim Above 25K"}:
+                    cell.value = THRESHOLD_FIELD
+                    sheet.column_dimensions[get_column_letter(cell.column)].hidden = True
             for row in sheet.iter_rows(min_row=header_row + 1):
                 for cell in row:
                     cell.value = None

@@ -128,8 +128,14 @@ def test_job_updates_require_current_worker_and_processing_state(
 ):
     connection, _ = database
     asyncio.run(getattr(repository, method)(*arguments))
-    query, *values = connection.execute.call_args.args
-    assert tuple(values) == parameters
+    if method in {"complete_job", "fail_job"}:
+        query, *values = connection.cursor.return_value.execute.call_args.args
+        message = arguments[2] if method == "fail_job" else None
+        assert tuple(values) == (message is not None, message is not None, message, str(JOB_ID), "worker", False)
+        assert "WHEN CancelRequested = 1 THEN 'cancelled'" in query
+    else:
+        query, *values = connection.execute.call_args.args
+        assert tuple(values) == parameters
     assert "Status = 'processing'" in query
     assert "WorkerId = ?" in query
     connection.commit.assert_called_once()

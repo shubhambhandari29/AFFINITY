@@ -10,14 +10,14 @@ from core.models.loss_run.affinity.affinity_loss_run import (
     AffinityLossRunJobResponse,
     AffinityLossRunSelection,
 )
-from core.models.loss_run.loss_run_job import LossRunJobCreated
+from core.models.loss_run.loss_run_job import LossRunJobCreated, LossRunJobCancellation
 from services.auth_service import get_current_user_from_token
 from services.loss_run.affinity.affinity_loss_run_service import (
     create_affinity_loss_run_job,
     get_affinity_loss_run_programs,
 )
 from services.loss_run.loss_run_download_service import prepare_loss_run_download
-from services.loss_run.loss_run_job_service import get_loss_run_job, get_loss_run_jobs
+from services.loss_run.loss_run_job_service import cancel_loss_run_job, get_loss_run_job, get_loss_run_jobs
 
 router = APIRouter()
 CurrentUser = Annotated[dict, Depends(get_current_user_from_token)]
@@ -68,3 +68,8 @@ async def download_job(job_id: UUID, _current_user: CurrentUser):
         media_type=download.media_type,
         background=BackgroundTask(os.remove, download.path),
     )
+
+
+@router.post("/jobs/{job_id}/cancel", response_model=LossRunJobCancellation, status_code=202)
+async def cancel_job(job_id: UUID, _current_user: CurrentUser):
+    return await cancel_loss_run_job(job_id, "affinity")

@@ -305,6 +305,7 @@ def test_repository_persists_affinity_and_filters_jobs(monkeypatch):
 
 
 def test_worker_routes_affinity_without_calling_sac(monkeypatch):
+    monkeypatch.setattr(worker_module, "get_cancellation_state", AsyncMock(return_value=False))
     for name in [
         "complete_job",
         "fail_job",

@@ -19,6 +19,7 @@ from openpyxl.utils import get_column_letter
 from core.db_helpers import run_raw_query_async
 from services.loss_run.databricks_storage_service import DatabricksLossRunStorage
 from services.loss_run.excel_package import save_report_workbook
+from services.loss_run.loss_run_cancellation import LossRunCancellation, LossRunCancelled
 from services.loss_run.loss_run_job_repository import create_job, get_job
 
 logger = logging.getLogger(__name__)
@@ -51,8 +52,11 @@ DATE_COLUMNS = {
 }
 
 
-async def get_affinity_loss_run_programs() -> list[dict]:
-    rows = await run_raw_query_async("""
+async def get_affinity_loss_run_programs(
+    cancellation: LossRunCancellation | None = None,
+) -> list[dict]:
+    query = cancellation.run_query if cancellation else run_raw_query_async
+    rows = await query("""
         SELECT p.AcctAffinityProgramKey AS ProgramId, p.ProgramName,
                p.AcctStatus, p.LossRunDistFreq, a.AgentCode, a.AgentName
         FROM dbo.tblAcctAffinityProgram p
@@ -229,9 +233,14 @@ async def generate_affinity_loss_runs(
     on_phase,
     on_customers,
     on_result,
+    cancellation: LossRunCancellation | None = None,
 ):
+    query = cancellation.run_query if cancellation else run_raw_query_async
+    if cancellation:
+        cancellation.check()
     await on_phase("loading_accounts")
-    programs = await get_affinity_loss_run_programs()
+    programs = (await get_affinity_loss_run_programs(cancellation=cancellation)
+                if cancellation else await get_affinity_loss_run_programs())
     if program_ids is not None:
         requested = set(map(int, program_ids))
         programs = [
@@ -255,10 +264,14 @@ async def generate_affinity_loss_runs(
                 )
     if not programs:
         return
+    if cancellation:
+        cancellation.check()
     await on_phase("loading_template")
     template_started = perf_counter()
     storage = await run_in_threadpool(DatabricksLossRunStorage)
     template = await run_in_threadpool(storage.download_template, "affinity")
+    if cancellation:
+        cancellation.check()
     # Temporary diagnostic output: visible in standalone-worker terminals too,
     # without changing application-wide logging levels or environment settings.
     print(f"[AFFINITY TIMING] stage=template seconds={perf_counter() - template_started:.2f}", flush=True)
@@ -271,16 +284,22 @@ async def generate_affinity_loss_runs(
         stage = "claims_query"
         stage_started = program_started
         try:
+            if cancellation:
+                cancellation.check()
             await on_phase("querying_loss_run_data")
             params = [json.dumps(program["agentCodes"])]
             stage_started = perf_counter()
             print(f"[AFFINITY TIMING] program={key} stage={stage} started", flush=True)
-            claims = await run_raw_query_async(CLAIMS_QUERY, params)
+            claims = await query(CLAIMS_QUERY, params)
+            if cancellation:
+                cancellation.check()
             print(f"[AFFINITY TIMING] program={key} stage={stage} seconds={perf_counter() - stage_started:.2f} rows={len(claims)}", flush=True)
             stage = "record_only_query"
             stage_started = perf_counter()
             print(f"[AFFINITY TIMING] program={key} stage={stage} started", flush=True)
-            record_only = await run_raw_query_async(RECORD_ONLY_QUERY, params)
+            record_only = await query(RECORD_ONLY_QUERY, params)
+            if cancellation:
+                cancellation.check()
             print(f"[AFFINITY TIMING] program={key} stage={stage} seconds={perf_counter() - stage_started:.2f} rows={len(record_only)}", flush=True)
             await on_phase("generating_reports")
             stage = "workbook"
@@ -293,6 +312,8 @@ async def generate_affinity_loss_runs(
                 record_only,
                 report_date,
             )
+            if cancellation:
+                cancellation.check()
             print(f"[AFFINITY TIMING] program={key} stage={stage} seconds={perf_counter() - stage_started:.2f}", flush=True)
             safe_name = re.sub(
                 r'[<>:"/\\|?*\x00-\x1f]', "_", program["programName"]
@@ -304,7 +325,11 @@ async def generate_affinity_loss_runs(
                 storage.upload_report, filename, content, subdirectory=run_directory
             )
             print(f"[AFFINITY TIMING] program={key} stage={stage} seconds={perf_counter() - stage_started:.2f}", flush=True)
+        except LossRunCancelled:
+            raise
         except Exception:
+            if cancellation:
+                cancellation.check()
             print(f"[AFFINITY TIMING] program={key} stage={stage} failed_after={perf_counter() - stage_started:.2f}s", flush=True)
             logger.exception("Affinity loss run failed for program %s", key)
             await on_result(
@@ -315,5 +340,8 @@ async def generate_affinity_loss_runs(
             )
         else:
             await on_result(key, True, None, path)
+            # Preserve an uploaded file before acknowledging cancellation.
+            if cancellation:
+                cancellation.check()
         finally:
             print(f"[AFFINITY TIMING] program={key} stage=program_total seconds={perf_counter() - program_started:.2f}", flush=True)

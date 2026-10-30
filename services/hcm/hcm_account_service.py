@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from fastapi import HTTPException
+from pydantic import TypeAdapter
 
 from core.date_utils import format_records_dates, normalize_payload_dates
 from core.db_helpers import (
@@ -34,14 +35,33 @@ def _sanitize_account_record(record: dict[str, Any]) -> dict[str, Any]:
 
 async def get_hcm_account(query_params: dict[str, Any]):
     try:
+        query_params = dict(query_params)
+        include_retired = TypeAdapter(bool).validate_python(query_params.pop("include_retired", False))
         filters = sanitize_filters(query_params)
         records = await fetch_records_async(table=TABLE_NAME, filters=filters)
+        if not include_retired:
+            records = [
+                record for record in records
+                if str(record.get("Stage", "")).strip().lower() != "retired"
+            ]
         return format_records_dates(records, fields=_DATE_FIELDS)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
     except Exception as e:
         logger.warning(f"Error fetching HCM account records - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
+
+
+async def get_retired_hcm_accounts():
+    """Return records with Stage Retired, regardless of status or submission state."""
+    try:
+        records = await fetch_records_async(table=TABLE_NAME, filters={"Stage": "Retired"})
+        return format_records_dates(
+            records, fields=_DATE_FIELDS | {"UpdateDateTime", "UpdatDateTime"}
+        )
+    except Exception as exc:
+        logger.warning(f"Error fetching retired HCM accounts - {str(exc)}")
+        raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc
 
 
 async def upsert_hcm_account(data: dict[str, Any]):

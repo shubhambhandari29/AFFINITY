@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from api.loss_run.affinity import affinity_loss_run as api
+from services.loss_run import loss_run_job_service as service
 
 
 @pytest.fixture
@@ -87,3 +88,25 @@ def test_wrong_domain_download_rejected_before_storage(client, monkeypatch):
     monkeypatch.setattr(api, "prepare_loss_run_download", download)
     assert client.get(f"/affinity_loss_run/jobs/{uuid4()}/download").status_code == 404
     download.assert_not_awaited()
+
+
+@pytest.mark.parametrize("state", ["processing", "cancelled"])
+def test_affinity_cancel_endpoint_returns_domain_and_flag(client, monkeypatch, state):
+    job_id = uuid4()
+    monkeypatch.setattr(service, "get_job", AsyncMock(return_value={"BusinessType": "affinity"}))
+    mutation = AsyncMock(return_value={"Status": state, "CancelRequested": True})
+    monkeypatch.setattr(service, "request_cancellation", mutation)
+    response = client.post(f"/affinity_loss_run/jobs/{job_id}/cancel")
+    assert response.status_code == 202
+    assert response.json()["businessType"] == "affinity"
+    assert response.json()["cancelRequested"] is True
+    assert response.json()["status"] == state
+    mutation.assert_awaited_once_with(job_id)
+
+
+def test_affinity_cancel_rejects_sac_job(client, monkeypatch):
+    monkeypatch.setattr(service, "get_job", AsyncMock(return_value={"BusinessType": "sac"}))
+    mutation = AsyncMock()
+    monkeypatch.setattr(service, "request_cancellation", mutation)
+    assert client.post(f"/affinity_loss_run/jobs/{uuid4()}/cancel").status_code == 404
+    mutation.assert_not_awaited()

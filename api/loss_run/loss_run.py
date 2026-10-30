@@ -7,10 +7,15 @@ from starlette.background import BackgroundTask
 from starlette.responses import FileResponse
 
 from core.models.loss_run.loss_run import LossRunOptions, LossRunSelection
-from core.models.loss_run.loss_run_job import LossRunJobCreated, LossRunJobResponse
+from core.models.loss_run.loss_run_job import (
+    LossRunJobCancellation,
+    LossRunJobCreated,
+    LossRunJobResponse,
+)
 from services.auth_service import get_current_user_from_token
 from services.loss_run.loss_run_download_service import prepare_loss_run_download
 from services.loss_run.loss_run_job_service import (
+    cancel_loss_run_job,
     create_loss_run_job,
     get_loss_run_job,
     get_loss_run_jobs,
@@ -96,3 +101,12 @@ async def download_loss_run_job(
         media_type=download.media_type,
         background=BackgroundTask(os.remove, download.path),
     )
+
+
+@router.post("/jobs/{job_id}/cancel", response_model=LossRunJobCancellation,
+             status_code=status.HTTP_202_ACCEPTED)
+async def cancel_loss_run_job_request(
+    job_id: UUID,
+    _current_user: Annotated[dict, Depends(get_current_user_from_token)],
+):
+    return await cancel_loss_run_job(job_id)

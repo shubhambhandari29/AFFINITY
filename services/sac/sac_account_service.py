@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 from fastapi import HTTPException
+from pydantic import TypeAdapter
 
 from core.date_utils import (
     format_records_dates,
@@ -53,12 +54,15 @@ def _exclude_retired_stage(records: list[dict[str, Any]]) -> list[dict[str, Any]
 
 async def get_sac_account(query_params: dict[str, Any]):
     try:
+        query_params = dict(query_params)
+        include_retired = TypeAdapter(bool).validate_python(query_params.pop("include_retired", False))
         filters = sanitize_filters(query_params, ALLOWED_FILTERS)
         branch_filter = filters.pop("BranchName", None)
 
         if not branch_filter:
             records = await fetch_records_async(table=TABLE_NAME, filters=filters)
-            records = _exclude_retired_stage(records)
+            if not include_retired:
+                records = _exclude_retired_stage(records)
             if not records:
                 return []
             return format_records_dates(records, fields=_DATE_FIELDS)
@@ -68,7 +72,8 @@ async def get_sac_account(query_params: dict[str, Any]):
         # Fall back to simple filtering if nothing usable came from the branch filter.
         if not branch_terms:
             records = await fetch_records_async(table=TABLE_NAME, filters=filters)
-            records = _exclude_retired_stage(records)
+            if not include_retired:
+                records = _exclude_retired_stage(records)
             if not records:
                 return []
             return format_records_dates(records, fields=_DATE_FIELDS)
@@ -89,7 +94,8 @@ async def get_sac_account(query_params: dict[str, Any]):
             query += " WHERE " + " AND ".join(clauses)
 
         records = await run_raw_query_async(query, list(params))
-        records = _exclude_retired_stage(records)
+        if not include_retired:
+            records = _exclude_retired_stage(records)
         if not records:
             return []
         return format_records_dates(records, fields=_DATE_FIELDS)
@@ -98,6 +104,19 @@ async def get_sac_account(query_params: dict[str, Any]):
     except Exception as e:
         logger.warning(f"Error fetching SAC account List - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e
+
+async def get_retired_sac_accounts():
+    """Return accounts with Stage Retired, regardless of status or submission state."""
+    try:
+        records = await fetch_records_async(
+            table=TABLE_NAME, filters={"Stage": "Retired"}
+        )
+        return format_records_dates(
+            records, fields=_DATE_FIELDS | {"UpdateDateTime", "UpdatDateTime"}
+        )
+    except Exception as exc:
+        logger.warning(f"Error fetching retired SAC accounts - {str(exc)}")
+        raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc
 
 
 async def upsert_sac_account(data: dict[str, Any]):

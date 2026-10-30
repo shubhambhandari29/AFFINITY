@@ -9,11 +9,17 @@ from uuid import UUID, uuid4
 from services.loss_run.affinity.affinity_loss_run_service import (
     generate_affinity_loss_runs,
 )
+from services.loss_run.loss_run_cancellation import (
+    LossRunCancellation,
+    LossRunCancelled,
+)
 from services.loss_run.loss_run_job_repository import (
+    cancel_job,
     claim_next_job,
     complete_job,
     fail_job,
     get_account_numbers,
+    get_cancellation_state,
     record_account_result,
     update_heartbeat,
     update_phase,
@@ -27,6 +33,7 @@ logger = logging.getLogger(__name__)
 POLL_INTERVAL_SECONDS = 10
 SCHEDULE_CHECK_INTERVAL_SECONDS = 60
 HEARTBEAT_INTERVAL_SECONDS = 60
+CANCELLATION_CHECK_INTERVAL_SECONDS = 5
 
 
 class LossRunWorker:
@@ -83,9 +90,13 @@ class LossRunWorker:
     async def _process_job(self, job: dict) -> None:
         job_id = UUID(str(job["JobId"]))
         job_type = str(job["JobType"])
-        heartbeat = asyncio.create_task(self._heartbeat(job_id))
+        cancellation = LossRunCancellation()
+        heartbeat = None
 
         async def on_phase(phase: str) -> None:
+            if await get_cancellation_state(job_id, self.worker_id) is not False:
+                cancellation.request()
+            cancellation.check()
             await update_phase(job_id, self.worker_id, phase)
 
         async def on_customers(customers: list[dict]) -> None:
@@ -104,8 +115,17 @@ class LossRunWorker:
                 reason,
                 output_path,
             )
+            # Check at account boundaries as well as polling, so a batch of
+            # quick workbooks does not start more accounts during the poll gap.
+            if await get_cancellation_state(job_id, self.worker_id) is not False:
+                cancellation.request()
 
         try:
+            state = await get_cancellation_state(job_id, self.worker_id)
+            if state is not False:
+                cancellation.request()
+            cancellation.check()
+            heartbeat = asyncio.create_task(self._heartbeat(job_id, cancellation))
             if job.get("PolicyEffectiveDateFrom") and not job.get("LossDateFrom"):
                 await fail_job(
                     job_id, self.worker_id,
@@ -113,7 +133,8 @@ class LossRunWorker:
                 )
                 return
             numbers = None if job_type == "all" else await get_account_numbers(job_id)
-            callbacks = dict(on_phase=on_phase, on_customers=on_customers, on_result=on_result)
+            callbacks = dict(on_phase=on_phase, on_customers=on_customers, on_result=on_result,
+                             cancellation=cancellation)
             if job.get("BusinessType", "sac") == "affinity":
                 await generate_affinity_loss_runs(numbers, **callbacks)
             else:
@@ -123,7 +144,10 @@ class LossRunWorker:
                     loss_date_from=job.get("LossDateFrom"),
                     **callbacks,
                 )
+            cancellation.check()
             await complete_job(job_id, self.worker_id)
+        except LossRunCancelled:
+            await cancel_job(job_id, self.worker_id)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -134,15 +158,26 @@ class LossRunWorker:
                 "Loss-run generation failed. Check application logs for details.",
             )
         finally:
-            heartbeat.cancel()
-            with suppress(asyncio.CancelledError):
-                await heartbeat
+            if heartbeat:
+                heartbeat.cancel()
+                with suppress(asyncio.CancelledError):
+                    await heartbeat
 
-    async def _heartbeat(self, job_id: UUID) -> None:
+    async def _heartbeat(self, job_id: UUID, cancellation: LossRunCancellation) -> None:
+        next_heartbeat = monotonic() + HEARTBEAT_INTERVAL_SECONDS
         while True:
-            await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
+            await asyncio.sleep(CANCELLATION_CHECK_INTERVAL_SECONDS)
             try:
-                await update_heartbeat(job_id, self.worker_id)
+                state = await get_cancellation_state(job_id, self.worker_id)
+                if state is None:
+                    cancellation.request()
+                    return
+                if state:
+                    cancellation.request()
+                if monotonic() >= next_heartbeat:
+                    # Keep the lease alive while the driver acknowledges cancel.
+                    await update_heartbeat(job_id, self.worker_id)
+                    next_heartbeat = monotonic() + HEARTBEAT_INTERVAL_SECONDS
             except Exception:
                 logger.exception("Failed to renew lease for loss-run job %s", job_id)
 
