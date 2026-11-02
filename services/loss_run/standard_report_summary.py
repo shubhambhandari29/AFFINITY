@@ -4,11 +4,11 @@ from copy import copy
 from datetime import date, datetime
 from decimal import Decimal
 
-from openpyxl.chart import BarChart, Reference
+from openpyxl.chart import BarChart, LineChart, Reference
 from openpyxl.pivot.cache import CacheField, WorksheetSource
 from openpyxl.pivot.fields import DateTimeField, Index, Missing, Number, Text
 from openpyxl.pivot.record import Record, RecordList
-from openpyxl.pivot.table import FieldItem
+from openpyxl.pivot.table import FieldItem, RowColItem
 from openpyxl.utils import get_column_letter
 
 from services.loss_run.pivot_cache import (
@@ -41,7 +41,8 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
     values = []
     for row_index, claim in enumerate(claims, 2):
         claim = dict(claim)
-        number = claim["Claim Number"]
+        # Count a claim once per policy year, even with multiple exposures.
+        number = (claim.get("Policy Year"), str(claim["Claim Number"]).casefold())
         claim["Distinct Claim Helper"] = int(number not in seen)
         seen.add(number)
         row = [claim.get(header) for header in headers]
@@ -137,6 +138,20 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
         for field in pivot.dataFields:
             field.baseField = -1
             field.baseItem = 1048832
+        is_summary = sheet.title == "Summary By Policy Year"
+        year_field = next(
+            (i for i, f in enumerate(pivot.rowFields) if headers[f.x] == "Policy Year"),
+            None,
+        )
+        year_subtotals = is_summary and year_field == 0
+        if year_subtotals:
+            year = pivot.pivotFields[pivot.rowFields[0].x]
+            year.defaultSubtotal = True
+            year.subtotalTop = False
+            year.sortType = "descending"
+            year.items = [*year.items, FieldItem(t="default")]
+        pivot.compact = False
+        pivot.compactData = False
         groups = {}
         for row, item_indexes in zip(values, indexes, strict=True):
             key = tuple(item_indexes[field.x] for field in pivot.rowFields)
@@ -158,6 +173,8 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 cell.value = None
         rows = []
         row_paths = []
+        summary_items = []
+        total_rows = set()
         grand = [Decimal(0) for _ in pivot.dataFields]
 
         def labels(key, row_fields=pivot.rowFields):
@@ -166,26 +183,67 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 for field, ref in zip(row_fields, key, strict=True)
             ]
 
-        for key in sorted(
+        ordered = sorted(
             groups, key=lambda k: tuple(str(v or "").casefold() for v in labels(k))
-        ):
+        )
+        if year_subtotals:
+            # Stable secondary ordering keeps policies/claims grouped within year.
+            ordered.sort(key=lambda k: str(labels(k)[0] or ""), reverse=True)
+        previous_labels = []
+        year_totals = [Decimal(0) for _ in pivot.dataFields]
+
+        def finish_year(key):
+            rows.append([
+                f"{labels(key)[0]} Total",
+                *([None] * (len(pivot.rowFields) - 1)), *year_totals,
+            ])
+            total_rows.add(len(rows) - 1)
+            summary_items.append(RowColItem(t="default", x=[Index(v=key[0])]))
+
+        for position, key in enumerate(ordered):
             totals, refs = groups[key]
-            rows.append([*labels(key), *totals])
+            current_labels = labels(key)
+            shown = list(current_labels)
+            if is_summary:
+                # The burst report retains exposure detail but blanks repeated
+                # parent labels (year/policy/claim), rather than repeating claims.
+                for column, value in enumerate(current_labels):
+                    if previous_labels[:column + 1] != current_labels[:column + 1]:
+                        break
+                    shown[column] = None
+                previous_labels = current_labels
+            rows.append([*shown, *totals])
             row_paths.append(refs)
+            summary_items.append(RowColItem(x=[Index(v=v) for v in refs]))
             grand = [a + b for a, b in zip(grand, totals, strict=True)]
+            year_totals = [a + b for a, b in zip(year_totals, totals, strict=True)]
+            if year_subtotals and (
+                position == len(ordered) - 1 or ordered[position + 1][0] != key[0]
+            ):
+                finish_year(key)
+                year_totals = [Decimal(0) for _ in pivot.dataFields]
+                previous_labels = []
         rows.append(["Grand Total", *([None] * (len(pivot.rowFields) - 1)), *grand])
+        total_rows.add(len(rows) - 1)
         for index, row in enumerate(rows, start):
             for column, value in enumerate(row, 1):
                 cell = sheet.cell(index, column)
                 if column <= len(styles):
                     cell._style = copy(styles[column - 1])
+                if index - start in total_rows:
+                    font = copy(cell.font)
+                    font.bold = True
+                    cell.font = font
                 cell.value = value
                 if isinstance(value, str):
                     cell.data_type = "s"
         end = start + len(rows) - 1
         if sheet.max_row > end:
             sheet.delete_rows(end + 1, sheet.max_row - end)
-        pivot.rowItems = pivot_row_items(row_paths)
+        pivot.rowItems = (
+            summary_items + [RowColItem(t="grand", x=[Index(v=0)])]
+            if year_subtotals else pivot_row_items(row_paths)
+        )
         pivot.location.ref = f"A{start - 1}:{get_column_letter(len(rows[-1]))}{end}"
         pivot.location.firstHeaderRow = 0
         pivot.location.firstDataRow = 1
@@ -195,14 +253,27 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
             sheet._charts.clear()
             if groups:
                 chart = BarChart()
-                chart.title = "Total Incurred by Policy Year"
-                chart.y_axis.title = "Total Incurred"
+                chart.title = "Claims and Total Incurred by Policy Year"
+                chart.y_axis.title = "Number of Claims"
                 chart.x_axis.title = "Policy Year"
                 chart.add_data(
-                    Reference(sheet, min_col=3, min_row=1, max_row=end - 1),
+                    Reference(sheet, min_col=2, min_row=1, max_row=end - 1),
                     titles_from_data=True,
                 )
                 chart.set_categories(
                     Reference(sheet, min_col=1, min_row=2, max_row=end - 1)
                 )
+                incurred = LineChart()
+                incurred.add_data(
+                    Reference(sheet, min_col=3, min_row=1, max_row=end - 1),
+                    titles_from_data=True,
+                )
+                incurred.set_categories(
+                    Reference(sheet, min_col=1, min_row=2, max_row=end - 1)
+                )
+                incurred.y_axis.axId = 200
+                incurred.y_axis.title = "Total Incurred ($)"
+                incurred.y_axis.numFmt = '$#,##0'
+                incurred.y_axis.crosses = "max"
+                chart += incurred
                 sheet.add_chart(chart, "E2")

@@ -93,6 +93,70 @@ def test_summary_source_does_not_rescan_dimensions_for_each_claim(monkeypatch):
     wb.close()
 
 
+def test_standard_summary_matches_burst_grouping_and_year_totals():
+    wb = template()
+    pivot = wb["Summary By Policy Year"]._pivots[0]
+    pivot.cache.cacheFields.extend([CacheField(name="Policy"), CacheField(name="Exposure")])
+    # The two sheets share a cache, just as they do in the standard template.
+    for name in ("Summary By Policy Year", "Chart"):
+        wb[name]._pivots[0].pivotFields.extend([PivotField(), PivotField()])
+    pivot.rowFields = [RowColField(x=i) for i in (0, 4, 1, 5)]
+    for i in (0, 4, 1, 5):
+        pivot.pivotFields[i].axis = "axisRow"
+    claims = [
+        {"Policy Year": 2024, "Policy": "P0", "Claim Number": "OLD", "Exposure": "01", "Total Incurred": 5},
+        {"Policy Year": 2025, "Policy": "P2", "Claim Number": "B", "Exposure": "01", "Total Incurred": 40},
+        {"Policy Year": 2025, "Policy": "P1", "Claim Number": "A", "Exposure": "02", "Total Incurred": 20},
+        {"Policy Year": 2025, "Policy": "P1", "Claim Number": "A", "Exposure": "01", "Total Incurred": 10},
+    ]
+    populate_standard_summaries(wb, claims)
+    assert list(wb["Summary By Policy Year"].values)[6:] == [
+        (2025, "P1", "A", "01", 0, Decimal(10)),
+        (None, None, None, "02", 1, Decimal(20)),
+        (None, "P2", "B", "01", 1, Decimal(40)),
+        ("2025 Total", None, None, None, 2, Decimal(70)),
+        (2024, "P0", "OLD", "01", 1, Decimal(5)),
+        ("2024 Total", None, None, None, 1, Decimal(5)),
+        ("Grand Total", None, None, None, 3, Decimal(75)),
+    ]
+    assert wb["Summary By Policy Year"]["A10"].font.bold
+    assert pivot.pivotFields[0].sortType == "descending"
+    assert pivot.pivotFields[0].defaultSubtotal
+    assert not pivot.pivotFields[0].subtotalTop
+    assert [r.t for r in pivot.rowItems] == [
+        "data", "data", "data", "default", "data", "default", "grand",
+    ]
+    output = BytesIO()
+    wb.save(output)
+    reopened = load_workbook(output)
+    assert list(reopened["Summary By Policy Year"].values)[6:] == list(wb["Summary By Policy Year"].values)[6:]
+    reopened.close()
+    wb.close()
+
+
+def test_standard_chart_serializes_claim_count_and_incurred_on_separate_axes():
+    wb = template()
+    populate_standard_summaries(wb, [
+        {"Policy Year": 2025, "Claim Number": "A", "Total Incurred": 10},
+        {"Policy Year": 2025, "Claim Number": "A", "Total Incurred": 20},
+        {"Policy Year": 2024, "Claim Number": "A", "Total Incurred": 5},
+    ])
+    assert list(wb["Chart"].values)[1:] == [
+        (2024, 1, Decimal(5)), (2025, 1, Decimal(30)), ("Grand Total", 2, Decimal(35)),
+    ]
+    output = BytesIO()
+    wb.save(output)
+    with ZipFile(output) as archive:
+        chart = ET.fromstring(archive.read("xl/charts/chart1.xml"))
+        ns = {"c": "http://schemas.openxmlformats.org/drawingml/2006/chart"}
+        assert len(chart.findall(".//c:barChart/c:ser", ns)) == 1
+        assert len(chart.findall(".//c:lineChart/c:ser", ns)) == 1
+        formulas = [n.text for n in chart.findall(".//c:ser/c:val//c:f", ns)]
+        assert formulas == ["'Chart'!$B$2:$B$3", "'Chart'!$C$2:$C$3"]
+        assert len(chart.findall(".//c:valAx", ns)) == 2
+    wb.close()
+
+
 @pytest.mark.parametrize(
     "items,expected",
     [
