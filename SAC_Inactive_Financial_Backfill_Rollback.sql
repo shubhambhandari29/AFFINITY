@@ -7,7 +7,7 @@ SET XACT_ABORT ON;
 -- Does not remove pre-existing rows. Both sets of audit tables must be retained.
 -- Refuses rollback if an inserted row has since changed or disappeared.
 -- Audit tables are kept for review; rerunning after rollback will fail safely.
-DECLARE @ApplyRollback bit = 0;
+DECLARE @ApplyRollback bit = 1;
 IF CONVERT(nvarchar(256), SERVERPROPERTY('ServerName')) NOT LIKE 'clms-preprd-sqlmanagedinstance%'
  OR DB_NAME() <> 'CLMAA_SpecialAccounts'
     THROW 50100, 'PREPROD only.', 1;
