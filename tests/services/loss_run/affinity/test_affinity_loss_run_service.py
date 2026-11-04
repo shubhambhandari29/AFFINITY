@@ -37,18 +37,19 @@ def test_revised_workbook_claim_totals_and_cover(amounts, expected):
         row.update({"Claim Number": "claim-1", "Exposure": exposure,
                     "Incurred w/o ALAE": amount})
         records.append(row)
-    program = dict(PROGRAM, agentNames=["5701083: First Agent", "5701212: Second Agent"])
+    program = dict(PROGRAM, agentNames=["First Agent", "Second Agent"])
     output = load_workbook(BytesIO(service.create_affinity_workbook(
         template, program, records, [], date(2026, 10, 29)
     )))
-    assert output["Cover Page"]["B3"].value == "5701083: First Agent\n5701212: Second Agent"
+    assert output["Cover Page"]["B3"].value == "First Agent\nSecond Agent"
+    assert output["Cover Page"].row_dimensions[3].height >= 30
     assert output["Cover Page"]["B4"].value == PROGRAM["programName"]
     assert output["Cover Page"]["B5"].value.date() == date(2026, 10, 29)
     assert len(output["Cover Page"]._images) == 1
     for values in output["Claim Details"].iter_rows(min_row=2, values_only=True):
         row = dict(zip(headers, values))
         assert row["Whole Claim Incurred w/o ALAE"] == sum(amounts)
-        assert row["Claims Above $50k"] == expected
+        assert row["Claims above $50K"] == expected
     output.close()
     with pytest.raises(ValueError, match="Duplicate Affinity"):
         service.create_affinity_workbook(template, program, [records[0], records[0]], [], date.today())
@@ -63,6 +64,7 @@ def test_programs_group_and_deduplicate_agents(monkeypatch):
         ProgramName="Example Program",
         AcctStatus="Active",
         LossRunDistFreq="Quarterly",
+        AgentName="  Example Agent, Inc.  ",
     )
     query = AsyncMock(
         return_value=[dict(row, AgentCode=code) for code in ["001", "002", "001"]]
@@ -71,6 +73,7 @@ def test_programs_group_and_deduplicate_agents(monkeypatch):
     result = asyncio.run(service.get_affinity_loss_run_programs())
     assert len(result) == 1
     assert result[0]["agentCodes"] == ["001", "002"]
+    assert result[0]["agentNames"] == ["Example Agent, Inc."]
     assert "a.LossRunReq = 'Yes'" in query.call_args.args[0]
 
 
@@ -130,7 +133,7 @@ def test_template_headers_match_query_outputs():
         aliases = set(re.findall(r"\[([^]]+)\]", select))
         aliases |= set(re.findall(r"D\.(CLMNT_\w+)\s*,", select))
         expected = {cell.value for cell in workbook[sheet_name][1]} - {
-            "Lag Time", "Whole Claim Incurred w/o ALAE", "Claims Above $50k"
+            "Lag Time", "Whole Claim Incurred w/o ALAE", "Claims above $50K"
         }
         expected = {service.COLUMN_SOURCES.get(label, label) for label in expected}
         assert expected <= aliases, expected - aliases

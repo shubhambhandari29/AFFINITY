@@ -3,9 +3,35 @@ from openpyxl import load_workbook
 
 from scripts.update_affinity_template import (
     FINANCIAL_COLUMNS,
+    ALIASES,
+    REFERENCE,
     TEMPLATE,
     update_template,
 )
+
+
+def test_dimensions_match_client_without_copying_instruction_colours():
+    reference = load_workbook(REFERENCE)
+    template = load_workbook(TEMPLATE)
+    for row in range(1, 8):
+        assert template["Cover Page"].row_dimensions[row].height == reference["Cover Page"].row_dimensions[row].height
+    for column in ("A", "B"):
+        assert template["Cover Page"].column_dimensions[column].width == reference["Cover Page"].column_dimensions[column].width
+    for name in ("Claim Details", "Record Only"):
+        source = reference[name]
+        columns = {
+            ALIASES.get(str(c.value or "").strip(), str(c.value or "").strip()): c.column
+            for c in source[1]
+        }
+        for cell in template[name][1]:
+            assert cell.fill.fgColor.value not in {"FF92D050", "FFFFFF00", "FFFF0000"}
+            if cell.value == "Whole Claim Incurred w/o ALAE":
+                continue  # Approved additional column, absent from the example.
+            index = columns[cell.value]
+            width = next(d.width for d in source.column_dimensions.values() if d.min <= index <= d.max)
+            assert template[name].column_dimensions[cell.column_letter].width == width
+    reference.close()
+    template.close()
 
 
 def test_revised_layout_preserves_runtime_template_and_is_repeatable(tmp_path):
@@ -28,7 +54,7 @@ def test_revised_layout_preserves_runtime_template_and_is_repeatable(tmp_path):
         assert claims[19] == "Outstanding Loss Reserves"
         assert claims[29] == "Expense_Recovery"
         assert claims[30] == "Litigation Status"
-        assert claims[-2:] == ["Whole Claim Incurred w/o ALAE", "Claims Above $50k"]
+        assert claims[-2:] == ["Whole Claim Incurred w/o ALAE", "Claims above $50K"]
         for name in ("Claim Details", "Record Only"):
             sheet = workbook[name]
             headers = [cell.value for cell in sheet[1]]

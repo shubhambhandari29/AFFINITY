@@ -1,6 +1,12 @@
 AFFINITY REVISED REPORT - PREPROD VALIDATION
 
 CLIENT HEADER ALIGNMENT (November 2026)
+The cover displays distinct agent names only (producer codes remain in their
+own field). The threshold header is "Claims above $50K". Cover row heights and
+column widths, and detail column widths/header heights follow the example.
+Instruction colours are not copied. The actual generation date and approved
+whole-claim total column remain. Rebuild tooling reads the local client example
+for dimensions only; runtime generation needs only the Databricks template.
 The Excel headers now use "Outstanding Loss Reserves" and "Expense_Recovery"
 exactly as in the annotated client example. The backend maps the plural reserve
 label to the existing singular SQL field; Expense_Recovery already exists in

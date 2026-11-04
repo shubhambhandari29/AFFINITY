@@ -85,8 +85,8 @@ async def get_affinity_loss_run_programs(
         if code not in program["agentCodes"]:
             program["agentCodes"].append(code)
         name = str(row.get("AgentName") or "").strip()
-        if name and f"{code}: {name}" not in program["agentNames"]:
-            program["agentNames"].append(f"{code}: {name}")
+        if name and name not in program["agentNames"]:
+            program["agentNames"].append(name)
     return list(programs.values())
 
 
@@ -138,7 +138,10 @@ def create_affinity_workbook(template_bytes, program, claims, record_only, repor
             alignment = copy(cover["B3"].alignment)
             alignment.wrap_text = True
             cover["B3"].alignment = alignment
-            cover.row_dimensions[3].height = 15 * max(1, len(program.get("agentNames", [])))
+            cover.row_dimensions[3].height = max(
+                cover.row_dimensions[3].height or 30,
+                15 * max(1, len(program.get("agentNames", []))),
+            )
         program_cell, date_cell = ("B4", "B5") if revised else ("B3", "B4")
         cover[program_cell] = program["programName"]
         cover[program_cell].data_type = "s"
@@ -183,6 +186,7 @@ def create_affinity_workbook(template_bytes, program, claims, record_only, repor
                     total = claim_totals[str(row["Claim Number"]).strip()]
                     row["Whole Claim Incurred w/o ALAE"] = total
                     row["Claims Above $50k"] = "Yes" if total > Decimal("50000") else "No"
+                    row["Claims above $50K"] = row["Claims Above $50k"]
                 missing = set(headers) - set(row) - {"Lag Time"}
                 if missing:
                     raise ValueError(
