@@ -23,6 +23,8 @@ from services.loss_run.loss_run_cancellation import LossRunCancellation, LossRun
 from services.loss_run.loss_run_job_repository import create_job, get_job
 
 logger = logging.getLogger(__name__)
+# Client-facing labels need not rename deployed SQL view columns.
+COLUMN_SOURCES = {"Outstanding Loss Reserves": "Outstanding Loss Reserve"}
 CLAIMS_QUERY = """
     SELECT *
     FROM dbo.Affinity_Loss_Run_Claims
@@ -174,6 +176,9 @@ def create_affinity_workbook(template_bytes, program, claims, record_only, repor
             sheet.delete_rows(2, max(1, sheet.max_row - 1))
             for row_number, source in enumerate(records, 2):
                 row = dict(source)
+                for label, source_column in COLUMN_SOURCES.items():
+                    if label not in row and source_column in row:
+                        row[label] = row[source_column]
                 if revised and name == "Claim Details":
                     total = claim_totals[str(row["Claim Number"]).strip()]
                     row["Whole Claim Incurred w/o ALAE"] = total

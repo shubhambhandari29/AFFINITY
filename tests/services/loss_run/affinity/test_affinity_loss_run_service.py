@@ -132,6 +132,7 @@ def test_template_headers_match_query_outputs():
         expected = {cell.value for cell in workbook[sheet_name][1]} - {
             "Lag Time", "Whole Claim Incurred w/o ALAE", "Claims Above $50k"
         }
+        expected = {service.COLUMN_SOURCES.get(label, label) for label in expected}
         assert expected <= aliases, expected - aliases
         assert "?" not in query
         assert f"FROM dbo.{view_name}" in runtime_query
@@ -195,6 +196,33 @@ def test_workbook_preserves_financial_cents():
     for name in ("Incurred w/o ALAE", "ALAE Reserve", "ALAE Paid", "Total Incurred + ALAE"):
         assert Decimal(str(values[name])) == row[name]
     result.close()
+
+
+def test_client_labels_use_existing_view_fields_without_losing_cents():
+    template = (ROOT / "AffinityLossRunTemplate_Revised.xlsx").read_bytes()
+    workbook = load_workbook(BytesIO(template))
+    headers = [cell.value for cell in workbook["Claim Details"][1]]
+    workbook.close()
+    row = dict.fromkeys(service.COLUMN_SOURCES.get(label, label) for label in headers)
+    row.update({
+        "Claim Number": "test-claim", "Exposure": "01",
+        "Incurred w/o ALAE": 1500.25,
+        "Outstanding Loss Reserve": 1200.25,
+        "Expense_Recovery": -17.83,
+        "Producing Agent Name": "Do not display as a detail column",
+    })
+    output = load_workbook(BytesIO(service.create_affinity_workbook(
+        template, PROGRAM, [row], [], date.today()
+    )), data_only=True)
+    sheet = output["Claim Details"]
+    values = dict(zip([c.value for c in sheet[1]], [c.value for c in sheet[2]]))
+    assert values["Outstanding Loss Reserves"] == 1200.25
+    assert values["Expense_Recovery"] == -17.83
+    assert "Outstanding Loss Reserve" not in values
+    assert "Expense Recovery" not in values
+    assert "Producing Agent Name" not in values
+    assert "Outstanding Loss Reserves" not in row
+    output.close()
 
 
 def test_workbook_fills_revised_template_and_no_claims():

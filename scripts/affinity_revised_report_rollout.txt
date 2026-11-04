@@ -1,5 +1,16 @@
 AFFINITY REVISED REPORT - PREPROD VALIDATION
 
+CLIENT HEADER ALIGNMENT (November 2026)
+The Excel headers now use "Outstanding Loss Reserves" and "Expense_Recovery"
+exactly as in the annotated client example. The backend maps the plural reserve
+label to the existing singular SQL field; Expense_Recovery already exists in
+the deployed view. No SQL/schema changes are required for this label update.
+Deploy/restart the updated backend and worker BEFORE replacing the Databricks
+template with AffinityLossRunTemplate_Revised.xlsx, uploaded under the existing
+runtime name AffinityLossRunTemplate.xlsx. Previously generated files do not
+change. Agent name remains cover-only; removed columns and green-column order
+remain unchanged. The internal filtering/calculation fields are NOT removed.
+
 DECIMAL PRECISION FIX (after initial revised-template rollout)
 Re-execute services/sql/affinity_loss_run_views.sql in PREPROD. The final grid
 must show DecimalPlaces = 2 for all six financial fields. Check Messages for
