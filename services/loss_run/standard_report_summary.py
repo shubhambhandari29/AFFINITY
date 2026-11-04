@@ -5,10 +5,15 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from openpyxl.chart import BarChart, LineChart, Reference
+from openpyxl.chart.axis import ChartLines
+from openpyxl.chart.label import DataLabelList
+from openpyxl.chart.shapes import GraphicalProperties
+from openpyxl.drawing.line import LineProperties
 from openpyxl.pivot.cache import CacheField, WorksheetSource
 from openpyxl.pivot.fields import DateTimeField, Index, Missing, Number, Text
 from openpyxl.pivot.record import Record, RecordList
 from openpyxl.pivot.table import FieldItem, RowColItem
+from openpyxl.styles import Border, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from services.loss_run.pivot_cache import (
@@ -190,6 +195,7 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
             # Stable secondary ordering keeps policies/claims grouped within year.
             ordered.sort(key=lambda k: str(labels(k)[0] or ""), reverse=True)
         previous_labels = []
+        previous_path = []
         year_totals = [Decimal(0) for _ in pivot.dataFields]
 
         def finish_year(key):
@@ -214,7 +220,14 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 previous_labels = current_labels
             rows.append([*shown, *totals])
             row_paths.append(refs)
-            summary_items.append(RowColItem(x=[Index(v=v) for v in refs]))
+            # Encode repeated ancestors with r, not a fresh full path: Excel
+            # otherwise displays expand/collapse buttons on blank parent cells.
+            item = (
+                pivot_row_items([previous_path, refs])[1]
+                if previous_path else pivot_row_items([refs])[0]
+            )
+            summary_items.append(item)
+            previous_path = refs
             grand = [a + b for a, b in zip(grand, totals, strict=True)]
             year_totals = [a + b for a, b in zip(year_totals, totals, strict=True)]
             if year_subtotals and (
@@ -223,6 +236,7 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 finish_year(key)
                 year_totals = [Decimal(0) for _ in pivot.dataFields]
                 previous_labels = []
+                previous_path = []
         rows.append(["Grand Total", *([None] * (len(pivot.rowFields) - 1)), *grand])
         total_rows.add(len(rows) - 1)
         for index, row in enumerate(rows, start):
@@ -237,6 +251,15 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 cell.value = value
                 if isinstance(value, str):
                     cell.data_type = "s"
+                if is_summary:
+                    # White cells conceal worksheet gridlines inside repeated
+                    # parent groups without merging pivot cells/filter targets.
+                    cell.fill = PatternFill("solid", fgColor="FFFFFF")
+                    edge = Side(style="thin", color="999999")
+                    cell.border = Border(
+                        left=edge,
+                        top=edge if value is not None or index - start in total_rows else Side(),
+                    )
         end = start + len(rows) - 1
         if sheet.max_row > end:
             sheet.delete_rows(end + 1, sheet.max_row - end)
@@ -253,6 +276,8 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
             sheet._charts.clear()
             if groups:
                 chart = BarChart()
+                chart.width = 26
+                chart.height = 14
                 chart.title = "Claims and Total Incurred by Policy Year"
                 chart.y_axis.title = "Number of Claims"
                 chart.x_axis.title = "Policy Year"
@@ -263,7 +288,21 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 chart.set_categories(
                     Reference(sheet, min_col=1, min_row=2, max_row=end - 1)
                 )
+                chart.y_axis.delete = False
+                chart.y_axis.tickLblPos = "nextTo"
+                chart.x_axis.delete = False
+                chart.x_axis.tickLblPos = "nextTo"
+                chart.y_axis.majorGridlines = ChartLines(
+                    spPr=GraphicalProperties(ln=LineProperties(solidFill="D9D9D9"))
+                )
+                chart.dLbls = DataLabelList(
+                    showVal=True, dLblPos="ctr", numFmt="0",
+                    spPr=GraphicalProperties(solidFill="FFFFFF"),
+                )
+                chart.series[0].graphicalProperties.solidFill = "156082"
+                chart.legend.position = "b"
                 incurred = LineChart()
+                incurred.smooth = False
                 incurred.add_data(
                     Reference(sheet, min_col=3, min_row=1, max_row=end - 1),
                     titles_from_data=True,
@@ -275,5 +314,14 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 incurred.y_axis.title = "Total Incurred ($)"
                 incurred.y_axis.numFmt = '$#,##0'
                 incurred.y_axis.crosses = "max"
+                incurred.y_axis.delete = False
+                incurred.y_axis.tickLblPos = "nextTo"
+                incurred.y_axis.majorGridlines = None
+                incurred.series[0].smooth = False
+                incurred.series[0].graphicalProperties.line.solidFill = "F46B2C"
+                incurred.dLbls = DataLabelList(
+                    showVal=True, dLblPos="ctr", numFmt='$#,##0.00',
+                    spPr=GraphicalProperties(solidFill="F46B2C"),
+                )
                 chart += incurred
                 sheet.add_chart(chart, "E2")
