@@ -58,11 +58,12 @@ def test_revised_workbook_claim_totals_and_cover(amounts, expected):
         service.create_affinity_workbook(template, program, records, [], date.today())
 
 
-def test_programs_group_and_deduplicate_agents(monkeypatch):
+@pytest.mark.parametrize("account_status", ["Active", "Inactive"])
+def test_programs_group_and_deduplicate_agents(monkeypatch, account_status):
     row = dict(
         ProgramId=3,
         ProgramName="Example Program",
-        AcctStatus="Active",
+        AcctStatus=account_status,
         LossRunDistFreq="Quarterly",
         AgentName="  Example Agent, Inc.  ",
     )
@@ -74,7 +75,12 @@ def test_programs_group_and_deduplicate_agents(monkeypatch):
     assert len(result) == 1
     assert result[0]["agentCodes"] == ["001", "002"]
     assert result[0]["agentNames"] == ["Example Agent, Inc."]
-    assert "a.LossRunReq = 'Yes'" in query.call_args.args[0]
+    assert result[0]["accountStatus"] == account_status
+    sql = query.call_args.args[0]
+    assert "p.LossRunDistFreq <> 'Not Needed'" in sql
+    assert "LossRunReq" not in sql
+    assert "AcctStatus" not in sql.split("WHERE", 1)[1]
+    assert "NULLIF(LTRIM(RTRIM(a.AgentCode)), '') IS NOT NULL" in sql
 
 
 @pytest.mark.parametrize("ids,expected", [([3, 3], ["3"]), (None, None)])

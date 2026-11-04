@@ -63,7 +63,7 @@ async def get_affinity_loss_run_programs(
                p.AcctStatus, p.LossRunDistFreq, a.AgentCode, a.AgentName
         FROM dbo.tblAcctAffinityProgram p
         INNER JOIN dbo.tblAffinityAgents a ON a.ProgramName = p.ProgramName
-        WHERE a.LossRunReq = 'Yes'
+        WHERE p.LossRunDistFreq <> 'Not Needed'
           AND NULLIF(LTRIM(RTRIM(a.AgentCode)), '') IS NOT NULL
         ORDER BY p.ProgramName, a.AgentCode
     """)
@@ -99,7 +99,7 @@ async def create_affinity_loss_run_job(program_ids, current_user):
         raise HTTPException(
             400,
             detail={
-                "error": "Select programs with at least one agent marked LossRunReq = Yes"
+                "error": "Select programs whose loss run frequency is not 'Not Needed' and that have at least one nonblank agent code"
             },
         )
     user = current_user.get("user") or {}
@@ -269,7 +269,7 @@ async def generate_affinity_loss_runs(
         for key in program_ids:
             if str(key) not in found:
                 await on_result(
-                    str(key), False, "Program no longer has eligible agents", None
+                    str(key), False, "Program is no longer eligible or has no nonblank agent codes", None
                 )
     if not programs:
         return

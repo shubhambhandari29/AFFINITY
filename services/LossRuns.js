@@ -225,7 +225,7 @@ export default function LossRuns() {
       </FormControl>
       {isAffinity ? (
         <Alert severity="info" variant="outlined" sx={{ width: "100%", boxSizing: "border-box" }}>
-          Affinity generates one workbook per program using its agents marked LossRunReq = Yes.
+          Affinity generates one workbook per program whose loss run frequency is not "Not Needed", regardless of account status.
           Selected and all-program runs are available. Scheduling, claim review and extended dates
           are not enabled for Affinity. Use View Existing Jobs to check progress and download reports.
         </Alert>
