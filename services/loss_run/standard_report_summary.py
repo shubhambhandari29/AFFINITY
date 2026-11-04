@@ -278,9 +278,12 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 chart = BarChart()
                 chart.width = 26
                 chart.height = 14
-                chart.title = "Claims and Total Incurred by Policy Year"
-                chart.y_axis.title = "Number of Claims"
-                chart.x_axis.title = "Policy Year"
+                chart.gapWidth = 219
+                # Match the burst chart: no chart/axis titles, legend at right,
+                # and values only inside labels (Excel otherwise supplies names).
+                chart.title = None
+                chart.y_axis.title = None
+                chart.x_axis.title = None
                 chart.add_data(
                     Reference(sheet, min_col=2, min_row=1, max_row=end - 1),
                     titles_from_data=True,
@@ -297,10 +300,13 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 )
                 chart.dLbls = DataLabelList(
                     showVal=True, dLblPos="ctr", numFmt="0",
+                    showLegendKey=False, showSerName=False, showCatName=False,
+                    showPercent=False, showBubbleSize=False, showLeaderLines=False,
                     spPr=GraphicalProperties(solidFill="FFFFFF"),
                 )
                 chart.series[0].graphicalProperties.solidFill = "156082"
-                chart.legend.position = "b"
+                chart.legend.position = "r"
+                chart.legend.overlay = False
                 incurred = LineChart()
                 incurred.smooth = False
                 incurred.add_data(
@@ -311,16 +317,19 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                     Reference(sheet, min_col=1, min_row=2, max_row=end - 1)
                 )
                 incurred.y_axis.axId = 200
-                incurred.y_axis.title = "Total Incurred ($)"
-                incurred.y_axis.numFmt = '$#,##0'
+                incurred.y_axis.title = None
+                incurred.y_axis.numFmt = '$#,##0.00'
                 incurred.y_axis.crosses = "max"
                 incurred.y_axis.delete = False
                 incurred.y_axis.tickLblPos = "nextTo"
                 incurred.y_axis.majorGridlines = None
                 incurred.series[0].smooth = False
                 incurred.series[0].graphicalProperties.line.solidFill = "F46B2C"
+                incurred.series[0].graphicalProperties.line.width = 28575
                 incurred.dLbls = DataLabelList(
                     showVal=True, dLblPos="ctr", numFmt='$#,##0.00',
+                    showLegendKey=False, showSerName=False, showCatName=False,
+                    showPercent=False, showBubbleSize=False, showLeaderLines=False,
                     spPr=GraphicalProperties(solidFill="F46B2C"),
                 )
                 chart += incurred
