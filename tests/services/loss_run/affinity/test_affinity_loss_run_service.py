@@ -235,6 +235,37 @@ def test_client_labels_use_existing_view_fields_without_losing_cents():
     output.close()
 
 
+def test_record_only_restored_columns_are_populated_in_client_order():
+    template = (ROOT / "AffinityLossRunTemplate_Revised.xlsx").read_bytes()
+    workbook = load_workbook(BytesIO(template))
+    headers = [cell.value for cell in workbook["Record Only"][1]]
+    workbook.close()
+    restored = {
+        "Policy Holder Claim Number": "holder-123",
+        "Product": "Equipment",
+        "Manufacturer": "Example Manufacturer",
+        "Policy Region Description": "East",
+        "Policy Holder Retailer Desc": "Example Retailer",
+    }
+    assert headers[22:27] == list(restored)
+    assert headers[27] == "Accident Day Of Week"
+    record = dict.fromkeys(headers)
+    record.update(restored)
+    record.update({"Claim Number": "record-only-1", "Exposure": "01"})
+    output = load_workbook(BytesIO(service.create_affinity_workbook(
+        template, PROGRAM, [], [record], date.today()
+    )))
+    sheet = output["Record Only"]
+    values = dict(zip(headers, [cell.value for cell in sheet[2]]))
+    assert {key: values[key] for key in restored} == restored
+    assert sheet.max_column == 32
+    assert "Producing Agent Name" not in headers
+    assert "(MOVE)  Litigation Status" not in headers
+    for index in range(23, 28):
+        assert sheet.cell(1, index).fill.fgColor.value not in {"FFFFFF00", "FFFFC000"}
+    output.close()
+
+
 def test_workbook_fills_revised_template_and_no_claims():
     template = (ROOT / "AffinityLossRunTemplate_Revised.xlsx").read_bytes()
     workbook = load_workbook(BytesIO(template))

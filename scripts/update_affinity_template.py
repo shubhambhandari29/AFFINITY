@@ -33,6 +33,8 @@ CLAIM_COLUMNS = [
     "Whole Claim Incurred w/o ALAE", "Claims above $50K",
 ]
 RECORD_ONLY_COLUMNS = [
+    "Policy Holder Claim Number", "Product", "Manufacturer",
+    "Policy Region Description", "Policy Holder Retailer Desc",
     "Accident Day Of Week", "Adjuster", "Adjuster Email",
     "Adjuster Phone Number", "Occupation",
 ]
