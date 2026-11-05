@@ -24,7 +24,10 @@ from services.loss_run.loss_run_job_repository import create_job, get_job
 
 logger = logging.getLogger(__name__)
 # Client-facing labels need not rename deployed SQL view columns.
-COLUMN_SOURCES = {"Outstanding Loss Reserves": "Outstanding Loss Reserve"}
+COLUMN_SOURCES = {
+    "Outstanding Loss Reserves": "Outstanding Loss Reserve",  # Older templates.
+    "Expense Recovery": "Expense_Recovery",
+}
 CLAIMS_QUERY = """
     SELECT *
     FROM dbo.Affinity_Loss_Run_Claims

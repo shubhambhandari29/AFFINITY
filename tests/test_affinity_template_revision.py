@@ -51,8 +51,8 @@ def test_revised_layout_preserves_runtime_template_and_is_repeatable(tmp_path):
         assert "A7:B7" in map(str, cover.merged_cells.ranges)
         claims = [cell.value for cell in workbook["Claim Details"][1]]
         assert claims[19:30] == FINANCIAL_COLUMNS
-        assert claims[19] == "Outstanding Loss Reserves"
-        assert claims[29] == "Expense_Recovery"
+        assert claims[19] == "Outstanding Loss Reserve"
+        assert claims[29] == "Expense Recovery"
         assert claims[30] == "Litigation Status"
         assert claims[-2:] == ["Whole Claim Incurred w/o ALAE", "Claims above $50K"]
         for name in ("Claim Details", "Record Only"):

@@ -225,12 +225,13 @@ def test_client_labels_use_existing_view_fields_without_losing_cents():
     )), data_only=True)
     sheet = output["Claim Details"]
     values = dict(zip([c.value for c in sheet[1]], [c.value for c in sheet[2]]))
-    assert values["Outstanding Loss Reserves"] == 1200.25
-    assert values["Expense_Recovery"] == -17.83
-    assert "Outstanding Loss Reserve" not in values
-    assert "Expense Recovery" not in values
+    assert values["Outstanding Loss Reserve"] == 1200.25
+    assert values["Expense Recovery"] == -17.83
+    assert "Outstanding Loss Reserves" not in values
+    assert "Expense_Recovery" not in values
     assert "Producing Agent Name" not in values
     assert "Outstanding Loss Reserves" not in row
+    assert "Expense Recovery" not in row
     output.close()
 
 

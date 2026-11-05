@@ -20,11 +20,11 @@ LEADING_COLUMNS = [
     "Claim Closed Date", "Coverage",
 ]
 FINANCIAL_COLUMNS = [
-    "Outstanding Loss Reserves",
+    "Outstanding Loss Reserve",
     "Total Paid Loss Net Salvage/Subro/Loss Recovery", "Incurred w/o ALAE",
     "ALAE Reserve", "ALAE Paid", "Total Incurred + ALAE",
     "Salvage Recovery", "Subro Recovery", "Loss Recovery",
-    "Deductible Recovery", "Expense_Recovery",
+    "Deductible Recovery", "Expense Recovery",
 ]
 LOSS_COLUMNS = ["Cause Of Loss", "Description Of Loss", "Contributing Factor"]
 CLAIM_COLUMNS = [
@@ -39,10 +39,10 @@ RECORD_ONLY_COLUMNS = [
 ALIASES = {
     "Feature Number": "Exposure",
     "Reported Date": "Date of Notice (Report Date)",
-    "Outstanding Loss Reserve": "Outstanding Loss Reserves",
-    "Expense Recovery": "Expense_Recovery",
+    "Outstanding Loss Reserves": "Outstanding Loss Reserve",
+    "Expense_Recovery": "Expense Recovery",
     "Claims Above $50k": "Claims above $50K",
-    "Outstanding Loss Reserves Current Loss Reserve": "Outstanding Loss Reserves",
+    "Outstanding Loss Reserves Current Loss Reserve": "Outstanding Loss Reserve",
     "Total Paid Loss Net Salvage/Subro/Loss Recovery  Total Paid Loss Net Salvage Subro": "Total Paid Loss Net Salvage/Subro/Loss Recovery",
     "Incurred w/o ALAE Total Incurred": "Incurred w/o ALAE",
 }
