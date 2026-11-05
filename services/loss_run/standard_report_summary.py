@@ -115,7 +115,7 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
         pivot.formats = []
         pivot.conditionalFormats = None
         pivot.filters = []
-        pivot.colGrandTotals = True
+        pivot.colGrandTotals = sheet.title != "Summary By Policy Year"
         pivot.rowGrandTotals = False
         for index, field in enumerate(pivot.pivotFields):
             field.items = (
@@ -237,8 +237,9 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                 year_totals = [Decimal(0) for _ in pivot.dataFields]
                 previous_labels = []
                 previous_path = []
-        rows.append(["Grand Total", *([None] * (len(pivot.rowFields) - 1)), *grand])
-        total_rows.add(len(rows) - 1)
+        if not is_summary:
+            rows.append(["Grand Total", *([None] * (len(pivot.rowFields) - 1)), *grand])
+            total_rows.add(len(rows) - 1)
         for index, row in enumerate(rows, start):
             for column, value in enumerate(row, 1):
                 cell = sheet.cell(index, column)
@@ -260,14 +261,18 @@ def populate_standard_summaries(workbook, claims: list[dict]) -> None:
                         left=edge,
                         top=edge if value is not None or index - start in total_rows else Side(),
                     )
+                elif index - start in total_rows:
+                    cell.fill = PatternFill("solid", fgColor="C0E6F5")
         end = start + len(rows) - 1
         if sheet.max_row > end:
             sheet.delete_rows(end + 1, sheet.max_row - end)
         pivot.rowItems = (
-            summary_items + [RowColItem(t="grand", x=[Index(v=0)])]
-            if year_subtotals else pivot_row_items(row_paths)
+            summary_items if year_subtotals
+            else pivot_row_items(row_paths)[:-1] if is_summary
+            else pivot_row_items(row_paths)
         )
-        pivot.location.ref = f"A{start - 1}:{get_column_letter(len(rows[-1]))}{end}"
+        width = len(pivot.rowFields) + len(pivot.dataFields)
+        pivot.location.ref = f"A{start - 1}:{get_column_letter(width)}{end}"
         pivot.location.firstHeaderRow = 0
         pivot.location.firstDataRow = 1
         pivot.location.firstDataCol = len(pivot.rowFields)
