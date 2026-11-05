@@ -14,6 +14,7 @@ LossRunJobStatus = Literal[
 
 
 class LossRunJobCreated(BaseModel):
+    businessType: Literal["sac", "affinity"] = "sac"
     jobId: UUID
     status: LossRunJobStatus
     message: str
@@ -29,6 +30,7 @@ class LossRunJobCancellation(LossRunJobCreated):
 
 
 class LossRunJobResponse(BaseModel):
+    businessType: Literal["sac", "affinity"] = "sac"
     jobId: UUID
     jobType: Literal["all", "selected"]
     reportType: Literal["standard", "claim_review"] = "standard"

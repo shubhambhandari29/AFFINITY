@@ -1,0 +1,221 @@
+import asyncio
+from datetime import UTC, date, datetime
+from uuid import uuid4
+
+import pytest
+from fastapi import HTTPException
+
+from services.loss_run import loss_run_job_service
+
+
+def test_create_selected_job_normalizes_accounts_and_requester(monkeypatch):
+    captured = {}
+    job_id = uuid4()
+
+    async def fake_create(
+        job_type,
+        requested_by,
+        customer_numbers,
+        report_type="standard",
+        loss_date_from=None,
+    ):
+        captured["values"] = (job_type, requested_by, customer_numbers, loss_date_from)
+        return job_id, True
+
+    monkeypatch.setattr(loss_run_job_service, "create_job", fake_create)
+
+    result = asyncio.run(
+        loss_run_job_service.create_loss_run_job(
+            "selected",
+            {"user": {"id": "sx1234", "email": "user@example.com"}},
+            ["00123", " 00456 ", "00123"],
+        )
+    )
+
+    assert captured["values"] == (
+        "selected",
+        "user@example.com",
+        ["00123", "00456"],
+        None,
+    )
+    assert result == {
+        "jobId": job_id,
+        "businessType": "sac",
+        "status": "queued",
+        "message": "Loss-run generation has been queued",
+    }
+
+
+def test_create_selected_job_rejects_empty_accounts():
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            loss_run_job_service.create_loss_run_job(
+                "selected",
+                {"user": {"id": "sx1234"}},
+                ["", "   "],
+            )
+        )
+
+    assert error.value.status_code == 400
+
+
+def test_create_job_returns_existing_active_job(monkeypatch):
+    active_job_id = uuid4()
+
+    async def fake_create(
+        job_type,
+        requested_by,
+        customer_numbers,
+        report_type="standard",
+        loss_date_from=None,
+    ):
+        assert job_type == "selected"
+        return active_job_id, False
+
+    async def fake_get(job_id):
+        assert job_id == active_job_id
+        return {"Status": "processing"}
+
+    monkeypatch.setattr(loss_run_job_service, "create_job", fake_create)
+    monkeypatch.setattr(loss_run_job_service, "get_job", fake_get)
+
+    result = asyncio.run(
+        loss_run_job_service.create_loss_run_job(
+            "selected",
+            {"user": {"email": "user@example.com"}},
+            ["00123"],
+        )
+    )
+
+    assert result == {
+        "jobId": active_job_id,
+        "businessType": "sac",
+        "status": "processing",
+        "message": "A loss-run job is already queued or running",
+    }
+
+
+def test_create_job_persists_extended_history_date(monkeypatch):
+    job_id = uuid4()
+    captured = {}
+
+    async def fake_create(*args):
+        captured["args"] = args
+        return job_id, True
+
+    monkeypatch.setattr(loss_run_job_service, "create_job", fake_create)
+    cutoff = date(2010, 1, 1)
+    asyncio.run(
+        loss_run_job_service.create_loss_run_job(
+            "all",
+            {"user": {"email": "user@example.com"}},
+            loss_date_from=cutoff,
+        )
+    )
+    assert captured["args"][-1] == cutoff
+
+
+def test_get_job_returns_failures_only_when_present(monkeypatch):
+    job_id = uuid4()
+    now = datetime(2026, 1, 15, 18, 30, tzinfo=UTC)
+
+    async def fake_get(received_job_id):
+        assert received_job_id == job_id
+        return {
+            "JobId": job_id,
+            "JobType": "selected",
+            "Status": "partially_completed",
+            "Phase": "finished",
+            "RequestedCount": 2,
+            "ProcessedCount": 2,
+            "GeneratedCount": 1,
+            "FailedCount": 1,
+            "RequestedBy": "user@example.com",
+            "CreatedAt": now,
+            "StartedAt": now,
+            "CompletedAt": now,
+            "ErrorMessage": None,
+            "LossDateFrom": date(2010, 1, 1),
+        }
+
+    async def fake_failures(received_job_id):
+        assert received_job_id == job_id
+        return [
+            {
+                "CustomerNumber": "00456",
+                "FailureReason": "No loss-run records found",
+            }
+        ]
+
+    monkeypatch.setattr(loss_run_job_service, "get_job", fake_get)
+    monkeypatch.setattr(loss_run_job_service, "get_failures", fake_failures)
+
+    result = asyncio.run(loss_run_job_service.get_loss_run_job(job_id))
+
+    assert result["generatedCount"] == 1
+    expected_datetime = "01-15-2026 01:30:00 PM"
+    assert result["createdAt"] == expected_datetime
+    assert result["startedAt"] == expected_datetime
+    assert result["completedAt"] == expected_datetime
+    assert result["lossDateFrom"] == "01-01-2010"
+    assert result["failures"] == [
+        {
+            "customerNumber": "00456",
+            "reason": "No loss-run records found",
+        }
+    ]
+
+
+def test_get_all_jobs_returns_newest_jobs_with_grouped_failures(monkeypatch):
+    first_job_id = uuid4()
+    second_job_id = uuid4()
+    now = datetime(2026, 7, 15, 18, 30)
+
+    def job(job_id, status, failed_count):
+        return {
+            "JobId": job_id,
+            "JobType": "selected",
+            "Status": status,
+            "Phase": "finished",
+            "RequestedCount": 1,
+            "ProcessedCount": 1,
+            "GeneratedCount": 1 - failed_count,
+            "FailedCount": failed_count,
+            "RequestedBy": "user@example.com",
+            "CreatedAt": now,
+            "StartedAt": now,
+            "CompletedAt": now,
+            "ErrorMessage": None,
+        }
+
+    async def fake_jobs(business_type):
+        assert business_type == "sac"
+        return [
+            job(first_job_id, "partially_completed", 1),
+            job(second_job_id, "completed", 0),
+        ]
+
+    async def fake_all_failures():
+        return [
+            {
+                "JobId": first_job_id,
+                "CustomerNumber": "00456",
+                "FailureReason": "No loss-run records found",
+            }
+        ]
+
+    monkeypatch.setattr(loss_run_job_service, "get_jobs", fake_jobs)
+    monkeypatch.setattr(loss_run_job_service, "get_all_failures", fake_all_failures)
+
+    result = asyncio.run(loss_run_job_service.get_loss_run_jobs())
+
+    assert [item["jobId"] for item in result] == [first_job_id, second_job_id]
+    expected_datetime = "07-15-2026 02:30:00 PM"
+    assert all(item["createdAt"] == expected_datetime for item in result)
+    assert result[0]["failures"] == [
+        {
+            "customerNumber": "00456",
+            "reason": "No loss-run records found",
+        }
+    ]
+    assert result[1]["failures"] == []

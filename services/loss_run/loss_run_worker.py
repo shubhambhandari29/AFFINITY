@@ -6,6 +6,9 @@ from contextlib import suppress
 from time import monotonic
 from uuid import UUID, uuid4
 
+from services.loss_run.affinity.affinity_loss_run_service import (
+    generate_affinity_loss_runs,
+)
 from services.loss_run.loss_run_cancellation import (
     LossRunCancellation,
     LossRunCancelled,
@@ -129,15 +132,18 @@ class LossRunWorker:
                     "This job used the old policy-date cutoff. Submit a new job using Loss date from.",
                 )
                 return
-            await generate_loss_runs(
-                None if job_type == "all" else await get_account_numbers(job_id),
-                report_type=job.get("ReportType", "standard"),
-                loss_date_from=job.get("LossDateFrom"),
-                on_phase=on_phase,
-                on_customers=on_customers,
-                on_result=on_result,
-                cancellation=cancellation,
-            )
+            numbers = None if job_type == "all" else await get_account_numbers(job_id)
+            callbacks = dict(on_phase=on_phase, on_customers=on_customers, on_result=on_result,
+                             cancellation=cancellation)
+            if job.get("BusinessType", "sac") == "affinity":
+                await generate_affinity_loss_runs(numbers, **callbacks)
+            else:
+                await generate_loss_runs(
+                    numbers,
+                    report_type=job.get("ReportType", "standard"),
+                    loss_date_from=job.get("LossDateFrom"),
+                    **callbacks,
+                )
             cancellation.check()
             await complete_job(job_id, self.worker_id)
         except LossRunCancelled:

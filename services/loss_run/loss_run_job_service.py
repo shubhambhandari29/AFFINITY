@@ -45,6 +45,7 @@ async def create_loss_run_job(
     if created:
         return {
             "jobId": job_id,
+            "businessType": "sac",
             "status": "queued",
             "message": "Loss-run generation has been queued",
         }
@@ -52,14 +53,15 @@ async def create_loss_run_job(
     existing = await get_job(job_id)
     return {
         "jobId": job_id,
+        "businessType": existing.get("BusinessType", "sac"),
         "status": existing["Status"],
         "message": "A loss-run job is already queued or running",
     }
 
 
-async def get_loss_run_job(job_id: UUID) -> dict:
+async def get_loss_run_job(job_id: UUID, business_type: str = "sac") -> dict:
     job = await get_job(job_id)
-    if job is None:
+    if job is None or job.get("BusinessType", "sac") != business_type:
         raise HTTPException(
             status_code=404,
             detail={"error": "Loss-run job not found"},
@@ -79,7 +81,10 @@ async def get_loss_run_job(job_id: UUID) -> dict:
     return _format_job(job, failures)
 
 
-async def cancel_loss_run_job(job_id: UUID) -> dict:
+async def cancel_loss_run_job(job_id: UUID, business_type: str = "sac") -> dict:
+    existing = await get_job(job_id)
+    if existing is None or existing.get("BusinessType", "sac") != business_type:
+        raise HTTPException(status_code=404, detail={"error": "Loss-run job not found"})
     job = await request_cancellation(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail={"error": "Loss-run job not found"})
@@ -91,11 +96,12 @@ async def cancel_loss_run_job(job_id: UUID) -> dict:
         "cancelRequested": job["CancelRequested"],
         "message": "Loss-run job cancelled" if job["Status"] == "cancelled"
         else "Cancellation requested. Waiting for the current operation to stop.",
+        "businessType": business_type,
     }
 
 
-async def get_loss_run_jobs() -> list[dict]:
-    jobs = await get_jobs()
+async def get_loss_run_jobs(business_type: str = "sac") -> list[dict]:
+    jobs = await get_jobs(business_type)
     if not jobs:
         return []
 
@@ -116,6 +122,8 @@ def _format_job(job: dict, failures: list[dict]) -> dict:
         "waiting_for_worker": "Waiting for the report worker to start.",
         "starting": "Starting report generation.",
         "downloading_template": "Loading the Excel template.",
+        "loading_template": "Loading the Excel template.",
+        "loading_accounts": "Loading eligible accounts or programs.",
         "querying_loss_run_data": "Retrieving claim data. This step may take several minutes.",
         "generating_reports": "Generating and saving Excel reports.",
         "finished": "Report generation finished.",
@@ -127,6 +135,7 @@ def _format_job(job: dict, failures: list[dict]) -> dict:
         progress = "Cancellation requested. Waiting for the current operation to stop."
     return {
         "jobId": job["JobId"],
+        "businessType": job.get("BusinessType", "sac"),
         "jobType": job["JobType"],
         "reportType": job.get("ReportType", "standard"),
         "triggerSource": job.get("TriggerSource", "manual"),

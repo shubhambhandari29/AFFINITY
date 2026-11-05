@@ -1,4 +1,4 @@
-import { Box, Button, Grid, Stack, useTheme } from "@mui/material";
+import { Box, Button, Grid, Stack, useTheme, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import Loader from "../../../ui/Loader";
 import { DataGrid, GridFooter } from "@mui/x-data-grid";
 import { useState } from "react";
@@ -8,7 +8,7 @@ import JobDetails from "./JobDetails";
 import { MdSync } from "react-icons/md";
 import useIntervalFetch from "../../../../hooks/useIntervalFetch";
 import { GridFooterContainer } from "@mui/x-data-grid";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 function CustomFooter({ manualRefresh, loading }) {
   const navigate = useNavigate();
@@ -47,6 +47,25 @@ function CustomFooter({ manualRefresh, loading }) {
 }
 
 export default function LossRunJobs() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const businessType = searchParams.get("businessType") === "affinity" ? "affinity" : "sac";
+  return <>
+    <FormControl sx={{ minWidth: 220, mb: 2 }}>
+      <InputLabel id="job-business-label">Loss Run Jobs For</InputLabel>
+      <Select labelId="job-business-label" label="Loss Run Jobs For" value={businessType}
+        onChange={(e) => setSearchParams({ businessType: e.target.value })}>
+        <MenuItem value="sac">SAC</MenuItem>
+        <MenuItem value="affinity">Affinity</MenuItem>
+      </Select>
+    </FormControl>
+    <LossRunJobsTable key={businessType} businessType={businessType} />
+  </>;
+}
+
+// Remount per business so the existing polling hook cannot retain the old endpoint.
+function LossRunJobsTable({ businessType }) {
+  const isAffinity = businessType === "affinity";
+  const apiBase = isAffinity ? "affinity_loss_run" : "loss_run";
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
@@ -70,7 +89,7 @@ export default function LossRunJobs() {
       headerName: "Report Type",
       width: 170,
       renderCell: (params) =>
-        params.value === "claim_review" ? "Claim Review" : "Standard Loss Run",
+        isAffinity ? "Affinity Loss Run" : params.value === "claim_review" ? "Claim Review" : "Standard Loss Run",
     },
     {
       field: "lossDateFrom",
@@ -146,7 +165,7 @@ export default function LossRunJobs() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/loss_run/jobs");
+      const res = await api.get(`/${apiBase}/jobs`);
       setJobs(res.data);
     } catch (err) {
       console.error(err);
@@ -177,6 +196,7 @@ export default function LossRunJobs() {
         open={!!openJob}
         onClose={() => setOpenJob("")}
         jobData={jobs.find((job) => job.jobId === openJob)}
+        businessType={businessType}
         onRefresh={manualRefresh}
       />
 
@@ -187,7 +207,7 @@ export default function LossRunJobs() {
           ) : (
             <DataGrid
               rows={jobs}
-              columns={columns}
+              columns={isAffinity ? columns.filter((column) => column.field !== "lossDateFrom") : columns}
               loading={loading}
               initialState={{
                 pagination: { paginationModel: { page: 0, pageSize: 25 } },

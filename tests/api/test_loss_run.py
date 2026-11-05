@@ -1,0 +1,154 @@
+import asyncio
+import os
+import tempfile
+from datetime import date
+from uuid import uuid4
+
+from api.loss_run import loss_run
+
+CURRENT_USER = {"user": {"id": "sx1234", "email": "user@example.com"}}
+
+
+def test_claim_review_request_reaches_job_service(monkeypatch):
+    async def fake_create(
+        job_type,
+        current_user,
+        customer_numbers=None,
+        report_type="standard",
+        loss_date_from=None,
+    ):
+        assert report_type == "claim_review"
+        return {"status": "queued"}
+
+    monkeypatch.setattr(loss_run, "create_loss_run_job", fake_create)
+    options = loss_run.LossRunOptions(reportType="claim_review")
+    assert asyncio.run(loss_run.generate_all_loss_runs(CURRENT_USER, options))["status"] == "queued"
+    selection = loss_run.LossRunSelection(customerNumbers=["00123"], reportType="claim_review")
+    assert (
+        asyncio.run(loss_run.generate_selected_loss_runs(selection, CURRENT_USER))["status"]
+        == "queued"
+    )
+
+
+def test_generate_all_loss_runs_creates_job(monkeypatch):
+    async def fake_create(
+        job_type,
+        current_user,
+        customer_numbers=None,
+        report_type="standard",
+        loss_date_from=None,
+    ):
+        assert job_type == "all"
+        assert current_user == CURRENT_USER
+        assert customer_numbers is None
+        return {"jobId": uuid4(), "status": "queued"}
+
+    monkeypatch.setattr(loss_run, "create_loss_run_job", fake_create)
+
+    result = asyncio.run(loss_run.generate_all_loss_runs(CURRENT_USER))
+    assert result["status"] == "queued"
+
+
+def test_generate_selected_loss_runs_creates_job_with_customer_array(monkeypatch):
+    captured = {}
+
+    async def fake_create(
+        job_type,
+        current_user,
+        customer_numbers=None,
+        report_type="standard",
+        loss_date_from=None,
+    ):
+        captured["job_type"] = job_type
+        captured["current_user"] = current_user
+        captured["customer_numbers"] = customer_numbers
+        captured["loss_date_from"] = loss_date_from
+        return {"jobId": uuid4(), "status": "queued"}
+
+    monkeypatch.setattr(loss_run, "create_loss_run_job", fake_create)
+    payload = loss_run.LossRunSelection(
+        customerNumbers=["00123"], lossDateFrom="2010-01-01"
+    )
+
+    result = asyncio.run(loss_run.generate_selected_loss_runs(payload, CURRENT_USER))
+
+    assert result["status"] == "queued"
+    assert captured == {
+        "job_type": "selected",
+        "current_user": CURRENT_USER,
+        "customer_numbers": ["00123"],
+        "loss_date_from": date(2010, 1, 1),
+    }
+
+
+def test_generate_all_passes_extended_history_date(monkeypatch):
+    captured = {}
+
+    async def fake_create(*args, **kwargs):
+        captured.update(kwargs)
+        return {"jobId": uuid4(), "status": "queued"}
+
+    monkeypatch.setattr(loss_run, "create_loss_run_job", fake_create)
+    payload = loss_run.LossRunOptions(lossDateFrom="2004-01-01")
+    asyncio.run(loss_run.generate_all_loss_runs(CURRENT_USER, payload))
+    assert captured["loss_date_from"] == date(2004, 1, 1)
+
+
+def test_get_loss_run_job_status_calls_service(monkeypatch):
+    job_id = uuid4()
+
+    async def fake_get(received_job_id):
+        assert received_job_id == job_id
+        return {"jobId": job_id, "status": "processing"}
+
+    monkeypatch.setattr(loss_run, "get_loss_run_job", fake_get)
+
+    result = asyncio.run(loss_run.get_loss_run_job_status(job_id, CURRENT_USER))
+
+    assert result["status"] == "processing"
+
+
+def test_get_all_loss_run_jobs_calls_service(monkeypatch):
+    job_id = uuid4()
+
+    async def fake_get_all():
+        return [{"jobId": job_id, "status": "completed"}]
+
+    monkeypatch.setattr(loss_run, "get_loss_run_jobs", fake_get_all)
+
+    result = asyncio.run(loss_run.get_all_loss_run_jobs(CURRENT_USER))
+
+    assert result == [{"jobId": job_id, "status": "completed"}]
+
+
+def test_download_loss_run_job_returns_attachment(monkeypatch):
+    job_id = uuid4()
+    temporary = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    temporary.write(b"workbook")
+    temporary.close()
+
+    async def fake_prepare(received_job_id):
+        assert received_job_id == job_id
+        return type(
+            "Download",
+            (),
+            {
+                "path": temporary.name,
+                "filename": "Customer.xlsx",
+                "media_type": (
+                    "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet"
+                ),
+            },
+        )()
+
+    monkeypatch.setattr(loss_run, "prepare_loss_run_download", fake_prepare)
+    async def fake_get_job(received_job_id):
+        assert received_job_id == job_id
+        return {"businessType": "sac"}
+    monkeypatch.setattr(loss_run, "get_loss_run_job", fake_get_job)
+
+    response = asyncio.run(loss_run.download_loss_run_job(job_id, CURRENT_USER))
+
+    assert response.filename == "Customer.xlsx"
+    assert response.path == temporary.name
+    os.remove(temporary.name)

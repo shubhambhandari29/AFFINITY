@@ -54,12 +54,14 @@ const MetricBox = ({ label, value, color = "#1a365d", bgColor = "white" }) => (
   </Box>
 );
 
-export default function JobDetails({ open, onClose, jobData, onRefresh }) {
+export default function JobDetails({ open, onClose, jobData, onRefresh, businessType = "sac" }) {
   const theme = useTheme();
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelRequestedJobId, setCancelRequestedJobId] = useState(null);
   if (!jobData) return null;
+  const isAffinity = (jobData.businessType || businessType) === "affinity";
+  const apiBase = isAffinity ? "affinity_loss_run" : "loss_run";
   const isActive = ["queued", "processing"].includes(jobData.status);
   const cancellationPending = isActive && (
     jobData.cancelRequested || cancelRequestedJobId === jobData.jobId
@@ -84,7 +86,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
     if (!confirmation.isConfirmed) return;
     setIsCancelling(true);
     try {
-      const response = await api.post(`/loss_run/jobs/${jobId}/cancel`);
+      const response = await api.post(`/${apiBase}/jobs/${jobId}/cancel`);
       setCancelRequestedJobId(jobId);
       await Swal.fire({
         title: "Cancellation",
@@ -137,7 +139,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
 
     try {
       const response = await api.get(
-        `/loss_run/jobs/${jobData.jobId}/download`,
+        `/${apiBase}/jobs/${jobData.jobId}/download`,
         {
           responseType: "blob",
         },
@@ -234,7 +236,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
             component="div"
             sx={{ fontWeight: "bold", color: theme.palette.background.blue }}
           >
-            Job Details
+            {isAffinity ? "Affinity Job Details" : "Job Details"}
           </Typography>
           <Typography
             variant="caption"
@@ -276,6 +278,9 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
       </DialogTitle>
 
       <DialogContent sx={{ py: 3, px: { xs: 2, sm: 3 }, overflowWrap: "anywhere" }}>
+        {isAffinity && <Typography variant="body2" sx={{ mt: 2 }}>
+          Counts below refer to programs. Each generated workbook includes the program's eligible agents.
+        </Typography>}
         {(jobData.progressMessage || cancellationPending) && (
           <Alert severity={cancellationPending ? "warning" : "info"} sx={{ mt: 1, mb: 2 }}>
             {cancellationPending
@@ -317,19 +322,19 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
                 Report Type
               </Typography>
               <Typography variant="body2" fontWeight="bold">
-                {jobData.reportType === "claim_review"
+                {isAffinity ? "Affinity Loss Run" : jobData.reportType === "claim_review"
                   ? "Claim Review"
                   : "Standard Loss Run"}
               </Typography>
             </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ minWidth: 0 }}>
+            {!isAffinity && <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ minWidth: 0 }}>
               <Typography variant="caption" color="textSecondary" display="block">
                 Loss Date From
               </Typography>
               <Typography variant="body2" fontWeight="bold">
                 {jobData.lossDateFrom || (jobData.policyEffectiveDateFrom ? `Legacy policy cutoff: ${jobData.policyEffectiveDateFrom}` : "Default history")}
               </Typography>
-            </Grid>
+            </Grid>}
             <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ minWidth: 0 }}>
               <Typography
                 variant="caption"
@@ -461,7 +466,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
                         fontSize: "12px",
                       }}
                     >
-                      Customer Number
+                      {isAffinity ? "Program ID" : "Customer Number"}
                     </TableCell>
                     <TableCell
                       sx={{
@@ -485,7 +490,7 @@ export default function JobDetails({ open, onClose, jobData, onRefresh }) {
                       <TableCell
                         sx={{ fontSize: "12px", verticalAlign: "top" }}
                       >
-                        {fail.customerNumber}
+                        {isAffinity ? fail.programId : fail.customerNumber}
                       </TableCell>
                       <TableCell
                         sx={{

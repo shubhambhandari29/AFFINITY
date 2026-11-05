@@ -1,0 +1,72 @@
+RECORD ONLY - DB-ONLY OPTIMIZATION TRIAL (PREPROD)
+
+No application, API, UI, template or permissions changes. Claims view logic is
+unchanged. The Record Only view now expresses policy/claim eligibility and the
+financial NOT EXISTS check before descriptive enrichment. Its policy date
+predicate no longer casts the source column. Jan 1 remains excluded completely.
+Output columns, grouping, current-version checks and NULL-feature semantics
+are retained. A CTE is NOT a materialized table and does not force join order.
+SQL Server may choose the same plan; do not assume this makes the query faster.
+
+1. Save a rollback copy in SSMS:
+   CLMAA_SpecialAccounts > Views > dbo.Affinity_Loss_Run_RecordOnly >
+   Script View as > ALTER To > File. Use this saved file if results differ
+   or performance regresses. Do not DROP the view.
+
+2. Stop competing test runs. In one SSMS window capture the old result:
+
+USE [CLMAA_SpecialAccounts];
+SET STATISTICS IO ON;
+SET STATISTICS TIME ON;
+SELECT v.* INTO #BeforeRecordOnly
+FROM dbo.Affinity_Loss_Run_RecordOnly v
+WHERE v.[Producing Agent Code] IN ('5504032', '1001690');
+SELECT [Producing Agent Code], COUNT_BIG(*) AS [RowCount]
+FROM #BeforeRecordOnly GROUP BY [Producing Agent Code];
+
+This includes Local 409 (previously zero rows) AND Kipp (previously four rows),
+so the equivalence check isn't only comparing two empty results. Current data
+may differ from previous reports. KEEP THIS WINDOW/CONNECTION OPEN.
+
+3. In a SECOND SSMS window select CLMAA_SpecialAccounts. Open
+   services/sql/affinity_loss_run_views.sql. Select ONLY the batch starting
+   CREATE OR ALTER VIEW dbo.Affinity_Loss_Run_RecordOnly through its following
+   GO, and execute it. Do not select the Claims view batch. Check Messages.
+
+4. Back in the FIRST window run the same filtered query against the new view:
+
+SELECT v.* INTO #AfterRecordOnly
+FROM dbo.Affinity_Loss_Run_RecordOnly v
+WHERE v.[Producing Agent Code] IN ('5504032', '1001690');
+SELECT [Producing Agent Code], COUNT_BIG(*) AS [RowCount]
+FROM #AfterRecordOnly GROUP BY [Producing Agent Code];
+
+-- Compare complete rows AND duplicate counts. JSON preserves named field
+-- values and provides one comparable representation for each output row.
+SELECT (SELECT b.* FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER)
+    AS RowData INTO #BeforeJson FROM #BeforeRecordOnly b;
+SELECT (SELECT a.* FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER)
+    AS RowData INTO #AfterJson FROM #AfterRecordOnly a;
+SELECT RowData, COUNT_BIG(*) AS Copies FROM #BeforeJson GROUP BY RowData
+EXCEPT
+SELECT RowData, COUNT_BIG(*) FROM #AfterJson GROUP BY RowData;
+SELECT RowData, COUNT_BIG(*) AS Copies FROM #AfterJson GROUP BY RowData
+EXCEPT
+SELECT RowData, COUNT_BIG(*) FROM #BeforeJson GROUP BY RowData;
+
+Both difference grids must be empty. Run the comparison on the same Eastern
+calendar day: RO System Date changes at midnight. Source changes during testing
+can also produce differences and must be investigated rather than ignored.
+Share counts, difference grids, and both Messages timing/IO outputs.
+
+5. If results agree, run Local 409 once from the existing UI. Existing temporary
+   AFFINITY TIMING output measures the application's unchanged query pattern.
+   Compare record_only_query with the prior 554.16 seconds. Claims was 698.88s
+   and has NOT been optimized in this revision. Run more than once if practical
+   to distinguish a real gain from database load/cache differences; do not clear
+   shared caches. No worker restart is required for a view-only update.
+
+If there is no improvement, do not make further cosmetic CTE rewrites. We need
+DB-team plan/index/statistics assistance or agreement on a parameterized DB
+routine that can materialize the selected claim set. A normal view cannot take
+the selected agent list as a parameter or create temporary tables.
