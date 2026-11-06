@@ -10,6 +10,20 @@ SQL = (Path(__file__).resolve().parents[1] / "services/sql/affinity_loss_run_vie
 VIEW = SQL.split("CREATE OR ALTER VIEW dbo.Affinity_Loss_Run_RecordOnly\nAS\n")[1].split("\nGO")[0]
 
 
+@pytest.mark.parametrize("positions,field", [
+    ("1_AND_2", "CAUSE_OF_LOSS"),
+    ("3_AND_4", "LOSS_DESC"),
+    ("5_AND_6", "CONTRIBUTING_FCTR"),
+])
+def test_record_only_uses_same_wc_aia_mapping_as_claim_details(positions, field):
+    expression = (
+        f"CASE WHEN CD.CLM_LOB_CD='wc' THEN CD.AIA_POSTNS_{positions}_DESC "
+        f"ELSE CD.{field} END AS {field}"
+    )
+    assert expression in VIEW
+    assert expression in SQL.split("CREATE OR ALTER VIEW dbo.Affinity_Loss_Run_RecordOnly")[0]
+
+
 def test_filters_and_anti_join_preserve_record_only_rules():
     candidates, enrichment = VIEW.split(")), DATA AS (", 1)
     assert "POL.POL_CURR_VERSN_IND = 'Y'" in candidates

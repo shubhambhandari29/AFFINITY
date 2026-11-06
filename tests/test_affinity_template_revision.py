@@ -66,9 +66,9 @@ def test_revised_layout_preserves_runtime_template_and_is_repeatable(tmp_path):
                        for row in sheet.iter_rows(min_row=2) for cell in row)
             assert not any(d.hidden for d in sheet.column_dimensions.values())
         record_headers = [cell.value for cell in workbook["Record Only"][1]]
-        assert record_headers[22:27] == [
-            "Policy Holder Claim Number", "Product", "Manufacturer",
-            "Policy Region Description", "Policy Holder Retailer Desc",
+        assert record_headers[22:] == [
+            "Policy Holder Claim Number", "Product", "Occupation",
+            "Accident Day Of Week", "Adjuster", "Adjuster Email", "Adjuster Phone Number",
         ]
         workbook.close()
         if attempt == 0:

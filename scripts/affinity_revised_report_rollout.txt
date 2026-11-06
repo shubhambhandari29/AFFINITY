@@ -1,5 +1,29 @@
 AFFINITY REVISED REPORT - PREPROD VALIDATION
 
+RECORD ONLY CLIENT FEEDBACK (November 6, 2026)
+This section supersedes the older Record Only rollout notes below.
+Keep Policy Holder Claim Number and Product; remove Manufacturer, Policy Region
+Description and Policy Holder Retailer Desc. Occupation now follows Product.
+For WC claims, Cause Of Loss, Description Of Loss and Contributing Factor use
+the same AIA description fields as Claim Details. Other claims retain their
+existing mappings. Null source descriptions remain blank.
+
+1. Let active report jobs finish.
+2. Open services/sql/affinity_loss_run_views.sql in SSMS, select database
+   CLMAA_SpecialAccounts, and select ONLY the full batch beginning
+   CREATE OR ALTER VIEW dbo.Affinity_Loss_Run_RecordOnly
+   through its terminating semicolon and GO (before Metadata verification).
+   Execute that selection. Do not select only the three CASE expressions.
+   This updates the Record Only view, not source records or the Claims view.
+3. Back up the Databricks template and replace AffinityLossRunTemplate.xlsx
+   with the repo's AffinityLossRunTemplate_Revised.xlsx.
+4. Generate a new Fortress Dental report. Record Only should have 29 columns;
+   T-V are loss descriptions, W is Policy Holder Claim Number, X is Product,
+   Y is Occupation, Z is Accident Day Of Week, AA-AC are adjuster details.
+   Verify WC descriptions against the source; available values require live DB
+   validation. Existing reports will not change. No runtime Python change is
+   required for this update if the latest financial-header mapping is deployed.
+
 CLIENT HEADER ALIGNMENT (November 2026)
 The cover displays distinct agent names only (producer codes remain in their
 own field). The threshold header is "Claims above $50K". Cover row heights and
@@ -7,10 +31,10 @@ column widths, and detail column widths/header heights follow the example.
 Instruction colours are not copied. The actual generation date and approved
 whole-claim total column remain. Rebuild tooling reads the local client example
 for dimensions only; runtime generation needs only the Databricks template.
-The Excel headers now use "Outstanding Loss Reserves" and "Expense_Recovery"
-exactly as in the annotated client example. The backend maps the plural reserve
-label to the existing singular SQL field; Expense_Recovery already exists in
-the deployed view. No SQL/schema changes are required for this label update.
+The latest Excel headers use "Outstanding Loss Reserve" and "Expense Recovery".
+The backend maps Expense Recovery to the existing Expense_Recovery SQL field
+and retains support for older plural-reserve templates. No SQL/schema changes
+are required for this label-only update.
 Deploy/restart the updated backend and worker BEFORE replacing the Databricks
 template with AffinityLossRunTemplate_Revised.xlsx, uploaded under the existing
 runtime name AffinityLossRunTemplate.xlsx. Previously generated files do not

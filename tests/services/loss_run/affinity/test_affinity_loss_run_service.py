@@ -243,12 +243,10 @@ def test_record_only_restored_columns_are_populated_in_client_order():
     restored = {
         "Policy Holder Claim Number": "holder-123",
         "Product": "Equipment",
-        "Manufacturer": "Example Manufacturer",
-        "Policy Region Description": "East",
-        "Policy Holder Retailer Desc": "Example Retailer",
+        "Occupation": "Dental Hygienist",
     }
-    assert headers[22:27] == list(restored)
-    assert headers[27] == "Accident Day Of Week"
+    assert headers[22:25] == list(restored)
+    assert headers[25] == "Accident Day Of Week"
     record = dict.fromkeys(headers)
     record.update(restored)
     record.update({"Claim Number": "record-only-1", "Exposure": "01"})
@@ -258,7 +256,8 @@ def test_record_only_restored_columns_are_populated_in_client_order():
     sheet = output["Record Only"]
     values = dict(zip(headers, [cell.value for cell in sheet[2]]))
     assert {key: values[key] for key in restored} == restored
-    assert sheet.max_column == 32
+    assert sheet.max_column == 29
+    assert not set(headers) & {"Manufacturer", "Policy Region Description", "Policy Holder Retailer Desc"}
     assert "Producing Agent Name" not in headers
     assert "(MOVE)  Litigation Status" not in headers
     for index in range(23, 28):
