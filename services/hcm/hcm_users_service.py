@@ -50,10 +50,19 @@ async def get_hcm_users(query_params: dict[str, Any]):
 async def upsert_hcm_users(data_list: list[dict[str, Any]]):
     try:
         payload = [normalize_payload_dates(_remap_keys(item)) for item in data_list]
+        to_update_by_id: list[dict[str, Any]] = []
         to_update: list[dict[str, Any]] = []
         to_insert: list[dict[str, Any]] = []
 
         for record in payload:
+            # An editable name cannot identify an existing row reliably.
+            if record.get(PRIMARY_KEY) not in (None, ""):
+                pk_value = record[PRIMARY_KEY]
+                if type(pk_value) is not int or pk_value <= 0:
+                    raise ValueError("PK_Number must be a positive integer")
+                to_update_by_id.append(record)
+                continue
+
             customer_num = record.get("CustNum")
             user_name = record.get("UserName")
             sanitized_record = {k: v for k, v in record.items() if k != PRIMARY_KEY}
@@ -63,6 +72,15 @@ async def upsert_hcm_users(data_list: list[dict[str, Any]]):
                     to_insert.append(sanitized_record)
             else:
                 to_update.append(sanitized_record)
+
+        if to_update_by_id:
+            await merge_upsert_records_async(
+                table=TABLE_NAME,
+                data_list=to_update_by_id,
+                key_columns=[PRIMARY_KEY],
+                exclude_key_columns_from_insert=True,
+                require_match=True,
+            )
 
         if to_update:
             await merge_upsert_records_async(
@@ -75,6 +93,10 @@ async def upsert_hcm_users(data_list: list[dict[str, Any]]):
             await insert_records_async(table=TABLE_NAME, records=to_insert)
 
         return {"message": "Transaction successful", "count": len(data_list)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
     except Exception as e:
         logger.warning(f"HCM users upsert failed - {str(e)}")
         raise HTTPException(status_code=500, detail={"error": str(e)}) from e

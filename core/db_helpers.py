@@ -162,6 +162,7 @@ def merge_upsert_records(
     key_columns: list[str],
     *,
     exclude_key_columns_from_insert: bool = False,
+    require_match: bool = False,
 ) -> dict[str, Any]:
     """
     Generic MERGE-based upsert helper.
@@ -169,6 +170,7 @@ def merge_upsert_records(
     - table: target table name
     - data_list: list of rows (dicts) to upsert
     - key_columns: columns used to match existing rows (ON clause)
+    - require_match: update only; raise LookupError if no row matches
     """
     if not data_list:
         return {"message": "No data provided", "count": 0}
@@ -224,16 +226,29 @@ WHEN MATCHED THEN
                 if not insert_columns:
                     raise ValueError("No columns available for insert operation")
 
+                insert_section = "" if require_match else f"""
+WHEN NOT MATCHED THEN
+    INSERT ({", ".join(insert_columns)})
+    VALUES ({", ".join(["source." + col for col in insert_columns])})
+"""
+                if require_match and not update_set:
+                    raise ValueError("No columns available for update operation")
+
                 merge_query = f"""
 MERGE INTO {table} AS target
 USING (SELECT {using_cols}) AS source
 ON {on_clause}
-{update_section}WHEN NOT MATCHED THEN
-    INSERT ({", ".join(insert_columns)})
-    VALUES ({", ".join(["source." + col for col in insert_columns])});
+{update_section}{insert_section};
+{"SELECT @@ROWCOUNT;" if require_match else ""}
 """
                 values = list(data.values())
                 cursor.execute(merge_query, values)
+                if require_match:
+                    # ODBC may expose the MERGE row count before the SELECT result.
+                    while cursor.description is None and cursor.nextset():
+                        pass
+                    if cursor.fetchone()[0] == 0:
+                        raise LookupError(f"No matching record in {table}")
 
             conn.commit()
 
@@ -376,6 +391,7 @@ async def merge_upsert_records_async(
     key_columns: list[str],
     *,
     exclude_key_columns_from_insert: bool = False,
+    require_match: bool = False,
 ) -> dict[str, Any]:
     return await run_in_threadpool(
         partial(
@@ -384,6 +400,7 @@ async def merge_upsert_records_async(
             data_list=data_list,
             key_columns=key_columns,
             exclude_key_columns_from_insert=exclude_key_columns_from_insert,
+            require_match=require_match,
         )
     )
 
