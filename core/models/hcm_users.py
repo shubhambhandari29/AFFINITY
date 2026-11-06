@@ -1,7 +1,8 @@
+from pydantic import BaseModel, Field
 
-from pydantic import BaseModel
 
 class HCMUserUpsert(BaseModel):
-    PK_Number: int | None = None
+    PK_Number: int | None = Field(default=None, gt=0, strict=True)
+
     class Config:
         extra = "allow"
